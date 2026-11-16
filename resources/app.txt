@@ -1,0 +1,1 @@
+Terminal++ — a unified Qt6 code editor + SSH + Serial terminal.

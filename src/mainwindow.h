@@ -1,0 +1,123 @@
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
+
+#include <QMainWindow>
+#include "editor/thememanager.h"
+#include "editor/syntaxhighlighter.h"
+
+class QTabWidget;
+class QListWidget;
+class QDockWidget;
+class QLabel;
+class QActionGroup;
+class EditorTab;
+class FindDialog;
+class SshTab;
+class SerialTab;
+class SessionManager;
+
+// The application main window. Hosts a central tab widget that can contain:
+//   * Editor tabs (ndd / Notepad-- replica)
+//   * SSH terminal tabs (MuxTerm replica)
+//   * Serial/UART terminal tabs (PuTTY replica)
+// with a shared menu/toolbar/status bar and a session sidebar.
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+public:
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
+
+    // Open a file into a new editor tab (used by command line + File menu).
+    EditorTab *openFile(const QString &path);
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
+private slots:
+    // --- File / editor ---
+    void newFile();
+    void openFileDialog();
+    bool saveFile();
+    bool saveFileAs();
+    bool saveAll();
+    void printFile();
+    void closeCurrentTab();
+
+    // --- Edit ---
+    void undo();
+    void redo();
+    void cut();
+    void copy();
+    void paste();
+    void selectAll();
+    void showFind();
+    void showReplace();
+    void gotoLine();
+
+    // --- View ---
+    void toggleLineNumbers(bool on);
+    void toggleWordWrap(bool on);
+    void zoomIn();
+    void zoomOut();
+    void zoomReset();
+    void applyThemeByName(const QString &name);
+    void toggleSidebar(bool on);
+
+    // --- Language / encoding / EOL ---
+    void setLanguage(int lang);
+    void setEncoding(const QString &enc);
+    void setEol(int eol);
+
+    // --- Terminal: SSH ---
+    void newSshSession();
+    void manageSessions();
+    void connectSelectedSession();
+    void reconnectCurrent();
+
+    // --- Terminal: Serial ---
+    void newSerialSession();
+
+    // --- Misc ---
+    void about();
+    void onCurrentTabChanged(int index);
+    void onTabCloseRequested(int index);
+    void updateStatusBar();
+    void updateWindowTitle();
+
+private:
+    void createActions();
+    void createMenus();
+    void createToolBars();
+    void createStatusBar();
+    void createSidebar();
+
+    EditorTab *currentEditorTab() const;
+    EditorTab *addEditorTab();
+    void refreshSessionList();
+    bool maybeSaveTab(EditorTab *tab);
+
+    QTabWidget *m_tabs = nullptr;
+
+    // Sidebar (SSH sessions, like MuxTerm).
+    QDockWidget *m_sidebarDock = nullptr;
+    QListWidget *m_sessionList = nullptr;
+    SessionManager *m_sessions = nullptr;
+
+    FindDialog *m_findDialog = nullptr;
+    ThemeManager m_themeManager;
+
+    // Status bar widgets.
+    QLabel *m_posLabel = nullptr;
+    QLabel *m_langLabel = nullptr;
+    QLabel *m_encLabel = nullptr;
+    QLabel *m_eolLabel = nullptr;
+
+    // Actions kept for enable/disable toggling.
+    QAction *m_actLineNumbers = nullptr;
+    QAction *m_actWordWrap = nullptr;
+    QAction *m_actSidebar = nullptr;
+    QActionGroup *m_langGroup = nullptr;
+};
+
+#endif // MAINWINDOW_H
