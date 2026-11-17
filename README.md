@@ -101,16 +101,20 @@
 MinGW-w64 + Qt6 + libssh2 全套工具链，`build-msys2.sh` 会用 g++ 直接编译、
 生成 exe 图标、并把全部运行时 DLL 打包到 `dist\`，得到免安装、可直接拷走的程序。
 
+> **一句话总览**：装 MSYS2 → 用 `pacman` 装工具链和依赖 → 运行 `build-msys2.sh`。
+> 下面是「跑 `build-msys2.sh` 之前」需要做的全部环境准备。
+
 ### 1. 安装 MSYS2
-1. 从 https://www.msys2.org 下载安装器，默认安装到 `C:\msys64`。
-2. 打开 **“MSYS2 MinGW 64-bit”** 终端（开始菜单里），先更新一次：
+1. 从 https://www.msys2.org 下载安装器（`msys2-x86_64-*.exe`），默认安装到 `C:\msys64`。
+2. 从开始菜单打开 **“MSYS2 MinGW 64-bit”** 终端（蓝色图标，**不要**用 UCRT64 / CLANG64 / MSYS 那几个）。
+3. 先做一次系统更新（更新完若提示关闭终端，关掉后重新打开再执行第二条）：
    ```bash
-   pacman -Syu          # 若提示关闭终端，关掉后再次打开并重复一次
-   pacman -Su
+   pacman -Syu          # 更新核心，若要求关闭终端就照做
+   pacman -Su           # 重新打开终端后再更新剩余包
    ```
 
-### 2. 安装编译工具链与依赖
-在 MSYS2 终端里执行（一条命令装全）：
+### 2. 安装编译工具链与依赖（跑脚本前必须完成）
+在 **MSYS2 MinGW 64-bit** 终端里执行（一条命令装全）：
 ```bash
 pacman -S --needed \
     mingw-w64-x86_64-gcc \
@@ -118,24 +122,48 @@ pacman -S --needed \
     mingw-w64-x86_64-qt6-serialport \
     mingw-w64-x86_64-libssh2 \
     mingw-w64-x86_64-zlib \
-    mingw-w64-x86_64-zstd \
-    mingw-w64-x86_64-cmake        # 可选：方式 B 的 CMake 需要
+    mingw-w64-x86_64-zstd
+# 可选：若还想用方式 B 的 CMake/Ninja，另装：
+pacman -S --needed mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
+# 可选：让生成的 exe 带文件图标（需系统 Python + Pillow）
+pacman -S --needed mingw-w64-x86_64-python-pillow
 ```
-> 说明：
-> - `qt6-base` 提供 Widgets/Gui/Core/Network/PrintSupport；`qt6-serialport` 提供串口模块。
-> - `libssh2` 是原生 SSH 功能的依赖。
-> - `zlib`/`zstd` 是 Qt 与工具链的运行时依赖。
-> - exe 文件图标由 `resources/icon.png` 自动转换为 `icon.ico`；如需自动转换，系统 Python 装一下 Pillow：`pip install Pillow`（不装也能编译，只是 exe 文件图标会跳过，窗口/任务栏图标仍生效）。
+各包用途：
+| 包 | 提供 | 必需 |
+|----|------|------|
+| `mingw-w64-x86_64-gcc` | g++ / windres / objdump 等编译链 | ✅ |
+| `mingw-w64-x86_64-qt6-base` | Qt6 Core/Gui/Widgets/Network/PrintSupport + moc/rcc | ✅ |
+| `mingw-w64-x86_64-qt6-serialport` | 串口 / UART 模块 | ✅ |
+| `mingw-w64-x86_64-libssh2` | 原生 SSH（含 libssl/libcrypto 依赖） | ✅ |
+| `mingw-w64-x86_64-zlib` / `-zstd` | Qt / 工具链运行时压缩库 | ✅ |
+| `mingw-w64-x86_64-cmake` / `-ninja` | 仅方式 B（CMake 构建）需要 | 可选 |
+| `mingw-w64-x86_64-python-pillow` | 把 `icon.png` 转成 `icon.ico`（exe 文件图标） | 可选 |
 
-### 3. 一键编译 + 打包
+> DPAPI 加密（SSH 密码）用的 `crypt32` 随 MinGW 自带，无需额外安装。
+
+### 3. 验证环境（可选但推荐）
+在 **MSYS2 MinGW 64-bit** 终端确认关键工具就位（都应打印出版本/路径）：
 ```bash
-# 在 MSYS2 终端里（任意子系统都行，脚本内部会切到 mingw64）：
+which g++ windres objdump                         # 编译链
+/mingw64/share/qt6/bin/moc.exe --version          # Qt moc
+/mingw64/share/qt6/bin/rcc.exe --version          # Qt rcc
+ls /mingw64/include/qt6/QtSerialPort >/dev/null && echo "SerialPort OK"
+ls /mingw64/lib/libssh2* >/dev/null && echo "libssh2 OK"
+```
+若某条报 “not found / 不存在”，回到第 2 步补装对应的包。
+
+### 4. 一键编译 + 打包
+环境就绪后，运行脚本（脚本内部已自动 `export PATH=/mingw64/bin:...`，所以**用哪个 MSYS2 子终端都行**，甚至直接从 Windows CMD 调用）：
+```bash
+# 在 MSYS2 终端里：
 bash /c/dx/myaiprojects/terminal++/TerminalPP/build-msys2.sh
 ```
-或从 Windows CMD / PowerShell：
+或直接从 Windows CMD / PowerShell：
 ```powershell
 C:\msys64\usr\bin\bash.exe -lc "bash /c/dx/myaiprojects/terminal++/TerminalPP/build-msys2.sh"
 ```
+脚本会依次执行：`[1/4] moc` → `[2/4] rcc` → `[2b] 图标` → `[3/4] 编译+链接` → `[4/4] 打包到 dist/`，
+最后打印 `DONE. Portable build in: .../dist/TerminalPP.exe (34 DLLs bundled)`。
 
 完成后产物在 **`TerminalPP\dist\`**：
 - `TerminalPP.exe`（已内嵌窗口图标 + exe 文件图标）
@@ -143,6 +171,14 @@ C:\msys64\usr\bin\bash.exe -lc "bash /c/dx/myaiprojects/terminal++/TerminalPP/bu
 - `platforms\qwindows.dll` + `styles\` + `imageformats\` 插件
 
 **双击 `TerminalPP\dist\TerminalPP.exe` 即可运行，无需安装 Qt。**
+
+### 5. 常见问题
+- **`moc: command not found` / `g++: command not found`**：没在 MinGW 64-bit 环境或工具链没装全。重开 “MSYS2 MinGW 64-bit” 终端并重跑第 2 步。
+- **`cannot find -lssh2` / `libssh2.h: No such file`**：未装 `mingw-w64-x86_64-libssh2`，补装后重试。
+- **`Qt6SerialPort` 相关链接错误**：未装 `mingw-w64-x86_64-qt6-serialport`。
+- **`rm: cannot remove '.../dist': Device or resource busy`**：上一次运行的 `TerminalPP.exe` 仍开着，先关掉程序（或 `taskkill /IM TerminalPP.exe /F`）再重跑；该提示不影响编译本身。
+- **exe 没有文件图标**：未装 Pillow（`icon.ico` 跳过），窗口/任务栏图标仍通过 qrc 生效；装 `mingw-w64-x86_64-python-pillow` 后重跑即可。
+- **路径**：把示例中的 `/c/dx/myaiprojects/terminal++/TerminalPP` 换成你本机的实际路径（MSYS2 下 `C:\` 对应 `/c/`）。
 
 ---
 

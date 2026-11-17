@@ -337,6 +337,8 @@ void I18n::loadTable()
     add("Mac (CR)",          "Mac (CR)",  "Mac (CR)",  "Mac (CR)",     "Mac (CR)",      "Mac (CR)",      "Mac (CR)",        "Mac (CR)",      "Mac (CR)");
     add("COLUMN",            "列编辑",    "欄編輯",    "COLUMNA",      "COLONNE",       "SPALTE",        "СТОЛБЕЦ",         "列編集",        "열 편집");
     add("Ln %1, Col %2",     "行 %1, 列 %2","行 %1, 欄 %2","Ln %1, Col %2","Lg %1, Col %2","Z %1, Sp %2","Стр %1, Стлб %2","行 %1, 列 %2","행 %1, 열 %2");
+    add("new",               "新建",      "新增",      "nuevo",        "nouveau",       "neu",           "новый",           "新規",          "새 파일");
+    add("untitled",          "未命名",    "未命名",    "sin título",   "sans titre",    "unbenannt",     "без имени",       "無題",          "제목 없음");
 
     // ---- Dialogs / messages ----
     add("Open Files",        "打开文件",  "開啟檔案",  "Abrir archivos","Ouvrir des fichiers","Dateien öffnen","Открыть файлы","ファイルを開く","파일 열기");

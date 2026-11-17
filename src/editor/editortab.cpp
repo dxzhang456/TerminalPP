@@ -4,6 +4,8 @@
 #include <QVBoxLayout>
 #include <QFile>
 #include <QFileInfo>
+#include "core/i18n.h"
+static inline QString TRc(const char *s){ return I18n::instance()->tr(QString::fromUtf8(s)); }
 #include <QTextStream>
 #include <QStringDecoder>
 #include <QStringEncoder>
@@ -29,7 +31,7 @@ EditorTab::EditorTab(QWidget *parent)
 QString EditorTab::fileName() const
 {
     if (m_filePath.isEmpty())
-        return tr("new");
+        return TRc("new");
     return QFileInfo(m_filePath).fileName();
 }
 
