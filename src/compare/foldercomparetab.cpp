@@ -1,4 +1,6 @@
 #include "foldercomparetab.h"
+#include "core/i18n.h"
+static inline QString TRc(const char *s){ return I18n::instance()->tr(QString::fromUtf8(s)); }
 
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
@@ -63,17 +65,17 @@ FolderCompareTab::FolderCompareTab(QWidget *parent)
     outer->setSpacing(0);
 
     auto *tb = new QToolBar(this);
-    tb->addAction(tr("Refresh"), this, &FolderCompareTab::refresh);
-    tb->addAction(tr("Copy →"), this, &FolderCompareTab::copyLeftToRight);
-    tb->addAction(tr("← Copy"), this, &FolderCompareTab::copyRightToLeft);
+    tb->addAction(TRc("Refresh"), this, &FolderCompareTab::refresh);
+    tb->addAction(TRc("Copy →"), this, &FolderCompareTab::copyLeftToRight);
+    tb->addAction(TRc("← Copy"), this, &FolderCompareTab::copyRightToLeft);
     tb->addSeparator();
-    QAction *diffOnly = tb->addAction(tr("Differences Only"));
+    QAction *diffOnly = tb->addAction(TRc("Differences Only"));
     diffOnly->setCheckable(true);
     connect(diffOnly, &QAction::toggled, this, &FolderCompareTab::setShowOnlyDifferences);
     tb->addSeparator();
-    tb->addWidget(new QLabel(tr(" Filter: "), this));
+    tb->addWidget(new QLabel(TRc(" Filter: "), this));
     m_filterEdit = new QLineEdit(this);
-    m_filterEdit->setPlaceholderText(tr("*.cpp;*.h   (glob, ; separated)"));
+    m_filterEdit->setPlaceholderText(TRc("*.cpp;*.h   (glob, ; separated)"));
     m_filterEdit->setMaximumWidth(220);
     connect(m_filterEdit, &QLineEdit::textChanged, this, &FolderCompareTab::setNameFilter);
     tb->addWidget(m_filterEdit);
@@ -81,8 +83,8 @@ FolderCompareTab::FolderCompareTab(QWidget *parent)
 
     auto *hdr = new QHBoxLayout();
     hdr->setContentsMargins(4, 2, 4, 2);
-    m_leftLabel = new QLabel(tr("(left folder)"), this);
-    m_rightLabel = new QLabel(tr("(right folder)"), this);
+    m_leftLabel = new QLabel(TRc("(left folder)"), this);
+    m_rightLabel = new QLabel(TRc("(right folder)"), this);
     m_leftLabel->setStyleSheet("font-weight:bold;");
     m_rightLabel->setStyleSheet("font-weight:bold;");
     hdr->addWidget(m_leftLabel, 1);
@@ -91,8 +93,8 @@ FolderCompareTab::FolderCompareTab(QWidget *parent)
 
     m_tree = new QTreeWidget(this);
     m_tree->setColumnCount(ColCount);
-    m_tree->setHeaderLabels({tr("Name"), tr("Size"), tr("Modified"),
-                             tr("Status"), tr("Size"), tr("Modified")});
+    m_tree->setHeaderLabels({TRc("Name"), TRc("Size"), TRc("Modified"),
+                             TRc("Status"), TRc("Size"), TRc("Modified")});
     m_tree->setAlternatingRowColors(true);
     m_tree->setUniformRowHeights(true);
     m_tree->header()->setSectionResizeMode(ColName, QHeaderView::Stretch);
@@ -127,7 +129,7 @@ void FolderCompareTab::refresh()
     m_tree->expandToDepth(1);
     applyFilterVisibility();
 
-    const QString msg = tr("Same: %1   Different: %2   Left only: %3   Right only: %4")
+    const QString msg = TRc("Same: %1   Different: %2   Left only: %3   Right only: %4")
                             .arg(m_cntSame).arg(m_cntDiff)
                             .arg(m_cntLeftOnly).arg(m_cntRightOnly);
     m_statsLabel->setText(msg);
@@ -174,10 +176,10 @@ void FolderCompareTab::scanInto(QTreeWidgetItem *parent,
             // Directory node: recurse. Status derived from children.
             item->setData(ColName, RoleStatus, int(FolderNode));
             if (lExists) {
-                item->setText(ColLeftSize, tr("<dir>"));
+                item->setText(ColLeftSize, TRc("<dir>"));
             }
             if (rExists) {
-                item->setText(ColRightSize, tr("<dir>"));
+                item->setText(ColRightSize, TRc("<dir>"));
             }
             // Recurse into whichever side(s) exist.
             scanInto(item,
@@ -186,15 +188,15 @@ void FolderCompareTab::scanInto(QTreeWidgetItem *parent,
                      relPath.isEmpty() ? name : relPath + "/" + name);
 
             if (!lExists) {
-                item->setText(ColStatus, tr("Right only"));
+                item->setText(ColStatus, TRc("Right only"));
                 item->setData(ColName, RoleStatus, int(RightOnly));
                 ++m_cntRightOnly;
             } else if (!rExists) {
-                item->setText(ColStatus, tr("Left only"));
+                item->setText(ColStatus, TRc("Left only"));
                 item->setData(ColName, RoleStatus, int(LeftOnly));
                 ++m_cntLeftOnly;
             } else {
-                item->setText(ColStatus, tr("Folder"));
+                item->setText(ColStatus, TRc("Folder"));
             }
             continue;
         }
@@ -226,12 +228,12 @@ void FolderCompareTab::scanInto(QTreeWidgetItem *parent,
         item->setData(ColName, RoleStatus, int(st));
 
         switch (st) {
-        case Same:       item->setText(ColStatus, tr("Same")); break;
-        case LeftNewer:  item->setText(ColStatus, tr("Left newer")); break;
-        case RightNewer: item->setText(ColStatus, tr("Right newer")); break;
-        case LeftOnly:   item->setText(ColStatus, tr("Left only")); break;
-        case RightOnly:  item->setText(ColStatus, tr("Right only")); break;
-        case DiffSize:   item->setText(ColStatus, tr("Different")); break;
+        case Same:       item->setText(ColStatus, TRc("Same")); break;
+        case LeftNewer:  item->setText(ColStatus, TRc("Left newer")); break;
+        case RightNewer: item->setText(ColStatus, TRc("Right newer")); break;
+        case LeftOnly:   item->setText(ColStatus, TRc("Left only")); break;
+        case RightOnly:  item->setText(ColStatus, TRc("Right only")); break;
+        case DiffSize:   item->setText(ColStatus, TRc("Different")); break;
         default: break;
         }
     }
@@ -284,7 +286,7 @@ void FolderCompareTab::copyLeftToRight()
     QString dst = QDir(m_rightDir).filePath(rel);
     copyFileOverwrite(l, dst);
     refresh();
-    emit statusMessage(tr("Copied to right: %1").arg(rel));
+    emit statusMessage(TRc("Copied to right: %1").arg(rel));
 }
 
 void FolderCompareTab::copyRightToLeft()
@@ -297,7 +299,7 @@ void FolderCompareTab::copyRightToLeft()
     QString dst = QDir(m_leftDir).filePath(rel);
     copyFileOverwrite(r, dst);
     refresh();
-    emit statusMessage(tr("Copied to left: %1").arg(rel));
+    emit statusMessage(TRc("Copied to left: %1").arg(rel));
 }
 
 void FolderCompareTab::setShowOnlyDifferences(bool on)

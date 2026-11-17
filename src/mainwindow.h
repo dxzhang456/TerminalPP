@@ -79,7 +79,7 @@ private slots:
     // --- Terminal: Serial ---
     void newSerialSession();
 
-    // --- Compare (Beyond Compare-style) ---
+    // --- Compare ---
     void newComparison();
     void openTextCompare(const QString &left, const QString &right);
     void openFolderCompare(const QString &left, const QString &right);
@@ -134,7 +134,7 @@ private:
     QMenu *m_langSyntaxMenu = nullptr;  // syntax "Language" menu
     QMenu *m_encMenu = nullptr;
     QMenu *m_termMenu = nullptr;
-    QMenu *m_compareMenu = nullptr;     // "Compare" (Beyond Compare) menu
+    QMenu *m_compareMenu = nullptr;     // "Compare" menu
     QMenu *m_uiLangMenu = nullptr;      // "UI Language" menu
     QMenu *m_helpMenu = nullptr;
 

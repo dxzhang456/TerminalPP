@@ -13,7 +13,7 @@ class QLabel;
 class QToolBar;
 class DiffPane;   // internal painting pane (defined in .cpp)
 
-// Beyond Compare-style side-by-side text comparison tab.
+// side-by-side side-by-side text comparison tab.
 //  * two aligned panes with gaps for inserted/removed lines
 //  * per-line coloring: changed / inserted / removed / same
 //  * inline character-level highlighting of changes
@@ -40,6 +40,9 @@ public:
 
 signals:
     void statusMessage(const QString &msg);
+    // Request the host to reopen the current two files as another comparison
+    // type (0=Text, 1=Folder, 2=Hex, 3=Image — matching CompareDialog::Type).
+    void requestCompareAs(int type, const QString &left, const QString &right);
 
 public slots:
     void recompute();

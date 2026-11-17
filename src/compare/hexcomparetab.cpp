@@ -1,4 +1,7 @@
 #include "hexcomparetab.h"
+#include "core/i18n.h"
+
+static inline QString TRc(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
 
 #include <QPlainTextEdit>
 #include <QVBoxLayout>
@@ -110,13 +113,22 @@ HexCompareTab::HexCompareTab(QWidget *parent)
     outer->setSpacing(0);
 
     auto *tb = new QToolBar(this);
-    tb->addAction(tr("Reload"), this, &HexCompareTab::reload);
+    tb->addAction(TRc("Reload"), this, &HexCompareTab::reload);
+    // Switch the current two files to another comparison type.
+    tb->addAction(TRc("As Text"), this, [this]() {
+        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+            emit requestCompareAs(0, m_leftPath, m_rightPath);
+    });
+    tb->addAction(TRc("As Picture"), this, [this]() {
+        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+            emit requestCompareAs(3, m_leftPath, m_rightPath);
+    });
     outer->addWidget(tb);
 
     auto *hdr = new QHBoxLayout();
     hdr->setContentsMargins(4, 2, 4, 2);
-    m_leftLabel = new QLabel(tr("(left)"), this);
-    m_rightLabel = new QLabel(tr("(right)"), this);
+    m_leftLabel = new QLabel(TRc("(left)"), this);
+    m_rightLabel = new QLabel(TRc("(right)"), this);
     m_leftLabel->setStyleSheet("font-weight:bold;");
     m_rightLabel->setStyleSheet("font-weight:bold;");
     hdr->addWidget(m_leftLabel, 1);
@@ -204,7 +216,7 @@ void HexCompareTab::rebuild()
         bool ah = i < m_leftData.size(), bh = i < m_rightData.size();
         if ((ah != bh) || (ah && bh && a != b)) ++diffBytes;
     }
-    const QString msg = tr("Left: %1 bytes   Right: %2 bytes   Differing: %3 bytes")
+    const QString msg = TRc("Left: %1 bytes   Right: %2 bytes   Differing: %3 bytes")
                             .arg(m_leftData.size()).arg(m_rightData.size()).arg(diffBytes);
     m_statsLabel->setText(msg);
     emit statusMessage(msg);

@@ -1,4 +1,7 @@
 #include "imagecomparetab.h"
+#include "core/i18n.h"
+
+static inline QString TRc(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
 
 #include <QLabel>
 #include <QScrollArea>
@@ -88,22 +91,31 @@ ImageCompareTab::ImageCompareTab(QWidget *parent)
     outer->setSpacing(0);
 
     auto *tb = new QToolBar(this);
-    tb->addAction(tr("Zoom In"), this, &ImageCompareTab::zoomIn);
-    tb->addAction(tr("Zoom Out"), this, &ImageCompareTab::zoomOut);
-    tb->addAction(tr("Fit"), this, &ImageCompareTab::zoomFit);
-    tb->addAction(tr("1:1"), this, &ImageCompareTab::zoomReset);
+    tb->addAction(TRc("Zoom In"), this, &ImageCompareTab::zoomIn);
+    tb->addAction(TRc("Zoom Out"), this, &ImageCompareTab::zoomOut);
+    tb->addAction(TRc("Fit"), this, &ImageCompareTab::zoomFit);
+    tb->addAction(TRc("1:1"), this, &ImageCompareTab::zoomReset);
     tb->addSeparator();
-    QAction *diffAct = tb->addAction(tr("Difference Overlay"));
+    QAction *diffAct = tb->addAction(TRc("Difference Overlay"));
     diffAct->setCheckable(true);
     connect(diffAct, &QAction::toggled, this, &ImageCompareTab::toggleDiffOverlay);
     tb->addSeparator();
-    tb->addAction(tr("Reload"), this, &ImageCompareTab::reload);
+    tb->addAction(TRc("Reload"), this, &ImageCompareTab::reload);
+    // Switch the current two files to another comparison type.
+    tb->addAction(TRc("As Text"), this, [this]() {
+        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+            emit requestCompareAs(0, m_leftPath, m_rightPath);
+    });
+    tb->addAction(TRc("As Hex"), this, [this]() {
+        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+            emit requestCompareAs(2, m_leftPath, m_rightPath);
+    });
     outer->addWidget(tb);
 
     auto *hdr = new QHBoxLayout();
     hdr->setContentsMargins(4, 2, 4, 2);
-    m_leftLabel = new QLabel(tr("(left)"), this);
-    m_rightLabel = new QLabel(tr("(right)"), this);
+    m_leftLabel = new QLabel(TRc("(left)"), this);
+    m_rightLabel = new QLabel(TRc("(right)"), this);
     m_leftLabel->setStyleSheet("font-weight:bold;");
     m_rightLabel->setStyleSheet("font-weight:bold;");
     hdr->addWidget(m_leftLabel, 1);
@@ -186,7 +198,7 @@ void ImageCompareTab::rebuildDiff()
 void ImageCompareTab::updateStats()
 {
     if (m_leftImg.isNull() || m_rightImg.isNull()) {
-        const QString msg = tr("One or both images failed to load.");
+        const QString msg = TRc("One or both images failed to load.");
         m_statsLabel->setText(msg);
         emit statusMessage(msg);
         return;
@@ -204,7 +216,7 @@ void ImageCompareTab::updateStats()
             if (pa != pb) ++diff;
         }
     double pct = total ? (100.0 * diff / total) : 0.0;
-    const QString msg = tr("Left: %1x%2   Right: %3x%4   Differing pixels: %5 (%6%)")
+    const QString msg = TRc("Left: %1x%2   Right: %3x%4   Differing pixels: %5 (%6%)")
                             .arg(m_leftImg.width()).arg(m_leftImg.height())
                             .arg(m_rightImg.width()).arg(m_rightImg.height())
                             .arg(diff).arg(QString::number(pct, 'f', 2));
@@ -227,8 +239,8 @@ void ImageCompareTab::toggleDiffOverlay(bool on)
     m_diffMode = on;
     m_right->setImage(on ? m_diffImg : m_rightImg);
     m_right->applyZoom(m_zoom);
-    emit statusMessage(on ? tr("Difference overlay ON (right pane).")
-                          : tr("Difference overlay OFF."));
+    emit statusMessage(on ? TRc("Difference overlay ON (right pane).")
+                          : TRc("Difference overlay OFF."));
 }
 
 void ImageCompareTab::applyTheme(const EditorTheme &t)

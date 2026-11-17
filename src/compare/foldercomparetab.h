@@ -11,7 +11,7 @@ class QLabel;
 class QToolBar;
 class QLineEdit;
 
-// Beyond Compare-style folder comparison tab.
+// side-by-side folder comparison tab.
 //  * recursive side-by-side tree of two directories
 //  * per-entry status: Same / Left-newer / Right-newer / Left-only / Right-only
 //    / Different-size

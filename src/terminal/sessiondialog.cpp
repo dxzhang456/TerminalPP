@@ -1,4 +1,6 @@
 #include "sessiondialog.h"
+#include "core/i18n.h"
+static inline QString TRc(const char *s){ return I18n::instance()->tr(QString::fromUtf8(s)); }
 
 #include <QFormLayout>
 #include <QVBoxLayout>
@@ -13,7 +15,7 @@
 SessionDialog::SessionDialog(QWidget *parent)
     : QDialog(parent)
 {
-    setWindowTitle(tr("SSH Session"));
+    setWindowTitle(TRc("SSH Session"));
 
     m_name = new QLineEdit(this);
     m_host = new QLineEdit(this);
@@ -24,29 +26,29 @@ SessionDialog::SessionDialog(QWidget *parent)
     m_pass = new QLineEdit(this);
     m_pass->setEchoMode(QLineEdit::Password);
     m_key = new QLineEdit(this);
-    m_useTmux = new QCheckBox(tr("Auto-attach tmux session"), this);
+    m_useTmux = new QCheckBox(TRc("Auto-attach tmux session"), this);
     m_tmuxName = new QLineEdit(this);
-    m_tmuxName->setPlaceholderText(tr("tmux session name (default: muxterm)"));
+    m_tmuxName->setPlaceholderText(TRc("tmux session name (default: muxterm)"));
     m_extra = new QLineEdit(this);
-    m_extra->setPlaceholderText(tr("extra ssh arguments (optional)"));
+    m_extra->setPlaceholderText(TRc("extra ssh arguments (optional)"));
 
     QFormLayout *form = new QFormLayout;
-    form->addRow(tr("Name:"), m_name);
-    form->addRow(tr("Host:"), m_host);
-    form->addRow(tr("Port:"), m_port);
-    form->addRow(tr("Username:"), m_user);
-    form->addRow(tr("Password:"), m_pass);
+    form->addRow(TRc("Name:"), m_name);
+    form->addRow(TRc("Host:"), m_host);
+    form->addRow(TRc("Port:"), m_port);
+    form->addRow(TRc("Username:"), m_user);
+    form->addRow(TRc("Password:"), m_pass);
 
     QHBoxLayout *keyLayout = new QHBoxLayout;
     keyLayout->addWidget(m_key);
-    QPushButton *browse = new QPushButton(tr("Browse..."), this);
+    QPushButton *browse = new QPushButton(TRc("Browse..."), this);
     connect(browse, &QPushButton::clicked, this, &SessionDialog::browseKey);
     keyLayout->addWidget(browse);
-    form->addRow(tr("Private key:"), keyLayout);
+    form->addRow(TRc("Private key:"), keyLayout);
 
     form->addRow(QString(), m_useTmux);
-    form->addRow(tr("tmux name:"), m_tmuxName);
-    form->addRow(tr("Extra args:"), m_extra);
+    form->addRow(TRc("tmux name:"), m_tmuxName);
+    form->addRow(TRc("Extra args:"), m_extra);
 
     QDialogButtonBox *box = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -62,7 +64,7 @@ SessionDialog::SessionDialog(QWidget *parent)
 
 void SessionDialog::browseKey()
 {
-    QString file = QFileDialog::getOpenFileName(this, tr("Select private key"));
+    QString file = QFileDialog::getOpenFileName(this, TRc("Select private key"));
     if (!file.isEmpty())
         m_key->setText(file);
 }

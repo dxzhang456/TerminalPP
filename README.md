@@ -57,11 +57,20 @@
 - 与 SSH 共用同一 ANSI 终端渲染，支持彩色日志
 - 设备拔出自动检测
 
-### 4. 共用框架
-- 统一标签页：编辑器 / SSH / 串口可任意混排
+### 4. 文件比较
+顶层 **Compare** 菜单（New Comparison = Ctrl+Shift+K；或直接选择某种比较类型，对话框会自动预选对应类型）：
+- **文本比较**：左右双栏对齐视图——插入/删除行留空、按类型着色（修改/新增/删除/相同）、字符级内联高亮、同步滚动、上一处/下一处差异导航（◀ Prev / Next ▶）、整块互拷（Copy → / ← Copy）、交换、重载、保存左/右、忽略大小写/忽略空白开关、差异统计。基于 Myers O(ND) 差异算法。
+- **文件夹比较**：**递归**对比两个目录的所有子文件夹，6 列（名称/大小/修改时间/状态/大小/修改时间），状态分类 Same / Left newer / Right newer / Left only / Right only / Different（MD5+大小判等）、状态列按主题着色、名称 glob 过滤（`*.cpp;*.h`）、仅显示差异开关、**文件与整个文件夹递归互拷**（Copy → / ← Copy）、刷新。双击差异文件对按类型智能分流：文本→文本比较、图片→图片比较、其它→十六进制比较。
+- **十六进制比较**：左右 hex dump（偏移 | 16 字节 | ASCII），差异字节高亮、同步滚动、字节差异统计。
+- **图片比较**：左右同步平移/缩放（放大/缩小/适应/1:1）、逐像素差异叠加模式、尺寸与差异像素百分比统计。
+
+### 5. 共用框架
+- 统一标签页：编辑器 / SSH / 串口 / 各类比较可任意混排
 - 统一菜单栏、工具栏、状态栏
 - 关闭时统一提示保存、统一断开所有连接
 - 跨平台：Windows 与 Linux（及 macOS）均可编译运行
+- **全程多语言**：所有菜单、子菜单、对话框、About、比较工具栏均支持 English / 简体中文 / 繁體中文 / Español / Français / Deutsch / Русский / 日本語 / 한국어，切换即时生效并持久化
+- **统一主题**：编辑器、SSH、串口、比较标签页及整个窗口（含菜单/状态栏）跟随同一主题，内置 VS Code Dark+/Light+/High Contrast、GitHub Dark、Solarized Dark 等；SSH 密码以 Windows DPAPI 加密保存
 
 ---
 
@@ -210,6 +219,18 @@ TerminalPP/
 └── src/
     ├── main.cpp
     ├── mainwindow.{h,cpp}           # 主窗口：菜单/工具栏/状态栏/标签页/侧边栏
+    ├── core/                        # ===== 公共设施 =====
+    │   ├── i18n.{h,cpp}             # 9 语言运行时翻译表
+    │   ├── cliphistory.{h,cpp}      # 剪贴板历史监听与持久化
+    │   ├── cliphistorydialog.{h,cpp}# 剪贴板历史选择对话框
+    │   └── secretstore.{h,cpp}      # SSH 密码加密（Windows DPAPI / XOR 回退）
+    ├── compare/                     # ===== 文件比较 =====
+    │   ├── diffengine.{h,cpp}       # Myers O(ND) 行差异 + 字符级内联差异
+    │   ├── textcomparetab.{h,cpp}   # 文本双栏比较视图
+    │   ├── foldercomparetab.{h,cpp} # 递归文件夹比较 + 互拷
+    │   ├── hexcomparetab.{h,cpp}    # 十六进制比较
+    │   ├── imagecomparetab.{h,cpp}  # 图片比较 + 差异叠加
+    │   └── comparedialog.{h,cpp}    # 新建比较启动对话框
     ├── editor/                      # ===== 代码编辑器 =====
     │   ├── codeeditor.{h,cpp}       # 行号 + 当前行高亮 + 缩进 + 缩放
     │   ├── syntaxhighlighter.{h,cpp}# 多语言语法高亮

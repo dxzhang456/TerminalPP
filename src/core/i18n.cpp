@@ -156,7 +156,7 @@ void I18n::loadTable()
     add("Open",              "打开",      "開啟",      "Abrir",        "Ouvrir",        "Öffnen",        "Открыть",         "開く",          "열기");
     add("Delete",            "删除",      "刪除",      "Eliminar",     "Supprimer",     "Löschen",       "Удалить",         "削除",          "삭제");
 
-    // ---- Compare menu (Beyond Compare-style) ----
+    // ---- Compare menu ----
     add("&Compare",          "比较(&C)",  "比較(&C)",  "&Comparar",    "&Comparer",     "&Vergleichen",  "&Сравнить",       "比較(&C)",      "비교(&C)");
     add("&New Comparison...","新建比较(&N)...","新增比較(&N)...","&Nueva comparación...","&Nouvelle comparaison...","&Neuer Vergleich...","&Новое сравнение...","新規比較(&N)...","새 비교(&N)...");
     add("New Comparison",    "新建比较",  "新增比較",  "Nueva comparación","Nouvelle comparaison","Neuer Vergleich","Новое сравнение","新規比較","새 비교");
@@ -177,8 +177,155 @@ void I18n::loadTable()
     add("Select Left Folder","选择左侧文件夹","選擇左側資料夾","Seleccionar carpeta izquierda","Sélectionner le dossier gauche","Linken Ordner wählen","Выбрать левую папку","左のフォルダを選択","왼쪽 폴더 선택");
     add("Select Right Folder","选择右侧文件夹","選擇右側資料夾","Seleccionar carpeta derecha","Sélectionner le dossier droit","Rechten Ordner wählen","Выбрать правую папку","右のフォルダを選択","오른쪽 폴더 선택");
 
+    // ---- Compare tabs (toolbars / labels / stats) ----
+    add("◀ Prev Diff",      "◀ 上一处差异","◀ 上一處差異","◀ Dif. ant.","◀ Diff préc.","◀ Vorige Diff","◀ Пред. различие","◀ 前の差分","◀ 이전 차이");
+    add("Next Diff ▶",      "下一处差异 ▶","下一處差異 ▶","Dif. sig. ▶","Diff suiv. ▶","Nächste Diff ▶","След. различие ▶","次の差分 ▶","다음 차이 ▶");
+    add("Copy →",            "复制 →",    "複製 →",    "Copiar →",     "Copier →",      "Kopieren →",    "Копировать →",    "コピー →",      "복사 →");
+    add("← Copy",            "← 复制",    "← 複製",    "← Copiar",     "← Copier",      "← Kopieren",    "← Копировать",    "← コピー",      "← 복사");
+    add("Swap",              "交换",      "交換",      "Intercambiar", "Échanger",      "Tauschen",      "Поменять",        "入れ替え",      "교체");
+    add("Reload",            "重载",      "重新載入",  "Recargar",     "Recharger",     "Neu laden",     "Перезагрузить",   "再読み込み",    "다시 로드");
+    add("Save L",            "保存左",    "儲存左",    "Guardar Izq",  "Enreg. G",      "Links speichern","Сохр. лев.",     "左を保存",      "왼쪽 저장");
+    add("Save R",            "保存右",    "儲存右",    "Guardar Der",  "Enreg. D",      "Rechts speichern","Сохр. прав.",   "右を保存",      "오른쪽 저장");
+    add("As Text",           "作为文本",  "作為文字",  "Como texto",   "En texte",      "Als Text",      "Как текст",       "テキストで",    "텍스트로");
+    add("As Hex",            "作为十六进制","作為十六進位","Como hex",   "En hexa",       "Als Hex",       "Как hex",         "Hexで",         "Hex로");
+    add("As Picture",        "作为图片",  "作為圖片",  "Como imagen",  "En image",      "Als Bild",      "Как изображение", "画像で",        "사진으로");
+    add("Ignore Case",       "忽略大小写","忽略大小寫","Ignorar mayús.","Ignorer la casse","Groß/Klein ignorieren","Игнор. регистр","大文字小文字無視","대소문자 무시");
+    add("Ignore Whitespace", "忽略空白",  "忽略空白",  "Ignorar espacios","Ignorer espaces","Leerraum ignorieren","Игнор. пробелы","空白を無視","공백 무시");
+    add("(left)",            "（左）",    "（左）",    "(izquierda)",  "(gauche)",      "(links)",       "(слева)",         "（左）",        "(왼쪽)");
+    add("(right)",           "（右）",    "（右）",    "(derecha)",    "(droite)",      "(rechts)",      "(справа)",        "（右）",        "(오른쪽)");
+    add("(left folder)",     "（左侧文件夹）","（左側資料夾）","(carpeta izquierda)","(dossier gauche)","(linker Ordner)","(левая папка)","（左フォルダ）","(왼쪽 폴더)");
+    add("(right folder)",    "（右侧文件夹）","（右側資料夾）","(carpeta derecha)","(dossier droit)","(rechter Ordner)","(правая папка)","（右フォルダ）","(오른쪽 폴더)");
+    add("Refresh",           "刷新",      "重新整理",  "Actualizar",   "Rafraîchir",    "Aktualisieren", "Обновить",        "更新",          "새로 고침");
+    add("Differences Only",  "仅差异",    "僅差異",    "Solo diferencias","Différences seules","Nur Unterschiede","Только различия","差分のみ","차이만");
+    add("Name",              "名称",      "名稱",      "Nombre",       "Nom",           "Name",          "Имя",             "名前",          "이름");
+    add("Size",              "大小",      "大小",      "Tamaño",       "Taille",        "Größe",         "Размер",          "サイズ",        "크기");
+    add("Modified",          "修改时间",  "修改時間",  "Modificado",   "Modifié",       "Geändert",      "Изменён",         "更新日時",      "수정됨");
+    add("Status",            "状态",      "狀態",      "Estado",       "État",          "Status",        "Статус",          "状態",          "상태");
+    add("Same",              "相同",      "相同",      "Igual",        "Identique",     "Gleich",        "Одинаково",       "同一",          "동일");
+    add("Left newer",        "左较新",    "左較新",    "Izq. más nuevo","Gauche + récent","Links neuer",  "Левее новее",     "左が新しい",    "왼쪽 최신");
+    add("Right newer",       "右较新",    "右較新",    "Der. más nuevo","Droite + récent","Rechts neuer", "Правее новее",    "右が新しい",    "오른쪽 최신");
+    add("Left only",         "仅左侧",    "僅左側",    "Solo izquierda","Gauche seul.",  "Nur links",     "Только слева",    "左のみ",        "왼쪽만");
+    add("Right only",        "仅右侧",    "僅右側",    "Solo derecha", "Droite seul.",  "Nur rechts",    "Только справа",   "右のみ",        "오른쪽만");
+    add("Different",         "不同",      "不同",      "Diferente",    "Différent",     "Unterschiedlich","Различается",    "相違",          "다름");
+    add("Folder",            "文件夹",    "資料夾",    "Carpeta",      "Dossier",       "Ordner",        "Папка",           "フォルダ",      "폴더");
+    add("Zoom In",           "放大",      "放大",      "Acercar",      "Zoom avant",    "Vergrößern",    "Увеличить",       "拡大",          "확대");
+    add("Zoom Out",          "缩小",      "縮小",      "Alejar",       "Zoom arrière",  "Verkleinern",   "Уменьшить",       "縮小",          "축소");
+    add("Fit",               "适应",      "適應",      "Ajustar",      "Ajuster",       "Anpassen",      "Вместить",        "全体表示",      "맞춤");
+    add("Difference Overlay","差异叠加",  "差異疊加",  "Superposición dif.","Superpos. diff.","Differenz-Overlay","Наложение различий","差分オーバーレイ","차이 오버레이");
+
+    // ---- Compare / find status messages ----
+    add("Same: %1   Changed: %2   Inserted: %3   Removed: %4",
+        "相同：%1   修改：%2   新增：%3   删除：%4",
+        "相同：%1   修改：%2   新增：%3   刪除：%4",
+        "Iguales: %1   Cambiadas: %2   Insertadas: %3   Eliminadas: %4",
+        "Identiques : %1   Modifiées : %2   Insérées : %3   Supprimées : %4",
+        "Gleich: %1   Geändert: %2   Eingefügt: %3   Entfernt: %4",
+        "Одинаково: %1   Изменено: %2   Добавлено: %3   Удалено: %4",
+        "同一: %1   変更: %2   挿入: %3   削除: %4",
+        "동일: %1   변경: %2   삽입: %3   제거: %4");
+    add("Same: %1   Different: %2   Left only: %3   Right only: %4",
+        "相同：%1   不同：%2   仅左侧：%3   仅右侧：%4",
+        "相同：%1   不同：%2   僅左側：%3   僅右側：%4",
+        "Iguales: %1   Diferentes: %2   Solo izq.: %3   Solo der.: %4",
+        "Identiques : %1   Différents : %2   Gauche seul. : %3   Droite seul. : %4",
+        "Gleich: %1   Unterschiedlich: %2   Nur links: %3   Nur rechts: %4",
+        "Одинаково: %1   Различается: %2   Только слева: %3   Только справа: %4",
+        "同一: %1   相違: %2   左のみ: %3   右のみ: %4",
+        "동일: %1   다름: %2   왼쪽만: %3   오른쪽만: %4");
+    add("Left: %1 bytes   Right: %2 bytes   Differing: %3 bytes",
+        "左：%1 字节   右：%2 字节   差异：%3 字节",
+        "左：%1 位元組   右：%2 位元組   差異：%3 位元組",
+        "Izq.: %1 bytes   Der.: %2 bytes   Difieren: %3 bytes",
+        "Gauche : %1 octets   Droite : %2 octets   Diff. : %3 octets",
+        "Links: %1 Bytes   Rechts: %2 Bytes   Abweichend: %3 Bytes",
+        "Слева: %1 байт   Справа: %2 байт   Отличаются: %3 байт",
+        "左: %1 バイト   右: %2 バイト   相違: %3 バイト",
+        "왼쪽: %1 바이트   오른쪽: %2 바이트   차이: %3 바이트");
+    add("Left: %1x%2   Right: %3x%4   Differing pixels: %5 (%6%)",
+        "左：%1x%2   右：%3x%4   差异像素：%5 (%6%)",
+        "左：%1x%2   右：%3x%4   差異像素：%5 (%6%)",
+        "Izq.: %1x%2   Der.: %3x%4   Píxeles dif.: %5 (%6%)",
+        "Gauche : %1x%2   Droite : %3x%4   Pixels diff. : %5 (%6%)",
+        "Links: %1x%2   Rechts: %3x%4   Abw. Pixel: %5 (%6%)",
+        "Слева: %1x%2   Справа: %3x%4   Отлич. пикселей: %5 (%6%)",
+        "左: %1x%2   右: %3x%4   相違ピクセル: %5 (%6%)",
+        "왼쪽: %1x%2   오른쪽: %3x%4   차이 픽셀: %5 (%6%)");
+    add("Copied block to the right side.","已复制块到右侧。","已複製區塊到右側。","Bloque copiado al lado derecho.","Bloc copié à droite.","Block nach rechts kopiert.","Блок скопирован вправо.","ブロックを右側にコピーしました。","블록을 오른쪽으로 복사함.");
+    add("Copied block to the left side.","已复制块到左侧。","已複製區塊到左側。","Bloque copiado al lado izquierdo.","Bloc copié à gauche.","Block nach links kopiert.","Блок скопирован влево.","ブロックを左側にコピーしました。","블록을 왼쪽으로 복사함.");
+    add("Saved left file: %1","已保存左侧文件：%1","已儲存左側檔案：%1","Archivo izquierdo guardado: %1","Fichier gauche enregistré : %1","Linke Datei gespeichert: %1","Левый файл сохранён: %1","左ファイルを保存: %1","왼쪽 파일 저장: %1");
+    add("Saved right file: %1","已保存右侧文件：%1","已儲存右側檔案：%1","Archivo derecho guardado: %1","Fichier droit enregistré : %1","Rechte Datei gespeichert: %1","Правый файл сохранён: %1","右ファイルを保存: %1","오른쪽 파일 저장: %1");
+    add("Copied to right: %1","已复制到右侧：%1","已複製到右側：%1","Copiado a la derecha: %1","Copié à droite : %1","Nach rechts kopiert: %1","Скопировано вправо: %1","右にコピー: %1","오른쪽으로 복사: %1");
+    add("Copied to left: %1","已复制到左侧：%1","已複製到左側：%1","Copiado a la izquierda: %1","Copié à gauche : %1","Nach links kopiert: %1","Скопировано влево: %1","左にコピー: %1","왼쪽으로 복사: %1");
+    add("Difference overlay ON (right pane).","差异叠加已开启（右侧）。","差異疊加已開啟（右側）。","Superposición de diferencias ACTIVADA (panel derecho).","Superposition des différences ACTIVÉE (volet droit).","Differenz-Overlay EIN (rechtes Fenster).","Наложение различий ВКЛ (правая панель).","差分オーバーレイ ON（右ペイン）。","차이 오버레이 켜짐(오른쪽).");
+    add("Difference overlay OFF.","差异叠加已关闭。","差異疊加已關閉。","Superposición de diferencias DESACTIVADA.","Superposition des différences DÉSACTIVÉE.","Differenz-Overlay AUS.","Наложение различий ВЫКЛ.","差分オーバーレイ OFF。","차이 오버레이 꺼짐.");
+    add("One or both images failed to load.","一张或两张图片加载失败。","一張或兩張圖片載入失敗。","Una o ambas imágenes no se pudieron cargar.","Une ou les deux images n'ont pas pu être chargées.","Ein oder beide Bilder konnten nicht geladen werden.","Одно или оба изображения не загрузились.","片方または両方の画像の読み込みに失敗しました。","하나 또는 두 이미지를 불러오지 못했습니다.");
+    add("Cannot find \"%1\"","找不到 \"%1\"","找不到 \"%1\"","No se encuentra \"%1\"","Introuvable : \"%1\"","\"%1\" nicht gefunden","Не найдено \"%1\"","\"%1\" が見つかりません","\"%1\" 을(를) 찾을 수 없음");
+    add("Replaced %1 occurrence(s)","已替换 %1 处","已取代 %1 處","%1 reemplazo(s)","%1 remplacement(s)","%1 Vorkommen ersetzt","Заменено: %1","%1 件を置換","%1개 바꿈");
+    add("Count: %1 occurrence(s)","计数：%1 处","計數：%1 處","Conteo: %1","Nombre : %1","Anzahl: %1","Количество: %1","件数: %1","개수: %1");
+
     // ---- Help ----
     add("&About Terminal++", "关于 Terminal++(&A)","關於 Terminal++(&A)","&Acerca de Terminal++","À &propos de Terminal++","&Über Terminal++","&О программе Terminal++","Terminal++について(&A)","Terminal++ 정보(&A)");
+    add("About Terminal++",  "关于 Terminal++","關於 Terminal++","Acerca de Terminal++","À propos de Terminal++","Über Terminal++","О программе Terminal++","Terminal++について","Terminal++ 정보");
+
+    // ---- About dialog body ----
+    add("A unified Qt 6 application combining:",
+        "一款集成以下功能的 Qt 6 应用：","一款整合以下功能的 Qt 6 應用：",
+        "Una aplicación Qt 6 unificada que combina:","Une application Qt 6 unifiée combinant :",
+        "Eine einheitliche Qt-6-Anwendung mit:","Единое Qt 6 приложение, объединяющее:",
+        "次を統合した Qt 6 アプリケーション：","다음을 결합한 통합 Qt 6 애플리케이션:");
+    add("Code editor", "代码编辑器","程式碼編輯器","Editor de código","Éditeur de code","Code-Editor","Редактор кода","コードエディタ","코드 편집기");
+    add("multi-tab editor with syntax highlighting, themes, find/replace, encodings, column/block edit, clipboard history, auto-save.",
+        "多标签编辑器，含语法高亮、主题、查找/替换、编码、列/块编辑、剪贴板历史、自动保存。",
+        "多分頁編輯器，含語法高亮、佈景主題、尋找/取代、編碼、欄/區塊編輯、剪貼簿歷史、自動儲存。",
+        "editor de varias pestañas con resaltado de sintaxis, temas, buscar/reemplazar, codificaciones, edición de columna/bloque, historial del portapapeles, autoguardado.",
+        "éditeur multi-onglets avec coloration syntaxique, thèmes, rechercher/remplacer, encodages, édition colonne/bloc, historique du presse-papiers, enregistrement auto.",
+        "Multi-Tab-Editor mit Syntaxhervorhebung, Designs, Suchen/Ersetzen, Kodierungen, Spalten-/Blockbearbeitung, Zwischenablage-Verlauf, Autospeichern.",
+        "многовкладочный редактор с подсветкой синтаксиса, темами, поиском/заменой, кодировками, редактированием столбцов/блоков, историей буфера, автосохранением.",
+        "構文強調・テーマ・検索/置換・エンコード・列/ブロック編集・クリップボード履歴・自動保存を備えたマルチタブエディタ。",
+        "구문 강조, 테마, 찾기/바꾸기, 인코딩, 열/블록 편집, 클립보드 기록, 자동 저장을 갖춘 다중 탭 편집기.");
+    add("SSH terminal", "SSH 终端","SSH 終端","Terminal SSH","Terminal SSH","SSH-Terminal","SSH-терминал","SSH 端末","SSH 터미널");
+    add("native libssh2 SSH sessions with tmux support and VT100/256-color rendering; passwords encrypted with Windows DPAPI.",
+        "基于 libssh2 的原生 SSH 会话，支持 tmux 与 VT100/256 色渲染；密码使用 Windows DPAPI 加密。",
+        "基於 libssh2 的原生 SSH 工作階段，支援 tmux 與 VT100/256 色渲染；密碼以 Windows DPAPI 加密。",
+        "sesiones SSH nativas con libssh2, soporte tmux y renderizado VT100/256 colores; contraseñas cifradas con Windows DPAPI.",
+        "sessions SSH natives via libssh2, prise en charge tmux et rendu VT100/256 couleurs ; mots de passe chiffrés avec Windows DPAPI.",
+        "native SSH-Sitzungen mit libssh2, tmux-Unterstützung und VT100/256-Farben; Passwörter mit Windows DPAPI verschlüsselt.",
+        "нативные SSH-сеансы на libssh2 с поддержкой tmux и рендерингом VT100/256 цветов; пароли шифруются Windows DPAPI.",
+        "libssh2 ネイティブ SSH セッション（tmux 対応・VT100/256 色描画）、パスワードは Windows DPAPI で暗号化。",
+        "libssh2 기반 네이티브 SSH 세션(tmux 지원, VT100/256색 렌더링); 비밀번호는 Windows DPAPI로 암호화.");
+    add("configurable serial console sharing the same ANSI engine.",
+        "可配置的串口控制台，与终端共用同一 ANSI 引擎。",
+        "可設定的序列主控台，與終端共用同一 ANSI 引擎。",
+        "consola serie configurable que comparte el mismo motor ANSI.",
+        "console série configurable partageant le même moteur ANSI.",
+        "konfigurierbare serielle Konsole mit derselben ANSI-Engine.",
+        "настраиваемая последовательная консоль с тем же движком ANSI.",
+        "同じ ANSI エンジンを共有する設定可能なシリアルコンソール。",
+        "동일한 ANSI 엔진을 공유하는 구성 가능한 시리얼 콘솔.");
+    add("File Compare", "文件比较","檔案比較","Comparación de archivos","Comparaison de fichiers","Dateivergleich","Сравнение файлов","ファイル比較","파일 비교");
+    add("Side-by-side text, folder, hex and picture comparison.",
+        "并排的文本、文件夹、十六进制与图片比较。",
+        "並排的文字、資料夾、十六進位與圖片比較。",
+        "comparación en paralelo de texto, carpetas, hex e imágenes.",
+        "comparaison côte à côte de texte, dossier, hexadécimal et image.",
+        "Text-, Ordner-, Hex- und Bildvergleich nebeneinander.",
+        "параллельное сравнение текста, папок, hex и изображений.",
+        "テキスト・フォルダ・Hex・画像の並列比較。",
+        "텍스트, 폴더, 16진수, 사진의 나란히 비교.");
+    add("Multi-language UI (9 languages), VS Code-like themes applied across all tabs.",
+        "多语言界面（9 种语言），VS Code 系主题应用于所有标签页。",
+        "多語言介面（9 種語言），VS Code 系佈景主題套用於所有分頁。",
+        "Interfaz multilingüe (9 idiomas), temas estilo VS Code en todas las pestañas.",
+        "Interface multilingue (9 langues), thèmes façon VS Code sur tous les onglets.",
+        "Mehrsprachige Oberfläche (9 Sprachen), VS-Code-artige Designs auf allen Tabs.",
+        "Многоязычный интерфейс (9 языков), темы в стиле VS Code во всех вкладках.",
+        "多言語 UI（9 言語）、VS Code 風テーマを全タブに適用。",
+        "다국어 UI(9개 언어), 모든 탭에 적용되는 VS Code 스타일 테마.");
+    add("Built with MinGW + Qt 6 + libssh2.",
+        "使用 MinGW + Qt 6 + libssh2 构建。","以 MinGW + Qt 6 + libssh2 建置。",
+        "Compilado con MinGW + Qt 6 + libssh2.","Compilé avec MinGW + Qt 6 + libssh2.",
+        "Erstellt mit MinGW + Qt 6 + libssh2.","Собрано с MinGW + Qt 6 + libssh2.",
+        "MinGW + Qt 6 + libssh2 でビルド。","MinGW + Qt 6 + libssh2로 빌드.");
 
     // ---- Status bar / misc ----
     add("Ready",             "就绪",      "就緒",      "Listo",        "Prêt",          "Bereit",        "Готово",          "準備完了",      "준비됨");
@@ -189,6 +336,7 @@ void I18n::loadTable()
     add("Unix (LF)",         "Unix (LF)", "Unix (LF)", "Unix (LF)",    "Unix (LF)",     "Unix (LF)",     "Unix (LF)",       "Unix (LF)",     "Unix (LF)");
     add("Mac (CR)",          "Mac (CR)",  "Mac (CR)",  "Mac (CR)",     "Mac (CR)",      "Mac (CR)",      "Mac (CR)",        "Mac (CR)",      "Mac (CR)");
     add("COLUMN",            "列编辑",    "欄編輯",    "COLUMNA",      "COLONNE",       "SPALTE",        "СТОЛБЕЦ",         "列編集",        "열 편집");
+    add("Ln %1, Col %2",     "行 %1, 列 %2","行 %1, 欄 %2","Ln %1, Col %2","Lg %1, Col %2","Z %1, Sp %2","Стр %1, Стлб %2","行 %1, 列 %2","행 %1, 열 %2");
 
     // ---- Dialogs / messages ----
     add("Open Files",        "打开文件",  "開啟檔案",  "Abrir archivos","Ouvrir des fichiers","Dateien öffnen","Открыть файлы","ファイルを開く","파일 열기");

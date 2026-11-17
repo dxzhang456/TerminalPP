@@ -264,29 +264,32 @@ void MainWindow::createMenus()
     m_sessionsMenu = m_termMenu->addMenu(TR("SSH / Serial &Sessions"));
     rebuildSessionsMenu();
 
-    // ---------- Compare (Beyond Compare-style) ----------
+    // ---------- Compare ----------
     m_compareMenu = menuBar()->addMenu(TR("&Compare"));
     m_compareMenu->addAction(TR("&New Comparison..."), QKeySequence("Ctrl+Shift+K"),
                              this, &MainWindow::newComparison);
     m_compareMenu->addSeparator();
     m_compareMenu->addAction(TR("&Text Compare..."), this, [this]() {
         CompareDialog dlg(this);
-        // Pre-select Text; user still picks files.
+        dlg.setType(CompareDialog::TextCompare);   // preselect matching type
         if (dlg.exec() == QDialog::Accepted)
             openTextCompare(dlg.leftPath(), dlg.rightPath());
     });
     m_compareMenu->addAction(TR("&Folder Compare..."), this, [this]() {
         CompareDialog dlg(this);
+        dlg.setType(CompareDialog::FolderCompare);
         if (dlg.exec() == QDialog::Accepted)
             openFolderCompare(dlg.leftPath(), dlg.rightPath());
     });
     m_compareMenu->addAction(TR("&Hex Compare..."), this, [this]() {
         CompareDialog dlg(this);
+        dlg.setType(CompareDialog::HexCompare);
         if (dlg.exec() == QDialog::Accepted)
             openHexCompare(dlg.leftPath(), dlg.rightPath());
     });
     m_compareMenu->addAction(TR("&Picture Compare..."), this, [this]() {
         CompareDialog dlg(this);
+        dlg.setType(CompareDialog::ImageCompare);
         if (dlg.exec() == QDialog::Accepted)
             openImageCompare(dlg.leftPath(), dlg.rightPath());
     });
@@ -325,7 +328,7 @@ void MainWindow::createStatusBar()
     statusBar()->addPermanentWidget(m_langLabel);
     statusBar()->addPermanentWidget(m_encLabel);
     statusBar()->addPermanentWidget(m_eolLabel);
-    statusBar()->showMessage(tr("Ready"));
+    statusBar()->showMessage(TR("Ready"));
 }
 
 // ------------------------------------------------------------------
@@ -408,9 +411,9 @@ EditorTab *MainWindow::addEditorTab()
         if (m_tabs->currentWidget() != tab)
             return;
         if (active) {
-            m_colLabel->setText(tr("COLUMN"));
+            m_colLabel->setText(TR("COLUMN"));
             statusBar()->showMessage(
-                tr("Column (block) edit mode — type/Delete/Ctrl+C/Ctrl+V across "
+                TR("Column (block) edit mode — type/Delete/Ctrl+C/Ctrl+V across "
                    "lines, Esc to exit"), 4000);
         } else {
             m_colLabel->setText("");
@@ -426,8 +429,8 @@ bool MainWindow::maybeSaveTab(EditorTab *tab)
         return true;
 
     QMessageBox::StandardButton ret = QMessageBox::warning(
-        this, tr("Terminal++"),
-        tr("The document \"%1\" has unsaved changes.\nDo you want to save?")
+        this, TR("Terminal++"),
+        TR("The document \"%1\" has unsaved changes.\nDo you want to save?")
             .arg(tab->fileName()),
         QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
@@ -463,7 +466,7 @@ EditorTab *MainWindow::openFile(const QString &path)
 
     EditorTab *tab = addEditorTab();
     if (!tab->loadFile(path)) {
-        QMessageBox::warning(this, tr("Open"), tr("Cannot open file:\n%1").arg(path));
+        QMessageBox::warning(this, TR("Open"), TR("Cannot open file:\n%1").arg(path));
         return nullptr;
     }
     tab->applyTheme(m_themeManager.current());
@@ -477,7 +480,7 @@ EditorTab *MainWindow::openFile(const QString &path)
 
 void MainWindow::openFileDialog()
 {
-    QStringList files = QFileDialog::getOpenFileNames(this, tr("Open Files"));
+    QStringList files = QFileDialog::getOpenFileNames(this, TR("Open Files"));
     for (const QString &f : files)
         openFile(f);
 }
@@ -490,10 +493,10 @@ bool MainWindow::saveFile()
     if (tab->isUntitled())
         return saveFileAs();
     if (!tab->save()) {
-        QMessageBox::warning(this, tr("Save"), tr("Cannot write file."));
+        QMessageBox::warning(this, TR("Save"), TR("Cannot write file."));
         return false;
     }
-    statusBar()->showMessage(tr("Saved %1").arg(tab->filePath()), 3000);
+    statusBar()->showMessage(TR("Saved %1").arg(tab->filePath()), 3000);
     updateWindowTitle();
     return true;
 }
@@ -503,17 +506,17 @@ bool MainWindow::saveFileAs()
     EditorTab *tab = currentEditorTab();
     if (!tab)
         return false;
-    QString path = QFileDialog::getSaveFileName(this, tr("Save As"), tab->fileName());
+    QString path = QFileDialog::getSaveFileName(this, TR("Save As"), tab->fileName());
     if (path.isEmpty())
         return false;
     if (!tab->saveFile(path)) {
-        QMessageBox::warning(this, tr("Save"), tr("Cannot write file."));
+        QMessageBox::warning(this, TR("Save"), TR("Cannot write file."));
         return false;
     }
     int i = m_tabs->indexOf(tab);
     m_tabs->setTabText(i, tab->fileName());
     m_tabs->setTabToolTip(i, tab->filePath());
-    statusBar()->showMessage(tr("Saved %1").arg(tab->filePath()), 3000);
+    statusBar()->showMessage(TR("Saved %1").arg(tab->filePath()), 3000);
     updateWindowTitle();
     updateStatusBar();
     return true;
@@ -672,7 +675,7 @@ void MainWindow::applyThemeByName(const QString &name)
     QSettings st;
     st.setValue(QStringLiteral("ui/theme"), name);
 
-    statusBar()->showMessage(tr("Theme: %1").arg(name), 3000);
+    statusBar()->showMessage(TR("Theme: %1").arg(name), 3000);
 }
 
 // ------------------------------------------------------------------
@@ -750,7 +753,7 @@ void MainWindow::newSshSession()
 
     SshSessionConfig cfg = dlg.config();
     if (cfg.host.isEmpty()) {
-        QMessageBox::warning(this, tr("SSH"), tr("Host is required."));
+        QMessageBox::warning(this, TR("SSH"), TR("Host is required."));
         return;
     }
 
@@ -779,7 +782,7 @@ void MainWindow::openSavedSshSession(int index)
     connect(tab, &SshTab::connectionClosed, this, [this, tab]() {
         int i = m_tabs->indexOf(tab);
         if (i >= 0)
-            m_tabs->setTabText(i, m_tabs->tabText(i) + tr(" [closed]"));
+            m_tabs->setTabText(i, m_tabs->tabText(i) + TR(" [closed]"));
     });
 
     tab->connectSession();
@@ -791,8 +794,8 @@ void MainWindow::deleteSavedSshSession(int index)
     const auto &list = m_sessions->sessions();
     if (index < 0 || index >= list.size())
         return;
-    if (QMessageBox::question(this, tr("Delete Session"),
-            tr("Delete SSH session \"%1\"?").arg(list.at(index).displayName()))
+    if (QMessageBox::question(this, TR("Delete Session"),
+            TR("Delete SSH session \"%1\"?").arg(list.at(index).displayName()))
         != QMessageBox::Yes)
         return;
     m_sessions->remove(index);
@@ -829,7 +832,7 @@ void MainWindow::newSerialSession()
 
     SerialConfig cfg = dlg.config();
     if (cfg.portName.isEmpty()) {
-        QMessageBox::warning(this, tr("Serial"), tr("No serial port selected."));
+        QMessageBox::warning(this, TR("Serial"), TR("No serial port selected."));
         return;
     }
 
@@ -859,7 +862,7 @@ void MainWindow::openSavedSerialSession(int index)
     connect(tab, &SerialTab::connectionClosed, this, [this, tab]() {
         int i = m_tabs->indexOf(tab);
         if (i >= 0)
-            m_tabs->setTabText(i, m_tabs->tabText(i) + tr(" [closed]"));
+            m_tabs->setTabText(i, m_tabs->tabText(i) + TR(" [closed]"));
     });
 
     tab->openPort();
@@ -871,8 +874,8 @@ void MainWindow::deleteSavedSerialSession(int index)
     const auto &list = m_sessions->serialSessions();
     if (index < 0 || index >= list.size())
         return;
-    if (QMessageBox::question(this, tr("Delete Session"),
-            tr("Delete serial session \"%1\"?").arg(list.at(index).displayName()))
+    if (QMessageBox::question(this, TR("Delete Session"),
+            TR("Delete serial session \"%1\"?").arg(list.at(index).displayName()))
         != QMessageBox::Yes)
         return;
     m_sessions->removeSerial(index);
@@ -880,7 +883,7 @@ void MainWindow::deleteSavedSerialSession(int index)
 }
 
 // ------------------------------------------------------------------
-// Compare (Beyond Compare-style)
+// Compare
 // ------------------------------------------------------------------
 void MainWindow::newComparison()
 {
@@ -907,7 +910,15 @@ void MainWindow::openTextCompare(const QString &left, const QString &right)
     connect(tab, &TextCompareTab::statusMessage, this, [this](const QString &m) {
         statusBar()->showMessage(m, 4000);
     });
-    int idx = m_tabs->addTab(tab, tr("Text: %1 ⟷ %2")
+    connect(tab, &TextCompareTab::requestCompareAs, this,
+            [this](int type, const QString &l, const QString &r) {
+        switch (type) {
+        case 2: openHexCompare(l, r); break;
+        case 3: openImageCompare(l, r); break;
+        default: openTextCompare(l, r); break;
+        }
+    });
+    int idx = m_tabs->addTab(tab, TR("Text: %1 ⟷ %2")
                                       .arg(QFileInfo(left).fileName(),
                                            QFileInfo(right).fileName()));
     m_tabs->setCurrentIndex(idx);
@@ -923,18 +934,28 @@ void MainWindow::openFolderCompare(const QString &left, const QString &right)
     connect(tab, &FolderCompareTab::statusMessage, this, [this](const QString &m) {
         statusBar()->showMessage(m, 4000);
     });
-    // Double-clicking a differing file pair opens a text compare (auto-detects
-    // binary/image by extension could be added; default to text).
+    // Double-clicking a differing file pair dispatches by content type:
+    //   image extensions  -> Picture Compare
+    //   text extensions   -> Text Compare
+    //   everything else   -> Hex Compare
     connect(tab, &FolderCompareTab::compareFiles, this,
             [this](const QString &lf, const QString &rf) {
         const QString ext = QFileInfo(lf).suffix().toLower();
-        static const QStringList imgExt = {"png","jpg","jpeg","bmp","gif","webp","ico","svg"};
+        static const QStringList imgExt = {
+            "png","jpg","jpeg","bmp","gif","webp","ico","svg","tif","tiff"};
+        static const QStringList textExt = {
+            "txt","c","cpp","cc","cxx","h","hpp","hh","cs","java","py","js","ts",
+            "json","xml","html","htm","css","sql","sh","bash","ini","cfg","conf",
+            "md","log","yml","yaml","pro","pri","cmake","gradle","bat","ps1",
+            "rb","go","rs","php","pl","lua","kt","swift","m","mm","vue","toml"};
         if (imgExt.contains(ext))
             openImageCompare(lf, rf);
-        else
+        else if (textExt.contains(ext))
             openTextCompare(lf, rf);
+        else
+            openHexCompare(lf, rf);
     });
-    int idx = m_tabs->addTab(tab, tr("Folders: %1 ⟷ %2")
+    int idx = m_tabs->addTab(tab, TR("Folders: %1 ⟷ %2")
                                       .arg(QFileInfo(left).fileName(),
                                            QFileInfo(right).fileName()));
     m_tabs->setCurrentIndex(idx);
@@ -950,7 +971,15 @@ void MainWindow::openHexCompare(const QString &left, const QString &right)
     connect(tab, &HexCompareTab::statusMessage, this, [this](const QString &m) {
         statusBar()->showMessage(m, 4000);
     });
-    int idx = m_tabs->addTab(tab, tr("Hex: %1 ⟷ %2")
+    connect(tab, &HexCompareTab::requestCompareAs, this,
+            [this](int type, const QString &l, const QString &r) {
+        switch (type) {
+        case 0: openTextCompare(l, r); break;
+        case 3: openImageCompare(l, r); break;
+        default: openHexCompare(l, r); break;
+        }
+    });
+    int idx = m_tabs->addTab(tab, TR("Hex: %1 ⟷ %2")
                                       .arg(QFileInfo(left).fileName(),
                                            QFileInfo(right).fileName()));
     m_tabs->setCurrentIndex(idx);
@@ -966,7 +995,15 @@ void MainWindow::openImageCompare(const QString &left, const QString &right)
     connect(tab, &ImageCompareTab::statusMessage, this, [this](const QString &m) {
         statusBar()->showMessage(m, 4000);
     });
-    int idx = m_tabs->addTab(tab, tr("Picture: %1 ⟷ %2")
+    connect(tab, &ImageCompareTab::requestCompareAs, this,
+            [this](int type, const QString &l, const QString &r) {
+        switch (type) {
+        case 0: openTextCompare(l, r); break;
+        case 2: openHexCompare(l, r); break;
+        default: openImageCompare(l, r); break;
+        }
+    });
+    int idx = m_tabs->addTab(tab, TR("Picture: %1 ⟷ %2")
                                       .arg(QFileInfo(left).fileName(),
                                            QFileInfo(right).fileName()));
     m_tabs->setCurrentIndex(idx);
@@ -1002,8 +1039,8 @@ void MainWindow::toggleAutoSave(bool on)
     s.setValue(QStringLiteral("editor/autoSave"), on);
 
     statusBar()->showMessage(
-        on ? tr("Auto-save enabled (every %1s)").arg(m_autoSaveIntervalSec)
-           : tr("Auto-save disabled"), 3000);
+        on ? TR("Auto-save enabled (every %1s)").arg(m_autoSaveIntervalSec)
+           : TR("Auto-save disabled"), 3000);
 }
 
 void MainWindow::onAutoSaveTimeout()
@@ -1020,7 +1057,7 @@ void MainWindow::onAutoSaveTimeout()
     }
     if (saved > 0) {
         updateWindowTitle();
-        statusBar()->showMessage(tr("Auto-saved %1 file(s)").arg(saved), 2000);
+        statusBar()->showMessage(TR("Auto-saved %1 file(s)").arg(saved), 2000);
     }
 }
 
@@ -1090,17 +1127,25 @@ void MainWindow::loadPreferences()
 // ------------------------------------------------------------------
 void MainWindow::about()
 {
-    QMessageBox::about(this, tr("About Terminal++"),
-        tr("<h3>Terminal++ 1.0</h3>"
-           "<p>A unified Qt 6 application combining:</p>"
-           "<ul>"
-           "<li><b>Code editor</b> &mdash; multi-tab editor with syntax "
-           "highlighting, themes, find/replace, encodings.</li>"
-           "<li><b>SSH terminal</b> &mdash; native libssh2 SSH sessions with "
-           "tmux support and VT100/256-color rendering.</li>"
-           "<li><b>Serial / UART</b> &mdash; configurable serial console.</li>"
-           "</ul>"
-           "<p>Built with MinGW + Qt 6 + libssh2.</p>"));
+    const QString body =
+        "<h3>Terminal++ 1.0</h3>"
+        "<p>" + TR("A unified Qt 6 application combining:") + "</p>"
+        "<ul>"
+        "<li><b>" + TR("Code editor") + "</b> &mdash; " +
+            TR("multi-tab editor with syntax highlighting, themes, find/replace, "
+               "encodings, column/block edit, clipboard history, auto-save.") + "</li>"
+        "<li><b>" + TR("SSH terminal") + "</b> &mdash; " +
+            TR("native libssh2 SSH sessions with tmux support and VT100/256-color "
+               "rendering; passwords encrypted with Windows DPAPI.") + "</li>"
+        "<li><b>" + TR("Serial / UART") + "</b> &mdash; " +
+            TR("configurable serial console sharing the same ANSI engine.") + "</li>"
+        "<li><b>" + TR("File Compare") + "</b> &mdash; " +
+            TR("Side-by-side text, folder, hex and picture comparison.") + "</li>"
+        "</ul>"
+        "<p>" + TR("Multi-language UI (9 languages), VS Code-like themes applied "
+                   "across all tabs.") + "</p>"
+        "<p>" + TR("Built with MinGW + Qt 6 + libssh2.") + "</p>";
+    QMessageBox::about(this, TR("About Terminal++"), body);
 }
 
 void MainWindow::onCurrentTabChanged(int)
@@ -1122,7 +1167,7 @@ void MainWindow::updateStatusBar()
     if (!t) {
         // Terminal tab selected.
         m_posLabel->setText("");
-        m_langLabel->setText(tr("Terminal"));
+        m_langLabel->setText(TR("Terminal"));
         m_encLabel->setText("UTF-8");
         m_eolLabel->setText("");
         return;
@@ -1131,21 +1176,21 @@ void MainWindow::updateStatusBar()
     QTextCursor c = t->editor()->textCursor();
     int line = c.blockNumber() + 1;
     int col = c.columnNumber() + 1;
-    m_posLabel->setText(tr("Ln %1, Col %2").arg(line).arg(col));
+    m_posLabel->setText(TR("Ln %1, Col %2").arg(line).arg(col));
     m_langLabel->setText(SyntaxHighlighter::languageName(t->highlighter()->language()));
     m_encLabel->setText(t->encoding());
     m_eolLabel->setText(t->eolName());
 
     // Reflect the active editor's column (block) edit state.
     if (m_colLabel)
-        m_colLabel->setText(t->editor()->hasColumnSelection() ? tr("COLUMN") : QString());
+        m_colLabel->setText(t->editor()->hasColumnSelection() ? TR("COLUMN") : QString());
 }
 
 void MainWindow::updateWindowTitle()
 {
     EditorTab *t = currentEditorTab();
     if (t) {
-        QString name = t->isUntitled() ? tr("new") : t->filePath();
+        QString name = t->isUntitled() ? TR("new") : t->filePath();
         if (t->isModified())
             name += " *";
         setWindowTitle(QString("%1 - Terminal++").arg(name));

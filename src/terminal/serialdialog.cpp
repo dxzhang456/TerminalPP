@@ -1,4 +1,6 @@
 #include "serialdialog.h"
+#include "core/i18n.h"
+static inline QString TRc(const char *s){ return I18n::instance()->tr(QString::fromUtf8(s)); }
 
 #include <QFormLayout>
 #include <QVBoxLayout>
@@ -11,7 +13,7 @@
 SerialDialog::SerialDialog(QWidget *parent)
     : QDialog(parent)
 {
-    setWindowTitle(tr("Serial / UART Configuration"));
+    setWindowTitle(TRc("Serial / UART Configuration"));
 
     m_port = new QComboBox(this);
     m_port->setEditable(true);
@@ -31,11 +33,11 @@ SerialDialog::SerialDialog(QWidget *parent)
     m_dataBits->setCurrentText("8");
 
     m_parity = new QComboBox(this);
-    m_parity->addItem(tr("None"),  QSerialPort::NoParity);
-    m_parity->addItem(tr("Even"),  QSerialPort::EvenParity);
-    m_parity->addItem(tr("Odd"),   QSerialPort::OddParity);
-    m_parity->addItem(tr("Mark"),  QSerialPort::MarkParity);
-    m_parity->addItem(tr("Space"), QSerialPort::SpaceParity);
+    m_parity->addItem(TRc("None"),  QSerialPort::NoParity);
+    m_parity->addItem(TRc("Even"),  QSerialPort::EvenParity);
+    m_parity->addItem(TRc("Odd"),   QSerialPort::OddParity);
+    m_parity->addItem(TRc("Mark"),  QSerialPort::MarkParity);
+    m_parity->addItem(TRc("Space"), QSerialPort::SpaceParity);
 
     m_stopBits = new QComboBox(this);
     m_stopBits->addItem("1",   QSerialPort::OneStop);
@@ -43,28 +45,28 @@ SerialDialog::SerialDialog(QWidget *parent)
     m_stopBits->addItem("2",   QSerialPort::TwoStop);
 
     m_flow = new QComboBox(this);
-    m_flow->addItem(tr("None"),         QSerialPort::NoFlowControl);
-    m_flow->addItem(tr("RTS/CTS"),      QSerialPort::HardwareControl);
-    m_flow->addItem(tr("XON/XOFF"),     QSerialPort::SoftwareControl);
+    m_flow->addItem(TRc("None"),         QSerialPort::NoFlowControl);
+    m_flow->addItem(TRc("RTS/CTS"),      QSerialPort::HardwareControl);
+    m_flow->addItem(TRc("XON/XOFF"),     QSerialPort::SoftwareControl);
 
     m_lineEnding = new QComboBox(this);
     m_lineEnding->addItems({"CR", "LF", "CRLF", "None"});
 
-    m_localEcho = new QCheckBox(tr("Local echo"), this);
+    m_localEcho = new QCheckBox(TRc("Local echo"), this);
 
     QFormLayout *form = new QFormLayout;
     QHBoxLayout *portLayout = new QHBoxLayout;
     portLayout->addWidget(m_port);
-    QPushButton *refresh = new QPushButton(tr("Refresh"), this);
+    QPushButton *refresh = new QPushButton(TRc("Refresh"), this);
     connect(refresh, &QPushButton::clicked, this, &SerialDialog::refreshPorts);
     portLayout->addWidget(refresh);
-    form->addRow(tr("Serial line:"), portLayout);
-    form->addRow(tr("Speed (baud):"), m_baud);
-    form->addRow(tr("Data bits:"), m_dataBits);
-    form->addRow(tr("Parity:"), m_parity);
-    form->addRow(tr("Stop bits:"), m_stopBits);
-    form->addRow(tr("Flow control:"), m_flow);
-    form->addRow(tr("Enter sends:"), m_lineEnding);
+    form->addRow(TRc("Serial line:"), portLayout);
+    form->addRow(TRc("Speed (baud):"), m_baud);
+    form->addRow(TRc("Data bits:"), m_dataBits);
+    form->addRow(TRc("Parity:"), m_parity);
+    form->addRow(TRc("Stop bits:"), m_stopBits);
+    form->addRow(TRc("Flow control:"), m_flow);
+    form->addRow(TRc("Enter sends:"), m_lineEnding);
     form->addRow(QString(), m_localEcho);
 
     QDialogButtonBox *box = new QDialogButtonBox(

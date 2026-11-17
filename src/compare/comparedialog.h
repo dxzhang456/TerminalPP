@@ -8,7 +8,7 @@ class QLineEdit;
 class QComboBox;
 
 // A small launcher dialog that collects two paths (files or folders) and the
-// desired comparison type, mirroring Beyond Compare's "New Session" chooser.
+// desired comparison type, mirroring a diff tool New Session chooser.
 class CompareDialog : public QDialog
 {
     Q_OBJECT

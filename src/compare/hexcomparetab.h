@@ -9,7 +9,7 @@ class QPlainTextEdit;
 class QLabel;
 class HexDiffHighlighter;
 
-// Beyond Compare-style hex (binary) comparison tab.
+// side-by-side hex (binary) comparison tab.
 //  * two side-by-side hex dumps (offset | hex bytes | ASCII)
 //  * differing bytes highlighted on both sides
 //  * synchronized scrolling
@@ -28,6 +28,9 @@ public:
 
 signals:
     void statusMessage(const QString &msg);
+    // Request the host to reopen the current two files as another comparison
+    // type (0=Text, 1=Folder, 2=Hex, 3=Image).
+    void requestCompareAs(int type, const QString &left, const QString &right);
 
 public slots:
     void reload();

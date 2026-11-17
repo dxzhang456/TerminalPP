@@ -1,5 +1,10 @@
 #include "textcomparetab.h"
 #include "diffengine.h"
+#include "core/i18n.h"
+#include "compare/comparedialog.h"
+
+// Runtime UI translator shorthand.
+static inline QString TRc(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
 
 #include <QAbstractScrollArea>
 #include <QPainter>
@@ -250,26 +255,35 @@ TextCompareTab::TextCompareTab(QWidget *parent)
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(0);
 
-    // Toolbar with Beyond Compare-style actions.
+    // Toolbar with side-by-side actions.
     auto *tb = new QToolBar(this);
-    tb->addAction(tr("◀ Prev Diff"), this, &TextCompareTab::prevDiff);
-    tb->addAction(tr("Next Diff ▶"), this, &TextCompareTab::nextDiff);
+    tb->addAction(TRc("◀ Prev Diff"), this, &TextCompareTab::prevDiff);
+    tb->addAction(TRc("Next Diff ▶"), this, &TextCompareTab::nextDiff);
     tb->addSeparator();
-    tb->addAction(tr("Copy →"), this, &TextCompareTab::copyLeftToRight);
-    tb->addAction(tr("← Copy"), this, &TextCompareTab::copyRightToLeft);
+    tb->addAction(TRc("Copy →"), this, &TextCompareTab::copyLeftToRight);
+    tb->addAction(TRc("← Copy"), this, &TextCompareTab::copyRightToLeft);
     tb->addSeparator();
-    tb->addAction(tr("Swap"), this, &TextCompareTab::swapSides);
-    tb->addAction(tr("Reload"), this, &TextCompareTab::reload);
-    tb->addAction(tr("Save L"), this, &TextCompareTab::saveLeft);
-    tb->addAction(tr("Save R"), this, &TextCompareTab::saveRight);
+    tb->addAction(TRc("Swap"), this, &TextCompareTab::swapSides);
+    tb->addAction(TRc("Reload"), this, &TextCompareTab::reload);
+    // Switch the current two files to another comparison type.
+    tb->addAction(TRc("As Hex"), this, [this]() {
+        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+            emit requestCompareAs(2, m_leftPath, m_rightPath);
+    });
+    tb->addAction(TRc("As Picture"), this, [this]() {
+        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+            emit requestCompareAs(3, m_leftPath, m_rightPath);
+    });
+    tb->addAction(TRc("Save L"), this, &TextCompareTab::saveLeft);
+    tb->addAction(TRc("Save R"), this, &TextCompareTab::saveRight);
     tb->addSeparator();
 
-    QAction *icAct = tb->addAction(tr("Ignore Case"));
+    QAction *icAct = tb->addAction(TRc("Ignore Case"));
     icAct->setCheckable(true);
     connect(icAct, &QAction::toggled, this, [this](bool on) {
         m_opts.ignoreCase = on; recompute();
     });
-    QAction *iwAct = tb->addAction(tr("Ignore Whitespace"));
+    QAction *iwAct = tb->addAction(TRc("Ignore Whitespace"));
     iwAct->setCheckable(true);
     connect(iwAct, &QAction::toggled, this, [this](bool on) {
         m_opts.ignoreWhitespace = on; recompute();
@@ -279,8 +293,8 @@ TextCompareTab::TextCompareTab(QWidget *parent)
     // Header labels (file paths).
     auto *hdr = new QHBoxLayout();
     hdr->setContentsMargins(4, 2, 4, 2);
-    m_leftLabel = new QLabel(tr("(left)"), this);
-    m_rightLabel = new QLabel(tr("(right)"), this);
+    m_leftLabel = new QLabel(TRc("(left)"), this);
+    m_rightLabel = new QLabel(TRc("(right)"), this);
     m_leftLabel->setStyleSheet("font-weight:bold;");
     m_rightLabel->setStyleSheet("font-weight:bold;");
     hdr->addWidget(m_leftLabel, 1);
@@ -379,7 +393,7 @@ void TextCompareTab::updateStats()
         case Diff::Removed: ++removed; break;
         }
     }
-    const QString msg = tr("Same: %1   Changed: %2   Inserted: %3   Removed: %4")
+    const QString msg = TRc("Same: %1   Changed: %2   Inserted: %3   Removed: %4")
                             .arg(same).arg(changed).arg(inserted).arg(removed);
     m_statsLabel->setText(msg);
     emit statusMessage(msg);
@@ -473,7 +487,7 @@ void TextCompareTab::copyLeftToRight()
         m_rightLines.insert(rightStart + i, leftBlock[i]);
 
     recompute();
-    emit statusMessage(tr("Copied block to the right side."));
+    emit statusMessage(TRc("Copied block to the right side."));
 }
 
 void TextCompareTab::copyRightToLeft()
@@ -507,7 +521,7 @@ void TextCompareTab::copyRightToLeft()
         m_leftLines.insert(leftStart + i, rightBlock[i]);
 
     recompute();
-    emit statusMessage(tr("Copied block to the left side."));
+    emit statusMessage(TRc("Copied block to the left side."));
 }
 
 void TextCompareTab::reload()
@@ -536,7 +550,7 @@ void TextCompareTab::saveLeft()
     if (m_leftPath.isEmpty())
         return;
     if (writeLines(m_leftPath, m_leftLines))
-        emit statusMessage(tr("Saved left file: %1").arg(m_leftPath));
+        emit statusMessage(TRc("Saved left file: %1").arg(m_leftPath));
 }
 
 void TextCompareTab::saveRight()
@@ -544,7 +558,7 @@ void TextCompareTab::saveRight()
     if (m_rightPath.isEmpty())
         return;
     if (writeLines(m_rightPath, m_rightLines))
-        emit statusMessage(tr("Saved right file: %1").arg(m_rightPath));
+        emit statusMessage(TRc("Saved right file: %1").arg(m_rightPath));
 }
 
 void TextCompareTab::applyTheme(const EditorTheme &t)

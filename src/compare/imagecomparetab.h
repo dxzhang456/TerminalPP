@@ -10,7 +10,7 @@ class QSlider;
 class QScrollArea;
 class ImageView;   // internal (defined in .cpp)
 
-// Beyond Compare-style picture comparison tab.
+// side-by-side picture comparison tab.
 //  * side-by-side image view with synchronized pan/zoom
 //  * zoom in/out/fit, 1:1
 //  * a "difference" overlay mode that highlights per-pixel differences
@@ -29,6 +29,9 @@ public:
 
 signals:
     void statusMessage(const QString &msg);
+    // Request the host to reopen the current two files as another comparison
+    // type (0=Text, 1=Folder, 2=Hex, 3=Image).
+    void requestCompareAs(int type, const QString &left, const QString &right);
 
 public slots:
     void zoomIn();

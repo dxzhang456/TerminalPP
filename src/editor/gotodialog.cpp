@@ -1,4 +1,6 @@
 #include "gotodialog.h"
+#include "core/i18n.h"
+static inline QString TRc(const char *s){ return I18n::instance()->tr(QString::fromUtf8(s)); }
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -9,10 +11,10 @@
 GotoDialog::GotoDialog(int maxLine, int current, QWidget *parent)
     : QDialog(parent)
 {
-    setWindowTitle(tr("Go To Line"));
+    setWindowTitle(TRc("Go To Line"));
 
     QVBoxLayout *l = new QVBoxLayout(this);
-    l->addWidget(new QLabel(tr("Line number (1 - %1):").arg(maxLine), this));
+    l->addWidget(new QLabel(TRc("Line number (1 - %1):").arg(maxLine), this));
 
     m_spin = new QSpinBox(this);
     m_spin->setRange(1, qMax(1, maxLine));

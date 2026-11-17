@@ -1,4 +1,6 @@
 #include "finddialog.h"
+#include "core/i18n.h"
+static inline QString TRc(const char *s){ return I18n::instance()->tr(QString::fromUtf8(s)); }
 #include "codeeditor.h"
 
 #include <QVBoxLayout>
@@ -16,15 +18,15 @@
 FindDialog::FindDialog(QWidget *parent)
     : QDialog(parent)
 {
-    setWindowTitle(tr("Find / Replace"));
+    setWindowTitle(TRc("Find / Replace"));
     setModal(false);
 
     m_tabs = new QTabWidget(this);
 
-    m_caseCheck = new QCheckBox(tr("Match case"), this);
-    m_wholeWordCheck = new QCheckBox(tr("Whole word only"), this);
-    m_regexCheck = new QCheckBox(tr("Regular expression"), this);
-    m_wrapCheck = new QCheckBox(tr("Wrap around"), this);
+    m_caseCheck = new QCheckBox(TRc("Match case"), this);
+    m_wholeWordCheck = new QCheckBox(TRc("Whole word only"), this);
+    m_regexCheck = new QCheckBox(TRc("Regular expression"), this);
+    m_wrapCheck = new QCheckBox(TRc("Wrap around"), this);
     m_wrapCheck->setChecked(true);
 
     m_findEdit = new QLineEdit(this);
@@ -35,13 +37,13 @@ FindDialog::FindDialog(QWidget *parent)
     {
         QVBoxLayout *l = new QVBoxLayout(findTab);
         QFormLayout *form = new QFormLayout;
-        form->addRow(tr("Find what:"), m_findEdit);
+        form->addRow(TRc("Find what:"), m_findEdit);
         l->addLayout(form);
 
         QHBoxLayout *btns = new QHBoxLayout;
-        QPushButton *next = new QPushButton(tr("Find Next"), this);
-        QPushButton *prev = new QPushButton(tr("Find Previous"), this);
-        QPushButton *count = new QPushButton(tr("Count"), this);
+        QPushButton *next = new QPushButton(TRc("Find Next"), this);
+        QPushButton *prev = new QPushButton(TRc("Find Previous"), this);
+        QPushButton *count = new QPushButton(TRc("Count"), this);
         btns->addWidget(next);
         btns->addWidget(prev);
         btns->addWidget(count);
@@ -57,12 +59,12 @@ FindDialog::FindDialog(QWidget *parent)
     {
         QVBoxLayout *l = new QVBoxLayout(replaceTab);
         QFormLayout *form = new QFormLayout;
-        form->addRow(tr("Replace with:"), m_replaceEdit);
+        form->addRow(TRc("Replace with:"), m_replaceEdit);
         l->addLayout(form);
 
         QHBoxLayout *btns = new QHBoxLayout;
-        QPushButton *rep = new QPushButton(tr("Replace"), this);
-        QPushButton *repAll = new QPushButton(tr("Replace All"), this);
+        QPushButton *rep = new QPushButton(TRc("Replace"), this);
+        QPushButton *repAll = new QPushButton(TRc("Replace All"), this);
         btns->addWidget(rep);
         btns->addWidget(repAll);
         l->addLayout(btns);
@@ -71,11 +73,11 @@ FindDialog::FindDialog(QWidget *parent)
         connect(repAll, &QPushButton::clicked, this, &FindDialog::replaceAll);
     }
 
-    m_tabs->addTab(findTab, tr("Find"));
-    m_tabs->addTab(replaceTab, tr("Replace"));
+    m_tabs->addTab(findTab, TRc("Find"));
+    m_tabs->addTab(replaceTab, TRc("Replace"));
 
     // ---- Options group ----
-    QGroupBox *opts = new QGroupBox(tr("Options"), this);
+    QGroupBox *opts = new QGroupBox(TRc("Options"), this);
     QVBoxLayout *optsLayout = new QVBoxLayout(opts);
     optsLayout->addWidget(m_caseCheck);
     optsLayout->addWidget(m_wholeWordCheck);
@@ -86,7 +88,7 @@ FindDialog::FindDialog(QWidget *parent)
     main->addWidget(m_tabs);
     main->addWidget(opts);
 
-    QPushButton *closeBtn = new QPushButton(tr("Close"), this);
+    QPushButton *closeBtn = new QPushButton(TRc("Close"), this);
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::hide);
     main->addWidget(closeBtn);
 
@@ -147,7 +149,7 @@ bool FindDialog::doFind(bool backward)
             opt |= QRegularExpression::CaseInsensitiveOption;
         QRegularExpression re(pattern, opt);
         if (!re.isValid()) {
-            QMessageBox::warning(this, tr("Find"), tr("Invalid regular expression."));
+            QMessageBox::warning(this, TRc("Find"), TRc("Invalid regular expression."));
             return false;
         }
         found = m_editor->find(re, f);
@@ -168,7 +170,7 @@ bool FindDialog::doFind(bool backward)
     }
 
     if (!found)
-        emit statusMessage(tr("Cannot find \"%1\"").arg(pattern));
+        emit statusMessage(TRc("Cannot find \"%1\"").arg(pattern));
     return found;
 }
 
@@ -220,7 +222,7 @@ void FindDialog::replaceAll()
         if (count > 1000000) break; // safety
     }
     cursor.endEditBlock();
-    emit statusMessage(tr("Replaced %1 occurrence(s)").arg(count));
+    emit statusMessage(TRc("Replaced %1 occurrence(s)").arg(count));
 }
 
 void FindDialog::countAll()
@@ -248,6 +250,6 @@ void FindDialog::countAll()
             from += pattern.length();
         }
     }
-    emit statusMessage(tr("Count: %1 occurrence(s)").arg(count));
-    QMessageBox::information(this, tr("Count"), tr("%1 occurrence(s) found.").arg(count));
+    emit statusMessage(TRc("Count: %1 occurrence(s)").arg(count));
+    QMessageBox::information(this, TRc("Count"), TRc("%1 occurrence(s) found.").arg(count));
 }

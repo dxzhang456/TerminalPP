@@ -6,7 +6,7 @@
 #include <QVector>
 
 // A line-based diff engine (Myers' O(ND) algorithm, LCS backtracking) plus a
-// char-level intra-line diff, replicating the core of Beyond Compare's text
+// char-level intra-line diff, providing a side-by-side text
 // comparison. Produces an aligned list of rows where each side is either a real
 // line index or a gap (-1), classified as Equal / Changed / Inserted / Removed.
 namespace Diff {
