@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include "sessionmanager.h"
+#include "editor/thememanager.h"
 
 class TerminalWidget;
 class SshSession;
@@ -22,6 +23,10 @@ public:
 
     const SshSessionConfig &config() const { return m_config; }
     TerminalWidget *terminal() const { return m_terminal; }
+
+    // Apply the shared editor theme's background/foreground to the terminal so
+    // SSH tabs match the rest of the application's look.
+    void applyTheme(const EditorTheme &theme);
 
 signals:
     void titleChanged(const QString &title);

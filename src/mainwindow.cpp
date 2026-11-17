@@ -39,9 +39,44 @@
 #include <QListWidgetItem>
 #include <QTimer>
 #include <QSettings>
+#include <QPalette>
 
 // Shorthand for the runtime UI translator.
 static inline QString TR(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
+
+// Build a Fusion palette from an editor theme so the whole application window
+// (menus, dialogs, tab bar, status bar) matches the chosen theme — giving SSH
+// and serial tabs the same look as everything else.
+static QPalette paletteFromTheme(const EditorTheme &t)
+{
+    const QColor bg = t.background;
+    const QColor fg = t.foreground;
+    // A mid shade derived from the background for panels/buttons.
+    const bool dark = bg.lightness() < 128;
+    const QColor base = dark ? bg.darker(110) : bg.lighter(102);
+    const QColor alt  = dark ? bg.lighter(130) : bg.darker(104);
+    const QColor button = dark ? bg.lighter(140) : bg.darker(106);
+
+    QPalette p;
+    p.setColor(QPalette::Window, bg);
+    p.setColor(QPalette::WindowText, fg);
+    p.setColor(QPalette::Base, base);
+    p.setColor(QPalette::AlternateBase, alt);
+    p.setColor(QPalette::Text, fg);
+    p.setColor(QPalette::Button, button);
+    p.setColor(QPalette::ButtonText, fg);
+    p.setColor(QPalette::ToolTipBase, base);
+    p.setColor(QPalette::ToolTipText, fg);
+    p.setColor(QPalette::Highlight, t.selectionBg);
+    p.setColor(QPalette::HighlightedText, dark ? QColor(255, 255, 255) : QColor(0, 0, 0));
+    p.setColor(QPalette::PlaceholderText, QColor(fg.red(), fg.green(), fg.blue(), 128));
+    // Disabled roles.
+    const QColor disabled(fg.red(), fg.green(), fg.blue(), 110);
+    p.setColor(QPalette::Disabled, QPalette::WindowText, disabled);
+    p.setColor(QPalette::Disabled, QPalette::Text, disabled);
+    p.setColor(QPalette::Disabled, QPalette::ButtonText, disabled);
+    return p;
+}
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -580,9 +615,28 @@ void MainWindow::zoomReset()
 void MainWindow::applyThemeByName(const QString &name)
 {
     m_themeManager.setCurrent(name);
-    for (int i = 0; i < m_tabs->count(); ++i)
-        if (EditorTab *t = qobject_cast<EditorTab *>(m_tabs->widget(i)))
-            t->applyTheme(m_themeManager.current());
+    const EditorTheme theme = m_themeManager.current();
+
+    // Apply a matching palette to the whole application so menus, dialogs, the
+    // tab bar and status bar share the look — this is what makes SSH/Serial
+    // tabs (and every other window) consistent with the editor theme.
+    qApp->setPalette(paletteFromTheme(theme));
+
+    // Propagate to every open tab, including SSH and Serial terminals.
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        QWidget *w = m_tabs->widget(i);
+        if (EditorTab *t = qobject_cast<EditorTab *>(w))
+            t->applyTheme(theme);
+        else if (SshTab *s = qobject_cast<SshTab *>(w))
+            s->applyTheme(theme);
+        else if (SerialTab *s = qobject_cast<SerialTab *>(w))
+            s->applyTheme(theme);
+    }
+
+    // Persist the chosen theme so it is restored on next launch.
+    QSettings st;
+    st.setValue(QStringLiteral("ui/theme"), name);
+
     statusBar()->showMessage(tr("Theme: %1").arg(name), 3000);
 }
 
@@ -678,6 +732,7 @@ void MainWindow::openSavedSshSession(int index)
     SshSessionConfig cfg = list.at(index);
 
     SshTab *tab = new SshTab(cfg, this);
+    tab->applyTheme(m_themeManager.current());   // match the app theme
     int idx = m_tabs->addTab(tab, cfg.displayName());
     m_tabs->setCurrentIndex(idx);
 
@@ -761,6 +816,7 @@ void MainWindow::openSavedSerialSession(int index)
     convertSerial(list.at(index), cfg);
 
     SerialTab *tab = new SerialTab(cfg, this);
+    tab->applyTheme(m_themeManager.current());   // match the app theme
     QString title = QString("%1 @ %2").arg(cfg.portName).arg(cfg.baudRate);
     int idx = m_tabs->addTab(tab, title);
     m_tabs->setCurrentIndex(idx);
@@ -892,6 +948,12 @@ void MainWindow::loadPreferences()
         if (autoSave)
             m_autoSaveTimer->start(m_autoSaveIntervalSec * 1000);
     }
+
+    // Restore the saved theme and apply it application-wide (palette + tabs).
+    const QString theme = s.value(QStringLiteral("ui/theme"),
+                                  m_themeManager.currentName()).toString();
+    if (m_themeManager.themeNames().contains(theme))
+        applyThemeByName(theme);
 }
 
 // ------------------------------------------------------------------

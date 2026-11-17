@@ -8,7 +8,7 @@ SerialTab::SerialTab(const SerialConfig &cfg, QWidget *parent)
     : QWidget(parent), m_config(cfg)
 {
     m_terminal = new TerminalWidget(this);
-    m_terminal->setColors(QColor(0, 255, 0), QColor(0, 0, 0)); // classic green-on-black
+    m_terminal->setColors(QColor(212, 212, 212), QColor(30, 30, 30));
 
     QVBoxLayout *l = new QVBoxLayout(this);
     l->setContentsMargins(0, 0, 0, 0);
@@ -46,4 +46,10 @@ void SerialTab::closePort()
 bool SerialTab::isOpen() const
 {
     return m_session->isOpen();
+}
+
+void SerialTab::applyTheme(const EditorTheme &theme)
+{
+    if (m_terminal)
+        m_terminal->setColors(theme.foreground, theme.background);
 }

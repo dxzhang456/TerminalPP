@@ -9,7 +9,7 @@ SshTab::SshTab(const SshSessionConfig &cfg, QWidget *parent)
     : QWidget(parent), m_config(cfg)
 {
     m_terminal = new TerminalWidget(this);
-    m_terminal->setColors(QColor(220, 220, 220), QColor(12, 12, 12));
+    m_terminal->setColors(QColor(212, 212, 212), QColor(30, 30, 30));
 
     QVBoxLayout *l = new QVBoxLayout(this);
     l->setContentsMargins(0, 0, 0, 0);
@@ -64,4 +64,12 @@ void SshTab::reconnect()
 bool SshTab::isConnected() const
 {
     return m_session->isRunning();
+}
+
+void SshTab::applyTheme(const EditorTheme &theme)
+{
+    // Use the theme's editor background/foreground for the terminal so SSH
+    // tabs share the application's overall look.
+    if (m_terminal)
+        m_terminal->setColors(theme.foreground, theme.background);
 }

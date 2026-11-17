@@ -117,6 +117,102 @@ ThemeManager::ThemeManager()
         registerTheme(t);
     }
 
+    // --- VS Code Dark+ ---
+    {
+        EditorTheme t;
+        t.name = "VS Code Dark+";
+        t.background = QColor(30, 30, 30);
+        t.foreground = QColor(212, 212, 212);
+        t.currentLine = QColor(40, 40, 40);
+        t.lineNumberBg = QColor(30, 30, 30);
+        t.lineNumberFg = QColor(133, 133, 133);
+        t.selectionBg = QColor(38, 79, 120);
+        t.keyword = QColor(86, 156, 214);
+        t.type = QColor(78, 201, 176);
+        t.comment = QColor(106, 153, 85);
+        t.string = QColor(206, 145, 120);
+        t.number = QColor(181, 206, 168);
+        t.preproc = QColor(197, 134, 192);
+        t.function = QColor(220, 220, 170);
+        registerTheme(t);
+    }
+    // --- VS Code Light+ ---
+    {
+        EditorTheme t;
+        t.name = "VS Code Light+";
+        t.background = QColor(255, 255, 255);
+        t.foreground = QColor(0, 0, 0);
+        t.currentLine = QColor(245, 245, 245);
+        t.lineNumberBg = QColor(255, 255, 255);
+        t.lineNumberFg = QColor(140, 140, 140);
+        t.selectionBg = QColor(173, 214, 255);
+        t.keyword = QColor(0, 0, 255);
+        t.type = QColor(38, 127, 153);
+        t.comment = QColor(0, 128, 0);
+        t.string = QColor(163, 21, 21);
+        t.number = QColor(9, 134, 88);
+        t.preproc = QColor(175, 0, 219);
+        t.function = QColor(121, 94, 38);
+        registerTheme(t);
+    }
+    // --- VS Code High Contrast ---
+    {
+        EditorTheme t;
+        t.name = "VS Code High Contrast";
+        t.background = QColor(0, 0, 0);
+        t.foreground = QColor(255, 255, 255);
+        t.currentLine = QColor(30, 30, 30);
+        t.lineNumberBg = QColor(0, 0, 0);
+        t.lineNumberFg = QColor(255, 255, 255);
+        t.selectionBg = QColor(0, 90, 160);
+        t.keyword = QColor(86, 156, 214);
+        t.type = QColor(78, 220, 200);
+        t.comment = QColor(126, 206, 125);
+        t.string = QColor(255, 170, 120);
+        t.number = QColor(181, 206, 168);
+        t.preproc = QColor(217, 154, 212);
+        t.function = QColor(240, 240, 180);
+        registerTheme(t);
+    }
+    // --- GitHub Dark ---
+    {
+        EditorTheme t;
+        t.name = "GitHub Dark";
+        t.background = QColor(13, 17, 23);
+        t.foreground = QColor(201, 209, 217);
+        t.currentLine = QColor(22, 27, 34);
+        t.lineNumberBg = QColor(13, 17, 23);
+        t.lineNumberFg = QColor(110, 118, 129);
+        t.selectionBg = QColor(28, 60, 110);
+        t.keyword = QColor(255, 123, 114);
+        t.type = QColor(121, 192, 255);
+        t.comment = QColor(139, 148, 158);
+        t.string = QColor(165, 214, 255);
+        t.number = QColor(121, 192, 255);
+        t.preproc = QColor(210, 168, 255);
+        t.function = QColor(210, 168, 255);
+        registerTheme(t);
+    }
+    // --- Solarized Dark ---
+    {
+        EditorTheme t;
+        t.name = "Solarized Dark";
+        t.background = QColor(0, 43, 54);
+        t.foreground = QColor(131, 148, 150);
+        t.currentLine = QColor(7, 54, 66);
+        t.lineNumberBg = QColor(0, 43, 54);
+        t.lineNumberFg = QColor(88, 110, 117);
+        t.selectionBg = QColor(7, 54, 66);
+        t.keyword = QColor(133, 153, 0);
+        t.type = QColor(181, 137, 0);
+        t.comment = QColor(88, 110, 117);
+        t.string = QColor(42, 161, 152);
+        t.number = QColor(211, 54, 130);
+        t.preproc = QColor(203, 75, 22);
+        t.function = QColor(38, 139, 210);
+        registerTheme(t);
+    }
+
     m_current = m_themes.value("Default");
 }
 

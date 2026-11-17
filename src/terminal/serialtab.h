@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include "serialsession.h"
+#include "editor/thememanager.h"
 
 class TerminalWidget;
 
@@ -19,6 +20,10 @@ public:
 
     const SerialConfig &config() const { return m_config; }
     TerminalWidget *terminal() const { return m_terminal; }
+
+    // Apply the shared editor theme's background/foreground so serial tabs
+    // match the application's overall look.
+    void applyTheme(const EditorTheme &theme);
 
 signals:
     void connectionClosed();
