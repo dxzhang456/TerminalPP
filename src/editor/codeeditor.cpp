@@ -4,7 +4,13 @@
 #include <QTextBlock>
 #include <QKeyEvent>
 #include <QWheelEvent>
+#include <QMouseEvent>
 #include <QFontMetrics>
+#include <QApplication>
+#include <QClipboard>
+#include <QScrollBar>
+#include <QAbstractTextDocumentLayout>
+#include <QtGlobal>
 
 CodeEditor::CodeEditor(QWidget *parent)
     : QPlainTextEdit(parent)
@@ -152,6 +158,53 @@ QString CodeEditor::currentIndent() const
 
 void CodeEditor::keyPressEvent(QKeyEvent *event)
 {
+    // ---- Column (block) selection mode handling --------------------------
+    if (m_columnMode) {
+        const int key = event->key();
+        const Qt::KeyboardModifiers mods = event->modifiers();
+
+        // Escape leaves column mode.
+        if (key == Qt::Key_Escape) {
+            clearColumnSelection();
+            return;
+        }
+        // Copy / Cut the rectangular selection.
+        if (mods.testFlag(Qt::ControlModifier) && key == Qt::Key_C) {
+            QApplication::clipboard()->setText(columnSelectionText());
+            return;
+        }
+        if (mods.testFlag(Qt::ControlModifier) && key == Qt::Key_X) {
+            QApplication::clipboard()->setText(columnSelectionText());
+            deleteColumnSelection();
+            clearColumnSelection();
+            return;
+        }
+        // Paste: distribute clipboard lines across the block rows.
+        if (mods.testFlag(Qt::ControlModifier) && key == Qt::Key_V) {
+            pasteColumn(QApplication::clipboard()->text());
+            clearColumnSelection();
+            return;
+        }
+        // Backspace / Delete remove the rectangle (or one column if empty).
+        if (key == Qt::Key_Backspace || key == Qt::Key_Delete) {
+            if (m_colValid && m_colAnchorCol != m_colCaretCol) {
+                deleteColumnSelection();
+            }
+            clearColumnSelection();
+            return;
+        }
+        // Printable text: insert it at the left edge of the rectangle on
+        // every spanned line (replacing the rectangle first if non-empty).
+        if (!event->text().isEmpty() && event->text().at(0).isPrint()) {
+            if (m_colValid && m_colAnchorCol != m_colCaretCol)
+                deleteColumnSelection();
+            insertIntoColumn(event->text());
+            return;
+        }
+        // Any other navigation key cancels column mode and falls through.
+        clearColumnSelection();
+    }
+
     // Tab -> spaces, Shift+Tab -> unindent, block indent on selection.
     if (event->key() == Qt::Key_Tab && !event->modifiers().testFlag(Qt::ControlModifier)) {
         QTextCursor cur = textCursor();
@@ -236,4 +289,289 @@ void CodeEditor::wheelEvent(QWheelEvent *event)
 void CodeEditor::matchBrackets()
 {
     // Reserved for future bracket matching extension.
+}
+
+// ============================================================================
+//  Column (block / rectangular) editing — Alt + drag, Notepad++ style.
+// ============================================================================
+
+// Convert a viewport point into a (block index, column-in-chars) pair.
+// The column may extend past the end of a short line (virtual space), which is
+// exactly what a rectangular selection needs.
+void CodeEditor::pointToBlockColumn(const QPoint &vpPos, int &block, int &column) const
+{
+    QTextCursor cur = cursorForPosition(vpPos);
+    block = cur.blockNumber();
+
+    // Horizontal: measure from the block's left edge in character widths.
+    const qreal charW = QFontMetricsF(font()).horizontalAdvance(QLatin1Char(' '));
+    QTextBlock blk = document()->findBlockByNumber(block);
+    QRectF blockRect = blockBoundingGeometry(blk).translated(contentOffset());
+    qreal xInBlock = vpPos.x() - blockRect.left();
+    if (charW > 0.0)
+        column = qMax(0, qRound(xInBlock / charW));
+    else
+        column = 0;
+}
+
+// Compute the viewport rectangle of character cell (block, column), allowing
+// the column to lie beyond the physical end of the line (virtual space).
+QRect CodeEditor::cellRect(int block, int column) const
+{
+    QTextBlock blk = document()->findBlockByNumber(block);
+    if (!blk.isValid())
+        return QRect();
+
+    QRectF geo = blockBoundingGeometry(blk).translated(contentOffset());
+    const qreal charW = QFontMetricsF(font()).horizontalAdvance(QLatin1Char(' '));
+    int x = qRound(geo.left() + column * charW);
+    int y = qRound(geo.top());
+    int h = qRound(geo.height());
+    return QRect(x, y, qMax(1, qRound(charW)), h);
+}
+
+void CodeEditor::clearColumnSelection()
+{
+    bool was = m_columnMode;
+    m_columnMode = false;
+    m_colValid = false;
+    m_colDragging = false;
+    viewport()->update();
+    if (was)
+        emit columnModeChanged(false);
+}
+
+// Build the rectangular text: each spanned line contributes the substring
+// between the left and right columns (clamped to the line length); rows joined
+// with '\n'.
+QString CodeEditor::columnSelectionText() const
+{
+    if (!m_colValid)
+        return QString();
+
+    int b0 = qMin(m_colAnchorBlk, m_colCaretBlk);
+    int b1 = qMax(m_colAnchorBlk, m_colCaretBlk);
+    int c0 = qMin(m_colAnchorCol, m_colCaretCol);
+    int c1 = qMax(m_colAnchorCol, m_colCaretCol);
+
+    QStringList lines;
+    for (int b = b0; b <= b1; ++b) {
+        QTextBlock blk = document()->findBlockByNumber(b);
+        if (!blk.isValid()) {
+            lines << QString();
+            continue;
+        }
+        const QString text = blk.text();
+        int from = qMin(c0, text.size());
+        int to = qMin(c1, text.size());
+        lines << text.mid(from, to - from);
+    }
+    return lines.join(QLatin1Char('\n'));
+}
+
+// Remove the rectangle on every spanned line.
+bool CodeEditor::deleteColumnSelection()
+{
+    if (!m_colValid)
+        return false;
+
+    int b0 = qMin(m_colAnchorBlk, m_colCaretBlk);
+    int b1 = qMax(m_colAnchorBlk, m_colCaretBlk);
+    int c0 = qMin(m_colAnchorCol, m_colCaretCol);
+    int c1 = qMax(m_colAnchorCol, m_colCaretCol);
+    if (c0 == c1)
+        return false;
+
+    QTextCursor edit(document());
+    edit.beginEditBlock();
+    for (int b = b0; b <= b1; ++b) {
+        QTextBlock blk = document()->findBlockByNumber(b);
+        if (!blk.isValid())
+            continue;
+        const int len = blk.text().size();
+        int from = qMin(c0, len);
+        int to = qMin(c1, len);
+        if (to <= from)
+            continue;
+        QTextCursor c(blk);
+        c.setPosition(blk.position() + from);
+        c.setPosition(blk.position() + to, QTextCursor::KeepAnchor);
+        c.removeSelectedText();
+    }
+    edit.endEditBlock();
+
+    // Collapse the rectangle to its left edge.
+    m_colAnchorCol = m_colCaretCol = c0;
+    return true;
+}
+
+// Insert the same text on every spanned line at the rectangle's left column.
+void CodeEditor::insertIntoColumn(const QString &text)
+{
+    if (text.isEmpty())
+        return;
+
+    int b0 = qMin(m_colAnchorBlk, m_colCaretBlk);
+    int b1 = qMax(m_colAnchorBlk, m_colCaretBlk);
+    int col = qMin(m_colAnchorCol, m_colCaretCol);
+
+    QTextCursor edit(document());
+    edit.beginEditBlock();
+    for (int b = b0; b <= b1; ++b) {
+        QTextBlock blk = document()->findBlockByNumber(b);
+        if (!blk.isValid())
+            continue;
+        const int len = blk.text().size();
+        QTextCursor c(blk);
+        if (col > len) {
+            // Pad short lines with spaces so the column aligns (virtual space).
+            c.setPosition(blk.position() + len);
+            c.insertText(QString(col - len, QLatin1Char(' ')) + text);
+        } else {
+            c.setPosition(blk.position() + col);
+            c.insertText(text);
+        }
+    }
+    edit.endEditBlock();
+
+    // Advance the caret column by the inserted length and keep the block.
+    int newCol = col + text.size();
+    m_colAnchorCol = m_colCaretCol = newCol;
+    m_colValid = true;
+    viewport()->update();
+}
+
+// Paste clipboard content line-by-line down the block rows.
+void CodeEditor::pasteColumn(const QString &text)
+{
+    if (text.isEmpty())
+        return;
+
+    // Replace any existing non-empty rectangle first.
+    if (m_colValid && m_colAnchorCol != m_colCaretCol)
+        deleteColumnSelection();
+
+    const QStringList parts = text.split(QLatin1Char('\n'));
+    int startBlk = qMin(m_colAnchorBlk, m_colCaretBlk);
+    int col = qMin(m_colAnchorCol, m_colCaretCol);
+
+    QTextCursor edit(document());
+    edit.beginEditBlock();
+    for (int i = 0; i < parts.size(); ++i) {
+        QString piece = parts.at(i);
+        if (piece.endsWith(QLatin1Char('\r')))
+            piece.chop(1);
+
+        int blkIdx = startBlk + i;
+        // Create extra lines at the end of the document if the clipboard has
+        // more rows than the document currently holds.
+        while (blkIdx >= document()->blockCount()) {
+            QTextCursor tail(document());
+            tail.movePosition(QTextCursor::End);
+            tail.insertBlock();
+        }
+        QTextBlock blk = document()->findBlockByNumber(blkIdx);
+        if (!blk.isValid())
+            continue;
+        const int len = blk.text().size();
+        QTextCursor c(blk);
+        if (col > len) {
+            c.setPosition(blk.position() + len);
+            c.insertText(QString(col - len, QLatin1Char(' ')) + piece);
+        } else {
+            c.setPosition(blk.position() + col);
+            c.insertText(piece);
+        }
+    }
+    edit.endEditBlock();
+    viewport()->update();
+}
+
+void CodeEditor::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton &&
+        event->modifiers().testFlag(Qt::AltModifier)) {
+        // Begin an Alt+drag rectangular selection.
+        m_columnMode = true;
+        m_colDragging = true;
+        m_colValid = false;
+        pointToBlockColumn(event->pos(), m_colAnchorBlk, m_colAnchorCol);
+        m_colCaretBlk = m_colAnchorBlk;
+        m_colCaretCol = m_colAnchorCol;
+
+        // Place the real text cursor there too (so typing origin is sane).
+        setTextCursor(cursorForPosition(event->pos()));
+        viewport()->update();
+        emit columnModeChanged(true);
+        event->accept();
+        return;
+    }
+
+    // A normal click cancels any active column selection.
+    if (m_columnMode)
+        clearColumnSelection();
+
+    QPlainTextEdit::mousePressEvent(event);
+}
+
+void CodeEditor::mouseMoveEvent(QMouseEvent *event)
+{
+    if (m_colDragging) {
+        pointToBlockColumn(event->pos(), m_colCaretBlk, m_colCaretCol);
+        m_colValid = true;
+        viewport()->update();
+        event->accept();
+        return;
+    }
+    QPlainTextEdit::mouseMoveEvent(event);
+}
+
+void CodeEditor::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (m_colDragging) {
+        m_colDragging = false;
+        pointToBlockColumn(event->pos(), m_colCaretBlk, m_colCaretCol);
+        m_colValid = (m_colAnchorBlk != m_colCaretBlk) ||
+                     (m_colAnchorCol != m_colCaretCol);
+        // Even a zero-width rectangle keeps column mode active so the user can
+        // immediately type a multi-line insertion at that column.
+        viewport()->update();
+        event->accept();
+        return;
+    }
+    QPlainTextEdit::mouseReleaseEvent(event);
+}
+
+void CodeEditor::paintEvent(QPaintEvent *event)
+{
+    QPlainTextEdit::paintEvent(event);
+
+    if (!m_columnMode)
+        return;
+
+    QPainter p(viewport());
+    const QColor fill(80, 140, 230, 70);
+    const QColor border(60, 120, 210, 180);
+    p.setPen(border);
+    p.setBrush(fill);
+
+    int b0 = qMin(m_colAnchorBlk, m_colCaretBlk);
+    int b1 = qMax(m_colAnchorBlk, m_colCaretBlk);
+    int c0 = qMin(m_colAnchorCol, m_colCaretCol);
+    int c1 = qMax(m_colAnchorCol, m_colCaretCol);
+
+    for (int b = b0; b <= b1; ++b) {
+        QRect left = cellRect(b, c0);
+        QRect right = cellRect(b, c1);
+        if (left.isNull() || right.isNull())
+            continue;
+        if (c0 == c1) {
+            // Zero-width caret rectangle: draw a thin vertical bar.
+            p.fillRect(QRect(left.left(), left.top(), 2, left.height()), border);
+        } else {
+            QRect row(left.left(), left.top(),
+                      right.left() - left.left(), left.height());
+            p.drawRect(row);
+        }
+    }
 }

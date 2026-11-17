@@ -10,6 +10,9 @@
 #include "terminal/serialdialog.h"
 #include "terminal/sessionmanager.h"
 #include "terminal/terminalwidget.h"
+#include "core/i18n.h"
+#include "core/cliphistory.h"
+#include "core/cliphistorydialog.h"
 
 #include <QTabWidget>
 #include <QListWidget>
@@ -34,6 +37,11 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QListWidgetItem>
+#include <QTimer>
+#include <QSettings>
+
+// Shorthand for the runtime UI translator.
+static inline QString TR(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -60,9 +68,17 @@ MainWindow::MainWindow(QWidget *parent)
 
     createActions();
     createMenus();
-    createToolBars();
     createStatusBar();
-    createSidebar();
+
+    // Auto-save timer (interval applied when enabled via loadPreferences()).
+    m_autoSaveTimer = new QTimer(this);
+    connect(m_autoSaveTimer, &QTimer::timeout, this, &MainWindow::onAutoSaveTimeout);
+
+    // Re-translate the whole menu bar whenever the UI language changes.
+    connect(I18n::instance(), &I18n::languageChanged,
+            this, [this](const QString &) { retranslateUi(); });
+
+    loadPreferences();
 
     addEditorTab();
     updateWindowTitle();
@@ -87,56 +103,63 @@ void MainWindow::createActions()
     m_actWordWrap = new QAction(tr("&Word Wrap"), this);
     m_actWordWrap->setCheckable(true);
     connect(m_actWordWrap, &QAction::toggled, this, &MainWindow::toggleWordWrap);
-
-    m_actSidebar = new QAction(tr("Show Session &Sidebar"), this);
-    m_actSidebar->setCheckable(true);
-    m_actSidebar->setChecked(true);
-    m_actSidebar->setShortcut(QKeySequence("Ctrl+B"));
-    connect(m_actSidebar, &QAction::toggled, this, &MainWindow::toggleSidebar);
 }
 
 void MainWindow::createMenus()
 {
     // ---------- File ----------
-    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
-    fileMenu->addAction(tr("&New"), QKeySequence::New, this, &MainWindow::newFile);
-    fileMenu->addAction(tr("&Open..."), QKeySequence::Open, this, &MainWindow::openFileDialog);
-    fileMenu->addAction(tr("&Save"), QKeySequence::Save, this, &MainWindow::saveFile);
-    fileMenu->addAction(tr("Save &As..."), QKeySequence::SaveAs, this, &MainWindow::saveFileAs);
-    fileMenu->addAction(tr("Save A&ll"), QKeySequence("Ctrl+Shift+S"), this, &MainWindow::saveAll);
-    fileMenu->addSeparator();
-    fileMenu->addAction(tr("&Print..."), QKeySequence::Print, this, &MainWindow::printFile);
-    fileMenu->addSeparator();
-    fileMenu->addAction(tr("&Close Tab"), QKeySequence("Ctrl+W"), this, &MainWindow::closeCurrentTab);
-    fileMenu->addAction(tr("E&xit"), QKeySequence("Ctrl+Q"), this, &MainWindow::close);
+    m_fileMenu = menuBar()->addMenu(TR("&File"));
+    m_fileMenu->addAction(TR("&New"), QKeySequence::New, this, &MainWindow::newFile);
+    m_fileMenu->addAction(TR("&Open..."), QKeySequence::Open, this, &MainWindow::openFileDialog);
+    m_fileMenu->addAction(TR("&Save"), QKeySequence::Save, this, &MainWindow::saveFile);
+    m_fileMenu->addAction(TR("Save &As..."), QKeySequence::SaveAs, this, &MainWindow::saveFileAs);
+    m_fileMenu->addAction(TR("Save A&ll"), QKeySequence("Ctrl+Shift+S"), this, &MainWindow::saveAll);
+    m_fileMenu->addSeparator();
+    m_fileMenu->addAction(TR("&Print..."), QKeySequence::Print, this, &MainWindow::printFile);
+    m_fileMenu->addSeparator();
+    m_fileMenu->addAction(TR("&Close Tab"), QKeySequence("Ctrl+W"), this, &MainWindow::closeCurrentTab);
+    m_fileMenu->addAction(TR("E&xit"), QKeySequence("Ctrl+Q"), this, &MainWindow::close);
 
     // ---------- Edit ----------
-    QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
-    editMenu->addAction(tr("&Undo"), QKeySequence::Undo, this, &MainWindow::undo);
-    editMenu->addAction(tr("&Redo"), QKeySequence::Redo, this, &MainWindow::redo);
-    editMenu->addSeparator();
-    editMenu->addAction(tr("Cu&t"), QKeySequence::Cut, this, &MainWindow::cut);
-    editMenu->addAction(tr("&Copy"), QKeySequence::Copy, this, &MainWindow::copy);
-    editMenu->addAction(tr("&Paste"), QKeySequence::Paste, this, &MainWindow::paste);
-    editMenu->addAction(tr("Select &All"), QKeySequence::SelectAll, this, &MainWindow::selectAll);
-    editMenu->addSeparator();
-    editMenu->addAction(tr("&Find..."), QKeySequence::Find, this, &MainWindow::showFind);
-    editMenu->addAction(tr("&Replace..."), QKeySequence::Replace, this, &MainWindow::showReplace);
-    editMenu->addAction(tr("&Go To Line..."), QKeySequence("Ctrl+G"), this, &MainWindow::gotoLine);
+    m_editMenu = menuBar()->addMenu(TR("&Edit"));
+    m_editMenu->addAction(TR("&Undo"), QKeySequence::Undo, this, &MainWindow::undo);
+    m_editMenu->addAction(TR("&Redo"), QKeySequence::Redo, this, &MainWindow::redo);
+    m_editMenu->addSeparator();
+    m_editMenu->addAction(TR("Cu&t"), QKeySequence::Cut, this, &MainWindow::cut);
+    m_editMenu->addAction(TR("&Copy"), QKeySequence::Copy, this, &MainWindow::copy);
+    m_editMenu->addAction(TR("&Paste"), QKeySequence::Paste, this, &MainWindow::paste);
+    m_editMenu->addAction(TR("Select &All"), QKeySequence::SelectAll, this, &MainWindow::selectAll);
+    m_editMenu->addSeparator();
+    m_editMenu->addAction(TR("&Find..."), QKeySequence::Find, this, &MainWindow::showFind);
+    m_editMenu->addAction(TR("&Replace..."), QKeySequence::Replace, this, &MainWindow::showReplace);
+    m_editMenu->addAction(TR("&Go To Line..."), QKeySequence("Ctrl+G"), this, &MainWindow::gotoLine);
+    m_editMenu->addSeparator();
+    // Clipboard history picker (Ctrl+Shift+V).
+    m_editMenu->addAction(TR("Clipboard &History"), QKeySequence("Ctrl+Shift+V"),
+                          this, &MainWindow::showClipboardHistory);
+    {
+        // Column (block / rectangular) editing: a non-clickable hint entry so
+        // users discover the Alt+drag gesture.
+        QAction *colHint = m_editMenu->addAction(TR("Column / Block Edit (Alt+Drag)"));
+        colHint->setEnabled(false);
+    }
 
     // ---------- View ----------
-    QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
-    viewMenu->addAction(m_actLineNumbers);
-    viewMenu->addAction(m_actWordWrap);
-    viewMenu->addSeparator();
-    viewMenu->addAction(tr("Zoom &In"), QKeySequence::ZoomIn, this, &MainWindow::zoomIn);
-    viewMenu->addAction(tr("Zoom &Out"), QKeySequence::ZoomOut, this, &MainWindow::zoomOut);
-    viewMenu->addAction(tr("&Reset Zoom"), QKeySequence("Ctrl+0"), this, &MainWindow::zoomReset);
-    viewMenu->addSeparator();
-    viewMenu->addAction(m_actSidebar);
+    m_viewMenu = menuBar()->addMenu(TR("&View"));
+    m_viewMenu->addAction(m_actLineNumbers);
+    m_viewMenu->addAction(m_actWordWrap);
+    m_viewMenu->addSeparator();
+    m_viewMenu->addAction(TR("Zoom &In"), QKeySequence::ZoomIn, this, &MainWindow::zoomIn);
+    m_viewMenu->addAction(TR("Zoom &Out"), QKeySequence::ZoomOut, this, &MainWindow::zoomOut);
+    m_viewMenu->addAction(TR("&Reset Zoom"), QKeySequence("Ctrl+0"), this, &MainWindow::zoomReset);
+    m_viewMenu->addSeparator();
+    // Auto-save toggle.
+    m_actAutoSave = m_viewMenu->addAction(TR("&Auto Save"));
+    m_actAutoSave->setCheckable(true);
+    connect(m_actAutoSave, &QAction::toggled, this, &MainWindow::toggleAutoSave);
 
     // Themes submenu.
-    QMenu *themeMenu = viewMenu->addMenu(tr("&Theme"));
+    QMenu *themeMenu = m_viewMenu->addMenu(TR("&Theme"));
     QActionGroup *themeGroup = new QActionGroup(this);
     for (const QString &name : m_themeManager.themeNames()) {
         QAction *a = themeMenu->addAction(name);
@@ -147,8 +170,8 @@ void MainWindow::createMenus()
         connect(a, &QAction::triggered, this, [this, name]() { applyThemeByName(name); });
     }
 
-    // ---------- Language ----------
-    QMenu *langMenu = menuBar()->addMenu(tr("&Language"));
+    // ---------- Language (syntax) ----------
+    m_langSyntaxMenu = menuBar()->addMenu(TR("&Language"));
     m_langGroup = new QActionGroup(this);
     struct LangItem { const char *name; int id; };
     const LangItem langs[] = {
@@ -166,7 +189,7 @@ void MainWindow::createMenus()
         {"INI",        SyntaxHighlighter::Ini},
     };
     for (const auto &li : langs) {
-        QAction *a = langMenu->addAction(li.name);
+        QAction *a = m_langSyntaxMenu->addAction(li.name);
         a->setCheckable(true);
         m_langGroup->addAction(a);
         int id = li.id;
@@ -174,44 +197,47 @@ void MainWindow::createMenus()
     }
 
     // ---------- Encoding ----------
-    QMenu *encMenu = menuBar()->addMenu(tr("E&ncoding"));
+    m_encMenu = menuBar()->addMenu(TR("E&ncoding"));
     const QStringList encs = {"UTF-8", "UTF-16LE", "UTF-16BE", "System", "ISO-8859-1", "GB18030"};
     for (const QString &e : encs) {
-        QAction *a = encMenu->addAction(e);
+        QAction *a = m_encMenu->addAction(e);
         connect(a, &QAction::triggered, this, [this, e]() { setEncoding(e); });
     }
-    encMenu->addSeparator();
-    QMenu *eolMenu = encMenu->addMenu(tr("Line Ending"));
-    eolMenu->addAction(tr("Windows (CRLF)"), this, [this]() { setEol(EditorTab::CRLF); });
-    eolMenu->addAction(tr("Unix (LF)"), this, [this]() { setEol(EditorTab::LF); });
-    eolMenu->addAction(tr("Mac (CR)"), this, [this]() { setEol(EditorTab::CR); });
+    m_encMenu->addSeparator();
+    QMenu *eolMenu = m_encMenu->addMenu(TR("Line Ending"));
+    eolMenu->addAction(TR("Windows (CRLF)"), this, [this]() { setEol(EditorTab::CRLF); });
+    eolMenu->addAction(TR("Unix (LF)"), this, [this]() { setEol(EditorTab::LF); });
+    eolMenu->addAction(TR("Mac (CR)"), this, [this]() { setEol(EditorTab::CR); });
 
     // ---------- Terminal ----------
-    QMenu *termMenu = menuBar()->addMenu(tr("&Terminal"));
-    termMenu->addAction(tr("New &SSH Session..."), QKeySequence("Ctrl+N"), this, &MainWindow::newSshSession)
+    m_termMenu = menuBar()->addMenu(TR("&Terminal"));
+    m_termMenu->addAction(TR("New &SSH Session..."), QKeySequence("Ctrl+N"), this, &MainWindow::newSshSession)
         ->setShortcutContext(Qt::ApplicationShortcut);
-    termMenu->addAction(tr("&Manage Sessions..."), this, &MainWindow::manageSessions);
-    termMenu->addAction(tr("&Reconnect Current"), QKeySequence("Ctrl+Shift+R"), this, &MainWindow::reconnectCurrent);
-    termMenu->addSeparator();
-    termMenu->addAction(tr("New Serial / &UART Session..."), this, &MainWindow::newSerialSession);
+    m_termMenu->addAction(TR("New Serial / &UART Session..."), this, &MainWindow::newSerialSession);
+    m_termMenu->addAction(TR("&Reconnect Current"), QKeySequence("Ctrl+Shift+R"), this, &MainWindow::reconnectCurrent);
+    m_termMenu->addSeparator();
+
+    // SSH / Serial Sessions submenu.
+    m_sessionsMenu = m_termMenu->addMenu(TR("SSH / Serial &Sessions"));
+    rebuildSessionsMenu();
+
+    // ---------- UI Language ----------
+    m_uiLangMenu = menuBar()->addMenu(TR("&UI Language"));
+    m_uiLangGroup = new QActionGroup(this);
+    m_uiLangGroup->setExclusive(true);
+    for (const QString &code : I18n::instance()->languageCodes()) {
+        QAction *a = m_uiLangMenu->addAction(I18n::instance()->languageDisplayName(code));
+        a->setCheckable(true);
+        a->setData(code);
+        if (code == I18n::instance()->currentLanguage())
+            a->setChecked(true);
+        m_uiLangGroup->addAction(a);
+        connect(a, &QAction::triggered, this, [this, code]() { changeUiLanguage(code); });
+    }
 
     // ---------- Help ----------
-    QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
-    helpMenu->addAction(tr("&About Terminal++"), this, &MainWindow::about);
-}
-
-void MainWindow::createToolBars()
-{
-    QToolBar *tb = addToolBar(tr("Main"));
-    tb->setMovable(false);
-    tb->addAction(tr("New"), this, &MainWindow::newFile);
-    tb->addAction(tr("Open"), this, &MainWindow::openFileDialog);
-    tb->addAction(tr("Save"), this, &MainWindow::saveFile);
-    tb->addSeparator();
-    tb->addAction(tr("Find"), this, &MainWindow::showFind);
-    tb->addSeparator();
-    tb->addAction(tr("SSH"), this, &MainWindow::newSshSession);
-    tb->addAction(tr("Serial"), this, &MainWindow::newSerialSession);
+    m_helpMenu = menuBar()->addMenu(TR("&Help"));
+    m_helpMenu->addAction(TR("&About Terminal++"), this, &MainWindow::about);
 }
 
 void MainWindow::createStatusBar()
@@ -220,7 +246,11 @@ void MainWindow::createStatusBar()
     m_langLabel = new QLabel("Plain Text", this);
     m_encLabel = new QLabel("UTF-8", this);
     m_eolLabel = new QLabel("Windows (CRLF)", this);
+    m_colLabel = new QLabel("", this);
+    // Make the column-mode indicator stand out when active.
+    m_colLabel->setStyleSheet("QLabel { color: #1060d0; font-weight: bold; }");
 
+    statusBar()->addPermanentWidget(m_colLabel);
     statusBar()->addPermanentWidget(m_posLabel);
     statusBar()->addPermanentWidget(m_langLabel);
     statusBar()->addPermanentWidget(m_encLabel);
@@ -228,46 +258,48 @@ void MainWindow::createStatusBar()
     statusBar()->showMessage(tr("Ready"));
 }
 
-void MainWindow::createSidebar()
+// ------------------------------------------------------------------
+// Sessions submenu (Terminal > SSH / Serial Sessions)
+// ------------------------------------------------------------------
+void MainWindow::rebuildSessionsMenu()
 {
-    m_sidebarDock = new QDockWidget(tr("SSH Sessions"), this);
-    m_sidebarDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-
-    QWidget *panel = new QWidget(m_sidebarDock);
-    QVBoxLayout *l = new QVBoxLayout(panel);
-    l->setContentsMargins(4, 4, 4, 4);
-
-    m_sessionList = new QListWidget(panel);
-    l->addWidget(m_sessionList);
-
-    QHBoxLayout *btns = new QHBoxLayout;
-    QPushButton *addBtn = new QPushButton(tr("+ Add"), panel);
-    QPushButton *connBtn = new QPushButton(tr("Connect"), panel);
-    btns->addWidget(addBtn);
-    btns->addWidget(connBtn);
-    l->addLayout(btns);
-
-    connect(addBtn, &QPushButton::clicked, this, &MainWindow::newSshSession);
-    connect(connBtn, &QPushButton::clicked, this, &MainWindow::connectSelectedSession);
-    connect(m_sessionList, &QListWidget::itemDoubleClicked, this,
-            [this](QListWidgetItem *) { connectSelectedSession(); });
-
-    m_sidebarDock->setWidget(panel);
-    addDockWidget(Qt::LeftDockWidgetArea, m_sidebarDock);
-    connect(m_sidebarDock, &QDockWidget::visibilityChanged, this, [this](bool v) {
-        if (m_actSidebar) m_actSidebar->setChecked(v);
-    });
-
-    refreshSessionList();
-}
-
-void MainWindow::refreshSessionList()
-{
-    if (!m_sessionList)
+    if (!m_sessionsMenu)
         return;
-    m_sessionList->clear();
-    for (const SshSessionConfig &c : m_sessions->sessions())
-        m_sessionList->addItem(c.displayName());
+    m_sessionsMenu->clear();
+
+    // ---- SSH saved sessions ----
+    QMenu *sshMenu = m_sessionsMenu->addMenu(tr("SSH"));
+    sshMenu->addAction(tr("+ New SSH Session..."), this, &MainWindow::newSshSession);
+    sshMenu->addSeparator();
+    const auto &ssh = m_sessions->sessions();
+    if (ssh.isEmpty()) {
+        QAction *none = sshMenu->addAction(tr("(no saved SSH sessions)"));
+        none->setEnabled(false);
+    } else {
+        for (int i = 0; i < ssh.size(); ++i) {
+            QMenu *item = sshMenu->addMenu(ssh[i].displayName());
+            int idx = i;
+            item->addAction(tr("Open"), this, [this, idx]() { openSavedSshSession(idx); });
+            item->addAction(tr("Delete"), this, [this, idx]() { deleteSavedSshSession(idx); });
+        }
+    }
+
+    // ---- Serial saved sessions ----
+    QMenu *serMenu = m_sessionsMenu->addMenu(tr("Serial / UART"));
+    serMenu->addAction(tr("+ New Serial Session..."), this, &MainWindow::newSerialSession);
+    serMenu->addSeparator();
+    const auto &ser = m_sessions->serialSessions();
+    if (ser.isEmpty()) {
+        QAction *none = serMenu->addAction(tr("(no saved serial sessions)"));
+        none->setEnabled(false);
+    } else {
+        for (int i = 0; i < ser.size(); ++i) {
+            QMenu *item = serMenu->addMenu(ser[i].displayName());
+            int idx = i;
+            item->addAction(tr("Open"), this, [this, idx]() { openSavedSerialSession(idx); });
+            item->addAction(tr("Delete"), this, [this, idx]() { deleteSavedSerialSession(idx); });
+        }
+    }
 }
 
 // ------------------------------------------------------------------
@@ -298,6 +330,22 @@ EditorTab *MainWindow::addEditorTab()
         updateWindowTitle();
     });
     connect(tab, &EditorTab::cursorInfoChanged, this, &MainWindow::updateStatusBar);
+
+    // Column (block) edit mode indicator in the status bar.
+    connect(tab->editor(), &CodeEditor::columnModeChanged, this,
+            [this, tab](bool active) {
+        // Only reflect the state of the currently visible tab.
+        if (m_tabs->currentWidget() != tab)
+            return;
+        if (active) {
+            m_colLabel->setText(tr("COLUMN"));
+            statusBar()->showMessage(
+                tr("Column (block) edit mode — type/Delete/Ctrl+C/Ctrl+V across "
+                   "lines, Esc to exit"), 4000);
+        } else {
+            m_colLabel->setText("");
+        }
+    });
 
     return tab;
 }
@@ -538,12 +586,6 @@ void MainWindow::applyThemeByName(const QString &name)
     statusBar()->showMessage(tr("Theme: %1").arg(name), 3000);
 }
 
-void MainWindow::toggleSidebar(bool on)
-{
-    if (m_sidebarDock)
-        m_sidebarDock->setVisible(on);
-}
-
 // ------------------------------------------------------------------
 // Language / encoding / EOL
 // ------------------------------------------------------------------
@@ -577,6 +619,40 @@ void MainWindow::setEol(int eol)
 // ------------------------------------------------------------------
 // SSH
 // ------------------------------------------------------------------
+static void convertSerial(const SerialSessionConfig &c, SerialConfig &out)
+{
+    out.portName = c.portName;
+    out.baudRate = c.baudRate;
+    out.dataBits = static_cast<QSerialPort::DataBits>(c.dataBits);
+    out.parity = (c.parity == "Even")  ? QSerialPort::EvenParity :
+                 (c.parity == "Odd")   ? QSerialPort::OddParity  :
+                 (c.parity == "Mark")  ? QSerialPort::MarkParity :
+                 (c.parity == "Space") ? QSerialPort::SpaceParity: QSerialPort::NoParity;
+    out.stopBits = (c.stopBits == "2")   ? QSerialPort::TwoStop :
+                   (c.stopBits == "1.5") ? QSerialPort::OneAndHalfStop : QSerialPort::OneStop;
+    out.flow = (c.flow == "RTS-CTS")  ? QSerialPort::HardwareControl :
+               (c.flow == "XON-XOFF") ? QSerialPort::SoftwareControl : QSerialPort::NoFlowControl;
+    out.lineEnding = c.lineEnding;
+    out.localEcho = c.localEcho;
+}
+
+static void convertSerialBack(const SerialConfig &c, SerialSessionConfig &out)
+{
+    out.portName = c.portName;
+    out.baudRate = c.baudRate;
+    out.dataBits = static_cast<int>(c.dataBits);
+    out.parity = (c.parity == QSerialPort::EvenParity)  ? "Even"  :
+                 (c.parity == QSerialPort::OddParity)   ? "Odd"   :
+                 (c.parity == QSerialPort::MarkParity)  ? "Mark"  :
+                 (c.parity == QSerialPort::SpaceParity) ? "Space" : "None";
+    out.stopBits = (c.stopBits == QSerialPort::TwoStop)         ? "2"   :
+                   (c.stopBits == QSerialPort::OneAndHalfStop)  ? "1.5" : "1";
+    out.flow = (c.flow == QSerialPort::HardwareControl) ? "RTS-CTS"  :
+               (c.flow == QSerialPort::SoftwareControl) ? "XON-XOFF" : "None";
+    out.lineEnding = c.lineEnding;
+    out.localEcho = c.localEcho;
+}
+
 void MainWindow::newSshSession()
 {
     SessionDialog dlg(this);
@@ -589,34 +665,18 @@ void MainWindow::newSshSession()
         return;
     }
 
-    m_sessions->add(cfg);
-    refreshSessionList();
-
-    SshTab *tab = new SshTab(cfg, this);
-    int idx = m_tabs->addTab(tab, cfg.displayName());
-    m_tabs->setCurrentIndex(idx);
-
-    connect(tab, &SshTab::titleChanged, this, [this, tab](const QString &title) {
-        int i = m_tabs->indexOf(tab);
-        if (i >= 0 && !title.isEmpty())
-            m_tabs->setTabText(i, title);
-    });
-    connect(tab, &SshTab::connectionClosed, this, [this, tab]() {
-        int i = m_tabs->indexOf(tab);
-        if (i >= 0)
-            m_tabs->setTabText(i, m_tabs->tabText(i) + tr(" [closed]"));
-    });
-
-    tab->connectSession();
+    m_sessions->add(cfg);          // persist
+    rebuildSessionsMenu();         // refresh Terminal > Sessions
+    openSavedSshSession(m_sessions->sessions().size() - 1);
 }
 
-void MainWindow::connectSelectedSession()
+void MainWindow::openSavedSshSession(int index)
 {
-    int row = m_sessionList->currentRow();
-    if (row < 0 || row >= m_sessions->sessions().size())
+    const auto &list = m_sessions->sessions();
+    if (index < 0 || index >= list.size())
         return;
+    SshSessionConfig cfg = list.at(index);
 
-    SshSessionConfig cfg = m_sessions->sessions().at(row);
     SshTab *tab = new SshTab(cfg, this);
     int idx = m_tabs->addTab(tab, cfg.displayName());
     m_tabs->setCurrentIndex(idx);
@@ -633,38 +693,33 @@ void MainWindow::connectSelectedSession()
     });
 
     tab->connectSession();
+    tab->terminal()->setFocus();
+}
+
+void MainWindow::deleteSavedSshSession(int index)
+{
+    const auto &list = m_sessions->sessions();
+    if (index < 0 || index >= list.size())
+        return;
+    if (QMessageBox::question(this, tr("Delete Session"),
+            tr("Delete SSH session \"%1\"?").arg(list.at(index).displayName()))
+        != QMessageBox::Yes)
+        return;
+    m_sessions->remove(index);
+    rebuildSessionsMenu();
+}
+
+// Kept for API compatibility (Ctrl+Shift+R).
+void MainWindow::connectSelectedSession()
+{
+    if (!m_sessions->sessions().isEmpty())
+        openSavedSshSession(0);
 }
 
 void MainWindow::manageSessions()
 {
-    // Simple management: list sessions and allow edit/delete via input.
-    QStringList names;
-    for (const SshSessionConfig &c : m_sessions->sessions())
-        names << c.displayName();
-
-    if (names.isEmpty()) {
-        QMessageBox::information(this, tr("Sessions"),
-                                 tr("No saved sessions. Add one via New SSH Session."));
-        return;
-    }
-
-    bool ok = false;
-    QString chosen = QInputDialog::getItem(this, tr("Manage Sessions"),
-                                           tr("Select a session to edit:"),
-                                           names, 0, false, &ok);
-    if (!ok)
-        return;
-
-    int row = names.indexOf(chosen);
-    if (row < 0)
-        return;
-
-    SessionDialog dlg(this);
-    dlg.setConfig(m_sessions->sessions().at(row));
-    if (dlg.exec() == QDialog::Accepted) {
-        m_sessions->update(row, dlg.config());
-        refreshSessionList();
-    }
+    // Management is now done inline via the Terminal > Sessions submenu.
+    rebuildSessionsMenu();
 }
 
 void MainWindow::reconnectCurrent()
@@ -688,6 +743,23 @@ void MainWindow::newSerialSession()
         return;
     }
 
+    // Persist a serial session entry.
+    SerialSessionConfig sc;
+    convertSerialBack(cfg, sc);
+    m_sessions->addSerial(sc);
+    rebuildSessionsMenu();
+    openSavedSerialSession(m_sessions->serialSessions().size() - 1);
+}
+
+void MainWindow::openSavedSerialSession(int index)
+{
+    const auto &list = m_sessions->serialSessions();
+    if (index < 0 || index >= list.size())
+        return;
+
+    SerialConfig cfg;
+    convertSerial(list.at(index), cfg);
+
     SerialTab *tab = new SerialTab(cfg, this);
     QString title = QString("%1 @ %2").arg(cfg.portName).arg(cfg.baudRate);
     int idx = m_tabs->addTab(tab, title);
@@ -699,8 +771,126 @@ void MainWindow::newSerialSession()
             m_tabs->setTabText(i, m_tabs->tabText(i) + tr(" [closed]"));
     });
 
-    if (!tab->openPort()) {
-        // Keep the tab open so the error message is visible in the terminal.
+    tab->openPort();
+    tab->terminal()->setFocus();
+}
+
+void MainWindow::deleteSavedSerialSession(int index)
+{
+    const auto &list = m_sessions->serialSessions();
+    if (index < 0 || index >= list.size())
+        return;
+    if (QMessageBox::question(this, tr("Delete Session"),
+            tr("Delete serial session \"%1\"?").arg(list.at(index).displayName()))
+        != QMessageBox::Yes)
+        return;
+    m_sessions->removeSerial(index);
+    rebuildSessionsMenu();
+}
+
+// ------------------------------------------------------------------
+// Clipboard history / auto-save / UI language
+// ------------------------------------------------------------------
+void MainWindow::showClipboardHistory()
+{
+    ClipHistoryDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted) {
+        const QString text = dlg.selectedText();
+        if (text.isEmpty())
+            return;
+        // Paste into the active editor; terminal tabs receive it via clipboard.
+        if (EditorTab *t = currentEditorTab()) {
+            t->editor()->insertPlainText(text);
+            t->editor()->setFocus();
+        }
+    }
+}
+
+void MainWindow::toggleAutoSave(bool on)
+{
+    m_autoSaveEnabled = on;
+    if (on)
+        m_autoSaveTimer->start(m_autoSaveIntervalSec * 1000);
+    else
+        m_autoSaveTimer->stop();
+
+    QSettings s;
+    s.setValue(QStringLiteral("editor/autoSave"), on);
+
+    statusBar()->showMessage(
+        on ? tr("Auto-save enabled (every %1s)").arg(m_autoSaveIntervalSec)
+           : tr("Auto-save disabled"), 3000);
+}
+
+void MainWindow::onAutoSaveTimeout()
+{
+    // Silently save every modified, already-named editor tab. Untitled tabs are
+    // skipped (nothing to save to yet) to avoid popping dialogs unexpectedly.
+    int saved = 0;
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        EditorTab *t = qobject_cast<EditorTab *>(m_tabs->widget(i));
+        if (t && t->isModified() && !t->isUntitled()) {
+            if (t->save())
+                ++saved;
+        }
+    }
+    if (saved > 0) {
+        updateWindowTitle();
+        statusBar()->showMessage(tr("Auto-saved %1 file(s)").arg(saved), 2000);
+    }
+}
+
+void MainWindow::changeUiLanguage(const QString &code)
+{
+    I18n::instance()->setLanguage(code);   // triggers retranslateUi() via signal
+    statusBar()->showMessage(
+        TR("Language changed. Some elements update immediately; reopen dialogs to fully refresh."),
+        5000);
+}
+
+// ------------------------------------------------------------------
+// Rebuild all menu text for the current UI language.
+// ------------------------------------------------------------------
+void MainWindow::retranslateUi()
+{
+    // Easiest robust approach: clear the menu bar and rebuild it. Action
+    // connections are recreated by createMenus(); the previous actions are
+    // owned by the old menus and deleted with them.
+    menuBar()->clear();
+
+    // Reset menu pointers that will be recreated.
+    m_sessionsMenu = nullptr;
+    m_fileMenu = m_editMenu = m_viewMenu = nullptr;
+    m_langSyntaxMenu = m_encMenu = m_termMenu = nullptr;
+    m_uiLangMenu = m_helpMenu = nullptr;
+    m_actAutoSave = nullptr;
+
+    createMenus();
+
+    // Restore the auto-save checkbox state in the freshly built menu.
+    if (m_actAutoSave) {
+        m_actAutoSave->blockSignals(true);
+        m_actAutoSave->setChecked(m_autoSaveEnabled);
+        m_actAutoSave->blockSignals(false);
+    }
+
+    updateStatusBar();
+}
+
+// ------------------------------------------------------------------
+// Restore persisted preferences (auto-save state).
+// ------------------------------------------------------------------
+void MainWindow::loadPreferences()
+{
+    QSettings s;
+    m_autoSaveIntervalSec = qMax(5, s.value(QStringLiteral("editor/autoSaveIntervalSec"), 30).toInt());
+    const bool autoSave = s.value(QStringLiteral("editor/autoSave"), false).toBool();
+    if (m_actAutoSave) {
+        m_actAutoSave->setChecked(autoSave);  // triggers toggleAutoSave()
+    } else {
+        m_autoSaveEnabled = autoSave;
+        if (autoSave)
+            m_autoSaveTimer->start(m_autoSaveIntervalSec * 1000);
     }
 }
 
@@ -711,21 +901,28 @@ void MainWindow::about()
 {
     QMessageBox::about(this, tr("About Terminal++"),
         tr("<h3>Terminal++ 1.0</h3>"
-           "<p>A unified Qt6 application combining:</p>"
+           "<p>A unified Qt 6 application combining:</p>"
            "<ul>"
-           "<li><b>Code editor</b> &mdash; a Notepad-- (ndd) style editor with "
-           "syntax highlighting, themes, find/replace, multi-tab, encodings.</li>"
-           "<li><b>SSH terminal</b> &mdash; MuxTerm-style SSH sessions with "
-           "tmux auto-attach and VT100/256-color rendering.</li>"
-           "<li><b>Serial / UART</b> &mdash; a PuTTY-like serial console.</li>"
+           "<li><b>Code editor</b> &mdash; multi-tab editor with syntax "
+           "highlighting, themes, find/replace, encodings.</li>"
+           "<li><b>SSH terminal</b> &mdash; native libssh2 SSH sessions with "
+           "tmux support and VT100/256-color rendering.</li>"
+           "<li><b>Serial / UART</b> &mdash; configurable serial console.</li>"
            "</ul>"
-           "<p>Built with MinGW + Qt 6.</p>"));
+           "<p>Built with MinGW + Qt 6 + libssh2.</p>"));
 }
 
 void MainWindow::onCurrentTabChanged(int)
 {
     updateWindowTitle();
     updateStatusBar();
+
+    // Give keyboard focus to terminal tabs so typing works immediately.
+    QWidget *w = m_tabs->currentWidget();
+    if (SshTab *s = qobject_cast<SshTab *>(w))
+        s->terminal()->setFocus();
+    else if (SerialTab *s = qobject_cast<SerialTab *>(w))
+        s->terminal()->setFocus();
 }
 
 void MainWindow::updateStatusBar()
@@ -747,6 +944,10 @@ void MainWindow::updateStatusBar()
     m_langLabel->setText(SyntaxHighlighter::languageName(t->highlighter()->language()));
     m_encLabel->setText(t->encoding());
     m_eolLabel->setText(t->eolName());
+
+    // Reflect the active editor's column (block) edit state.
+    if (m_colLabel)
+        m_colLabel->setText(t->editor()->hasColumnSelection() ? tr("COLUMN") : QString());
 }
 
 void MainWindow::updateWindowTitle()

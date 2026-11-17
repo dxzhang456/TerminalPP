@@ -15,6 +15,9 @@ SshTab::SshTab(const SshSessionConfig &cfg, QWidget *parent)
     l->setContentsMargins(0, 0, 0, 0);
     l->addWidget(m_terminal);
 
+    // Route focus straight to the terminal so keystrokes always reach it.
+    setFocusProxy(m_terminal);
+
     m_session = new SshSession(this);
     m_session->setConfig(m_config);
 

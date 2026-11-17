@@ -62,9 +62,11 @@ void SshSession::start()
         emit disconnected(code);
     });
 
-    // GUI -> worker (queued across threads).
-    connect(this, &SshSession::sendToWorker, m_worker, &SshWorker::writeData);
-    connect(this, &SshSession::resizeWorker, m_worker, &SshWorker::resize);
+    // NOTE: We intentionally do NOT use queued signals for GUI->worker here.
+    // run() blocks the worker thread in a tight loop and never returns to its
+    // event loop, so queued slot invocations would never execute. Instead
+    // sendData()/setWindowSize() call the worker's thread-safe (mutex-guarded)
+    // methods directly from the GUI thread.
 
     // Thread lifecycle.
     connect(m_thread, &QThread::started, m_worker, &SshWorker::run);
@@ -94,16 +96,17 @@ void SshSession::stop()
 
 void SshSession::sendData(const QByteArray &data)
 {
-    if (m_running.load())
-        emit sendToWorker(data);
+    // writeData() is mutex-guarded, safe to call across threads directly.
+    if (m_running.load() && m_worker)
+        m_worker->writeData(data);
 }
 
 void SshSession::setWindowSize(int rows, int cols)
 {
     m_rows = rows;
     m_cols = cols;
-    if (m_running.load())
-        emit resizeWorker(rows, cols);
+    if (m_running.load() && m_worker)
+        m_worker->resize(rows, cols);
 }
 
 // ====================================================================

@@ -12,6 +12,7 @@ class LineNumberArea;
 //  * tab/space handling, auto-indent
 //  * bracket matching
 //  * zoom in/out
+//  * column (block / rectangular) editing mode (Alt + drag, like Notepad++)
 class CodeEditor : public QPlainTextEdit
 {
     Q_OBJECT
@@ -33,10 +34,22 @@ public:
     void setCurrentLineColor(const QColor &c);
     void setLineNumberColors(const QColor &bg, const QColor &fg);
 
+    // Column (rectangular / block) selection mode. When active the user can
+    // Alt+drag to select a rectangle and type / delete / paste across lines.
+    bool hasColumnSelection() const { return m_columnMode && m_colValid; }
+
+signals:
+    // Emitted when the column-mode state changes (for the status bar indicator).
+    void columnModeChanged(bool active);
+
 protected:
     void resizeEvent(QResizeEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
 
 private slots:
     void updateLineNumberAreaWidth(int newBlockCount);
@@ -47,6 +60,22 @@ private:
     void matchBrackets();
     QString currentIndent() const;
 
+    // --- Column editing helpers ---
+    // Convert a viewport point to (block, columnInChars).
+    void pointToBlockColumn(const QPoint &vpPos, int &block, int &column) const;
+    // Position of a (block, column) char cell, in viewport coordinates.
+    QRect cellRect(int block, int column) const;
+    // Clear the column selection and leave column mode.
+    void clearColumnSelection();
+    // Copy the rectangular selection text (lines joined with '\n').
+    QString columnSelectionText() const;
+    // Delete the rectangular selection (returns true if anything removed).
+    bool deleteColumnSelection();
+    // Insert text into every selected line at the block's left column.
+    void insertIntoColumn(const QString &text);
+    // Paste a (possibly multi-line) string line-by-line into the block rows.
+    void pasteColumn(const QString &text);
+
     LineNumberArea *m_lineNumberArea = nullptr;
     bool   m_showLineNumbers = true;
     int    m_tabWidth = 4;
@@ -54,6 +83,15 @@ private:
     QColor m_currentLineColor = QColor(232, 242, 254);
     QColor m_lnBg = QColor(240, 240, 240);
     QColor m_lnFg = QColor(130, 130, 130);
+
+    // --- Column (block) selection state ---
+    bool m_columnMode   = false; // currently dragging/holding a column selection
+    bool m_colValid     = false; // the rectangle spans a real selection
+    bool m_colDragging  = false; // mouse button held during Alt+drag
+    int  m_colAnchorBlk = 0;     // anchor block (line) index
+    int  m_colAnchorCol = 0;     // anchor column (in characters)
+    int  m_colCaretBlk  = 0;     // moving-end block index
+    int  m_colCaretCol  = 0;     // moving-end column (in characters)
 };
 
 // The gutter widget painted alongside the editor.

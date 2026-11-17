@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Qt6 modules. SerialPort is required for the PuTTY-like UART feature.
+# Qt6 modules. SerialPort is required for the UART / serial feature.
 find_package(Qt6 REQUIRED COMPONENTS
     Core
     Gui
@@ -47,7 +47,15 @@ set(PROJECT_SOURCES
     src/mainwindow.cpp
     src/mainwindow.h
 
-    # --- Editor (Notepad-- / ndd replica) ---
+    # --- Core (i18n, clipboard history, preferences) ---
+    src/core/i18n.cpp
+    src/core/i18n.h
+    src/core/cliphistory.cpp
+    src/core/cliphistory.h
+    src/core/cliphistorydialog.cpp
+    src/core/cliphistorydialog.h
+
+    # --- Code editor ---
     src/editor/codeeditor.cpp
     src/editor/codeeditor.h
     src/editor/syntaxhighlighter.cpp
@@ -67,7 +75,7 @@ set(PROJECT_SOURCES
     src/terminal/ansiparser.cpp
     src/terminal/ansiparser.h
 
-    # --- SSH (MuxTerm replica) ---
+    # --- SSH terminal ---
     src/terminal/sshsession.cpp
     src/terminal/sshsession.h
     src/terminal/sshtab.cpp
@@ -77,7 +85,7 @@ set(PROJECT_SOURCES
     src/terminal/sessionmanager.cpp
     src/terminal/sessionmanager.h
 
-    # --- Serial / UART (PuTTY replica) ---
+    # --- Serial / UART terminal ---
     src/terminal/serialsession.cpp
     src/terminal/serialsession.h
     src/terminal/serialtab.cpp
@@ -86,10 +94,17 @@ set(PROJECT_SOURCES
     src/terminal/serialdialog.h
 )
 
+# Windows application icon (compiled from resources/app.rc -> icon.ico).
+set(APP_ICON_RESOURCE "")
+if (WIN32)
+    set(APP_ICON_RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc")
+endif()
+
 qt_add_executable(TerminalPP
     WIN32
     ${PROJECT_SOURCES}
     resources/resources.qrc
+    ${APP_ICON_RESOURCE}
 )
 
 target_include_directories(TerminalPP PRIVATE

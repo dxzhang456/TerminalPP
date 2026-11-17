@@ -24,6 +24,10 @@ TerminalWidget::TerminalWidget(QWidget *parent)
     setFocusPolicy(Qt::StrongFocus);
     viewport()->setCursor(Qt::IBeamCursor);
     setAttribute(Qt::WA_InputMethodEnabled, true);
+    // Keep keyboard focus on the scroll area itself (not the viewport) so our
+    // keyPressEvent/inputMethodEvent overrides receive all input.
+    viewport()->setFocusPolicy(Qt::NoFocus);
+    viewport()->setAttribute(Qt::WA_InputMethodEnabled, true);
 
     QPalette pal = viewport()->palette();
     pal.setColor(QPalette::Window, m_defaultBg);
@@ -218,6 +222,23 @@ QByteArray TerminalWidget::keyToBytes(QKeyEvent *event)
         return event->text().toUtf8();
 
     return QByteArray();
+}
+
+void TerminalWidget::showEvent(QShowEvent *e)
+{
+    QAbstractScrollArea::showEvent(e);
+    setFocus();
+}
+
+bool TerminalWidget::event(QEvent *e)
+{
+    // Intercept key presses (including Tab/Backtab which Qt would otherwise
+    // consume for focus navigation) so every keystroke reaches the terminal.
+    if (e->type() == QEvent::KeyPress) {
+        keyPressEvent(static_cast<QKeyEvent *>(e));
+        return true;
+    }
+    return QAbstractScrollArea::event(e);
 }
 
 void TerminalWidget::keyPressEvent(QKeyEvent *event)

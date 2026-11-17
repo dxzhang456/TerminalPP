@@ -28,6 +28,10 @@
 - 打印（Ctrl+P）
 - 命令行传参直接打开文件
 - 状态栏显示行列号、语言、编码、行尾
+- **列编辑 / 块编辑**（Alt+拖动鼠标框选矩形区域，输入/删除/复制/粘贴同时作用于所有选中行，Esc 退出；状态栏显示 COLUMN 指示）
+- **剪贴板历史**（Ctrl+Shift+V 打开历史列表，自动记录最近 50 条，双击回填并粘贴，持久化保存）
+- **自动保存**（View 菜单开关，默认 30 秒静默保存所有已命名且已修改的标签，设置持久化）
+- **多语言界面**：English / 简体中文 / 繁體中文 / Español / Français / Deutsch / Русский / 日本語 / 한국어，首次启动默认英文，可在 "UI Language" 菜单切换，选择后立即生效并持久化，下次启动沿用
 
 ### 2. SSH 终端
 - 多 SSH 会话，每个会话一个标签页
@@ -82,86 +86,99 @@
 
 ---
 
-## 三、编译步骤
+## 三、Windows 完整环境搭建（MSYS2 / MinGW-w64，推荐，已验证）
 
-### 方式 A：一键脚本（推荐）
+这是本项目实际用来产出 `dist\` 可执行包的完整、可复现流程。MSYS2 一次性装好
+MinGW-w64 + Qt6 + libssh2 全套工具链，`build-msys2.sh` 会用 g++ 直接编译、
+生成 exe 图标、并把全部运行时 DLL 打包到 `dist\`，得到免安装、可直接拷走的程序。
 
-**Windows** — PowerShell（自动在 `C:\Qt` 下探测 MinGW 版 Qt6）：
+### 1. 安装 MSYS2
+1. 从 https://www.msys2.org 下载安装器，默认安装到 `C:\msys64`。
+2. 打开 **“MSYS2 MinGW 64-bit”** 终端（开始菜单里），先更新一次：
+   ```bash
+   pacman -Syu          # 若提示关闭终端，关掉后再次打开并重复一次
+   pacman -Su
+   ```
 
+### 2. 安装编译工具链与依赖
+在 MSYS2 终端里执行（一条命令装全）：
+```bash
+pacman -S --needed \
+    mingw-w64-x86_64-gcc \
+    mingw-w64-x86_64-qt6-base \
+    mingw-w64-x86_64-qt6-serialport \
+    mingw-w64-x86_64-libssh2 \
+    mingw-w64-x86_64-zlib \
+    mingw-w64-x86_64-zstd \
+    mingw-w64-x86_64-cmake        # 可选：方式 B 的 CMake 需要
+```
+> 说明：
+> - `qt6-base` 提供 Widgets/Gui/Core/Network/PrintSupport；`qt6-serialport` 提供串口模块。
+> - `libssh2` 是原生 SSH 功能的依赖。
+> - `zlib`/`zstd` 是 Qt 与工具链的运行时依赖。
+> - exe 文件图标由 `resources/icon.png` 自动转换为 `icon.ico`；如需自动转换，系统 Python 装一下 Pillow：`pip install Pillow`（不装也能编译，只是 exe 文件图标会跳过，窗口/任务栏图标仍生效）。
+
+### 3. 一键编译 + 打包
+```bash
+# 在 MSYS2 终端里（任意子系统都行，脚本内部会切到 mingw64）：
+bash /c/dx/myaiprojects/terminal++/TerminalPP/build-msys2.sh
+```
+或从 Windows CMD / PowerShell：
+```powershell
+C:\msys64\usr\bin\bash.exe -lc "bash /c/dx/myaiprojects/terminal++/TerminalPP/build-msys2.sh"
+```
+
+完成后产物在 **`TerminalPP\dist\`**：
+- `TerminalPP.exe`（已内嵌窗口图标 + exe 文件图标）
+- 约 34 个运行时 DLL（Qt6 六模块、libssh2、libssl/libcrypto、icu、harfbuzz、freetype、gcc 运行时等）
+- `platforms\qwindows.dll` + `styles\` + `imageformats\` 插件
+
+**双击 `TerminalPP\dist\TerminalPP.exe` 即可运行，无需安装 Qt。**
+
+---
+
+## 四、其它编译方式（可选）
+
+### 方式 B：CMake（MSYS2 环境内）
+```bash
+export PATH=/mingw64/bin:/usr/bin:/bin
+cd /c/dx/myaiprojects/terminal++/TerminalPP
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/mingw64
+cmake --build build -j
+# 可执行文件: build/TerminalPP.exe （运行时需 /mingw64/bin 在 PATH，或用 build-msys2.sh 的打包步骤）
+```
+
+### 方式 C：官方 Qt 安装版（Qt Online Installer）
+若使用官方 Qt（含 MinGW Kit）而非 MSYS2，可用自带脚本：
 ```powershell
 cd TerminalPP
-.\build.ps1                 # 配置 + 编译
-.\build.ps1 -Clean          # 先清理再编译
-.\build.ps1 -Deploy         # 编译并用 windeployqt 打包运行时 DLL
-.\build.ps1 -QtDir C:\Qt\6.6.0\mingw_64 -Libssh2Dir C:\msys64\mingw64   # 手动指定 Qt + libssh2
-.\build.ps1 -UseQmake       # 用 qmake 而非 CMake
+.\build.ps1 -QtDir C:\Qt\6.6.0\mingw_64 -Libssh2Dir <libssh2 安装根目录> -Deploy
 ```
+或 CMD：先在 `build.bat` 顶部设置 `QT_DIR` / `MINGW_DIR` / `LIBSSH2_DIR`，再 `build.bat deploy`。
+> 注意：官方 Qt 不含 libssh2，需另行准备（最简单是复用 MSYS2 的 `C:\msys64\mingw64`）。
 
-**Windows** — CMD 批处理（需先按注释修改 `QT_DIR` / `MINGW_DIR`，libssh2 设 `LIBSSH2_DIR`）：
-
-```bat
-cd TerminalPP
-build.bat            REM 配置 + 编译
-build.bat clean      REM 清理后编译
-build.bat deploy     REM 编译 + windeployqt
-```
-
-**Linux / macOS** — shell 脚本：
-
+### 方式 D：Linux / macOS
 ```bash
+# Ubuntu: sudo apt install build-essential cmake qt6-base-dev qt6-serialport-dev libssh2-1-dev pkg-config
 cd TerminalPP
 chmod +x build.sh
-./build.sh           # CMake 配置 + 编译
-./build.sh clean     # 清理后编译
-./build.sh run       # 编译并运行
-./build.sh qmake     # 用 qmake 而非 CMake
-```
-
-### 方式 B：手动 CMake（Windows）
-
-```bat
-cd TerminalPP
-set QT=C:\Qt\6.6.0\mingw_64
-set PATH=%QT%\bin;C:\Qt\Tools\mingw1120_64\bin;%PATH%
-
-cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_PREFIX_PATH=%QT% -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-windeployqt --release build\TerminalPP.exe
-build\TerminalPP.exe
-```
-
-### 方式 C：手动 CMake（Linux / macOS）
-
-```bash
-cd TerminalPP
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-./build/TerminalPP
-```
-
-### 方式 D：手动 qmake
-
-```bash
-cd TerminalPP
-mkdir build && cd build
-qmake ../TerminalPP.pro      # Windows 用 qmake，Linux 用 qmake6
-make -j                      # Windows 用 mingw32-make
+./build.sh           # 或 ./build.sh run / ./build.sh clean / ./build.sh qmake
 ```
 
 ### 方式 E：Qt Creator
-直接用 Qt Creator 打开 `TerminalPP/CMakeLists.txt` 或 `TerminalPP/TerminalPP.pro`，选择 Qt6 Kit，点运行即可。
+用 Qt Creator 打开 `TerminalPP/CMakeLists.txt` 或 `TerminalPP/TerminalPP.pro`，选 Qt6 Kit，点运行。
 
 ---
 
-## 四、运行与部署
+## 五、运行与部署
 
-- 开发期运行：直接执行 `build/TerminalPP(.exe)`（确保 Qt 的 bin 目录在 PATH 上）。
-- Windows 分发：执行 `windeployqt --release build\TerminalPP.exe`，会把所需 Qt6 DLL、平台插件、`serialport` 插件拷贝到 exe 目录；注意同时拷贝 `libssh2` 运行时 DLL。整目录即可拷贝到无 Qt 的机器运行。
-- Linux 分发：依赖系统的 Qt6 与 libssh2 运行库，或使用 `linuxdeployqt` 等工具打包。
+- Windows（推荐）：用 `build-msys2.sh` 产出的 `TerminalPP\dist\` 已自带全部 DLL 与插件，整个 `dist` 目录拷贝到任意 Win10/11 x64 即可运行，无需安装 Qt。
+- Windows（官方 Qt）：执行 `windeployqt --release build\TerminalPP.exe` 打包 Qt6 DLL/插件，另需手动拷贝 `libssh2` 运行时 DLL。
+- Linux 分发：依赖系统的 Qt6 与 libssh2 运行库，或用 `linuxdeployqt` 等工具打包。
 
 ---
 
-## 五、键盘快捷键
+## 六、键盘快捷键
 
 | 快捷键 | 功能 |
 |--------|------|
@@ -181,7 +198,7 @@ make -j                      # Windows 用 mingw32-make
 
 ---
 
-## 六、源码结构
+## 七、源码结构
 
 ```
 TerminalPP/
@@ -214,7 +231,7 @@ TerminalPP/
 
 ---
 
-## 七、设计说明
+## 八、设计说明
 
 - **统一终端引擎**：`AnsiParser` 维护屏幕缓冲 + 滚动回看，`TerminalWidget` 负责绘制与输入，SSH 和串口只是不同的数据源（`SshSession` / `SerialSession`），因此两边都拥有完整的 VT100 渲染、256 色、中文 IME、复制粘贴能力。
 - **SSH 原生自包含**：`SshSession` 在独立工作线程里用 libssh2 完成 TCP 连接、SSH 握手、密码/公钥认证、请求 PTY(xterm-256color) 并开 shell（或 `tmux new-session -A`），再把收发字节通过队列信号与 GUI 线程的 `TerminalWidget` 交换。不调用任何外部 ssh / plink 程序，Windows(ws2_32) 与 Linux(BSD socket) 均可编译运行。

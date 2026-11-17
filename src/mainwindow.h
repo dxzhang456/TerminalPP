@@ -9,7 +9,9 @@ class QTabWidget;
 class QListWidget;
 class QDockWidget;
 class QLabel;
+class QMenu;
 class QActionGroup;
+class QTimer;
 class EditorTab;
 class FindDialog;
 class SshTab;
@@ -62,7 +64,6 @@ private slots:
     void zoomOut();
     void zoomReset();
     void applyThemeByName(const QString &name);
-    void toggleSidebar(bool on);
 
     // --- Language / encoding / EOL ---
     void setLanguage(int lang);
@@ -78,6 +79,12 @@ private slots:
     // --- Terminal: Serial ---
     void newSerialSession();
 
+    // --- Clipboard history / auto-save / UI language ---
+    void showClipboardHistory();
+    void toggleAutoSave(bool on);
+    void onAutoSaveTimeout();
+    void changeUiLanguage(const QString &code);
+
     // --- Misc ---
     void about();
     void onCurrentTabChanged(int index);
@@ -88,36 +95,59 @@ private slots:
 private:
     void createActions();
     void createMenus();
-    void createToolBars();
     void createStatusBar();
-    void createSidebar();
+    void retranslateUi();          // rebuild menu bar text for the current language
+    void loadPreferences();        // restore auto-save (and related) settings
 
     EditorTab *currentEditorTab() const;
     EditorTab *addEditorTab();
-    void refreshSessionList();
     bool maybeSaveTab(EditorTab *tab);
+
+    // Rebuild the Terminal > Sessions submenu from saved sessions.
+    void rebuildSessionsMenu();
+    void openSavedSshSession(int index);
+    void openSavedSerialSession(int index);
+    void deleteSavedSshSession(int index);
+    void deleteSavedSerialSession(int index);
 
     QTabWidget *m_tabs = nullptr;
 
-    // Sidebar (SSH sessions, like MuxTerm).
-    QDockWidget *m_sidebarDock = nullptr;
-    QListWidget *m_sessionList = nullptr;
-    SessionManager *m_sessions = nullptr;
+    SessionManager *m_sessions = nullptr;   // SSH session persistence
 
     FindDialog *m_findDialog = nullptr;
     ThemeManager m_themeManager;
+
+    // The "Sessions" submenu under the Terminal menu (rebuilt dynamically).
+    QMenu *m_sessionsMenu = nullptr;
+
+    // Top-level menus kept so retranslateUi() can refresh their titles.
+    QMenu *m_fileMenu = nullptr;
+    QMenu *m_editMenu = nullptr;
+    QMenu *m_viewMenu = nullptr;
+    QMenu *m_langSyntaxMenu = nullptr;  // syntax "Language" menu
+    QMenu *m_encMenu = nullptr;
+    QMenu *m_termMenu = nullptr;
+    QMenu *m_uiLangMenu = nullptr;      // "UI Language" menu
+    QMenu *m_helpMenu = nullptr;
 
     // Status bar widgets.
     QLabel *m_posLabel = nullptr;
     QLabel *m_langLabel = nullptr;
     QLabel *m_encLabel = nullptr;
     QLabel *m_eolLabel = nullptr;
+    QLabel *m_colLabel = nullptr;   // column (block) edit mode indicator
 
     // Actions kept for enable/disable toggling.
     QAction *m_actLineNumbers = nullptr;
     QAction *m_actWordWrap = nullptr;
-    QAction *m_actSidebar = nullptr;
+    QAction *m_actAutoSave = nullptr;
     QActionGroup *m_langGroup = nullptr;
+    QActionGroup *m_uiLangGroup = nullptr;
+
+    // Auto-save support.
+    QTimer *m_autoSaveTimer = nullptr;
+    bool m_autoSaveEnabled = false;
+    int  m_autoSaveIntervalSec = 30;
 };
 
 #endif // MAINWINDOW_H

@@ -35,6 +35,9 @@ win32 {
 SOURCES += \
     src/main.cpp \
     src/mainwindow.cpp \
+    src/core/i18n.cpp \
+    src/core/cliphistory.cpp \
+    src/core/cliphistorydialog.cpp \
     src/editor/codeeditor.cpp \
     src/editor/syntaxhighlighter.cpp \
     src/editor/finddialog.cpp \
@@ -53,6 +56,9 @@ SOURCES += \
 
 HEADERS += \
     src/mainwindow.h \
+    src/core/i18n.h \
+    src/core/cliphistory.h \
+    src/core/cliphistorydialog.h \
     src/editor/codeeditor.h \
     src/editor/syntaxhighlighter.h \
     src/editor/finddialog.h \
@@ -71,3 +77,8 @@ HEADERS += \
 
 RESOURCES += \
     resources/resources.qrc
+
+# Windows application icon (Explorer/taskbar exe icon).
+win32 {
+    RC_FILE = resources/app.rc
+}

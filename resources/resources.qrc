@@ -2,5 +2,6 @@
 <RCC version="1.0">
     <qresource prefix="/">
         <file>app.txt</file>
+        <file>icon.png</file>
     </qresource>
 </RCC>

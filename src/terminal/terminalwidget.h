@@ -43,6 +43,8 @@ protected:
     void inputMethodEvent(QInputMethodEvent *event) override;
     QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
     void wheelEvent(QWheelEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    bool event(QEvent *event) override;
 
 private slots:
     void onScreenUpdated();
