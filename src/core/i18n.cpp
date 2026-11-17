@@ -147,6 +147,35 @@ void I18n::loadTable()
     add("New Serial / &UART Session...","新建串口/UART会话(&U)...","新增序列/UART工作階段(&U)...","Nueva sesión serie / &UART...","Nouvelle session série / &UART...","Neue Seriell-/&UART-Sitzung...","Новый сеанс Serial / &UART...","新規シリアル/UARTセッション(&U)...","새 시리얼/UART 세션(&U)...");
     add("&Reconnect Current","重连当前(&R)","重新連線目前(&R)","&Reconectar actual","&Reconnecter l'actuel","Aktuelle &neu verbinden","&Переподключить текущий","現在の接続を再接続(&R)","현재 다시 연결(&R)");
     add("SSH / Serial &Sessions","SSH/串口会话(&S)","SSH/序列工作階段(&S)","&Sesiones SSH / Serie","&Sessions SSH / Série","SSH-/Seriell-&Sitzungen","SSH / Serial &сеансы","SSH/シリアルセッション(&S)","SSH/시리얼 세션(&S)");
+    add("SSH",               "SSH",       "SSH",       "SSH",          "SSH",           "SSH",           "SSH",             "SSH",           "SSH");
+    add("Serial / UART",     "串口 / UART","序列 / UART","Serie / UART", "Série / UART",  "Seriell / UART","Serial / UART",   "シリアル / UART","시리얼 / UART");
+    add("+ New SSH Session...","+ 新建SSH会话...","+ 新增SSH工作階段...","+ Nueva sesión SSH...","+ Nouvelle session SSH...","+ Neue SSH-Sitzung...","+ Новый SSH-сеанс...","+ 新規SSHセッション...","+ 새 SSH 세션...");
+    add("+ New Serial Session...","+ 新建串口会话...","+ 新增序列工作階段...","+ Nueva sesión serie...","+ Nouvelle session série...","+ Neue Seriell-Sitzung...","+ Новый Serial-сеанс...","+ 新規シリアルセッション...","+ 새 시리얼 세션...");
+    add("(no saved SSH sessions)","(无已保存的SSH会话)","(無已儲存的SSH工作階段)","(sin sesiones SSH guardadas)","(aucune session SSH enregistrée)","(keine gespeicherten SSH-Sitzungen)","(нет сохранённых SSH-сеансов)","(保存されたSSHセッションなし)","(저장된 SSH 세션 없음)");
+    add("(no saved serial sessions)","(无已保存的串口会话)","(無已儲存的序列工作階段)","(sin sesiones serie guardadas)","(aucune session série enregistrée)","(keine gespeicherten Seriell-Sitzungen)","(нет сохранённых Serial-сеансов)","(保存されたシリアルセッションなし)","(저장된 시리얼 세션 없음)");
+    add("Open",              "打开",      "開啟",      "Abrir",        "Ouvrir",        "Öffnen",        "Открыть",         "開く",          "열기");
+    add("Delete",            "删除",      "刪除",      "Eliminar",     "Supprimer",     "Löschen",       "Удалить",         "削除",          "삭제");
+
+    // ---- Compare menu (Beyond Compare-style) ----
+    add("&Compare",          "比较(&C)",  "比較(&C)",  "&Comparar",    "&Comparer",     "&Vergleichen",  "&Сравнить",       "比較(&C)",      "비교(&C)");
+    add("&New Comparison...","新建比较(&N)...","新增比較(&N)...","&Nueva comparación...","&Nouvelle comparaison...","&Neuer Vergleich...","&Новое сравнение...","新規比較(&N)...","새 비교(&N)...");
+    add("New Comparison",    "新建比较",  "新增比較",  "Nueva comparación","Nouvelle comparaison","Neuer Vergleich","Новое сравнение","新規比較","새 비교");
+    add("&Text Compare...",  "文本比较(&T)...","文字比較(&T)...","Comparar &texto...","Comparer le &texte...","&Textvergleich...","Сравнение &текста...","テキスト比較(&T)...","텍스트 비교(&T)...");
+    add("&Folder Compare...","文件夹比较(&F)...","資料夾比較(&F)...","Comparar &carpetas...","Comparer les &dossiers...","&Ordnervergleich...","Сравнение &папок...","フォルダ比較(&F)...","폴더 비교(&F)...");
+    add("&Hex Compare...",   "十六进制比较(&H)...","十六進位比較(&H)...","Comparación &hex...","Comparaison &hex...","&Hex-Vergleich...","&Hex-сравнение...","Hex比較(&H)...","Hex 비교(&H)...");
+    add("&Picture Compare...","图片比较(&P)...","圖片比較(&P)...","Comparar &imagen...","Comparer les &images...","&Bildvergleich...","Сравнение &изображений...","画像比較(&P)...","사진 비교(&P)...");
+    add("Text Compare",      "文本比较",  "文字比較",  "Comparar texto","Comparer le texte","Textvergleich","Сравнение текста","テキスト比較","텍스트 비교");
+    add("Folder Compare",    "文件夹比较","資料夾比較","Comparar carpetas","Comparer les dossiers","Ordnervergleich","Сравнение папок","フォルダ比較","폴더 비교");
+    add("Hex Compare",       "十六进制比较","十六進位比較","Comparación hex","Comparaison hex","Hex-Vergleich","Hex-сравнение","Hex比較","Hex 비교");
+    add("Picture Compare",   "图片比较",  "圖片比較",  "Comparar imagen","Comparer les images","Bildvergleich","Сравнение изображений","画像比較","사진 비교");
+    add("Type:",             "类型：",    "類型：",    "Tipo:",        "Type :",        "Typ:",          "Тип:",            "種類：",        "유형:");
+    add("Left:",             "左侧：",    "左側：",    "Izquierda:",   "Gauche :",      "Links:",        "Слева:",          "左：",          "왼쪽:");
+    add("Right:",            "右侧：",    "右側：",    "Derecha:",     "Droite :",      "Rechts:",       "Справа:",         "右：",          "오른쪽:");
+    add("Browse...",         "浏览...",   "瀏覽...",   "Examinar...",  "Parcourir...",  "Durchsuchen...","Обзор...",        "参照...",       "찾아보기...");
+    add("Select Left File",  "选择左侧文件","選擇左側檔案","Seleccionar archivo izquierdo","Sélectionner le fichier gauche","Linke Datei wählen","Выбрать левый файл","左のファイルを選択","왼쪽 파일 선택");
+    add("Select Right File", "选择右侧文件","選擇右側檔案","Seleccionar archivo derecho","Sélectionner le fichier droit","Rechte Datei wählen","Выбрать правый файл","右のファイルを選択","오른쪽 파일 선택");
+    add("Select Left Folder","选择左侧文件夹","選擇左側資料夾","Seleccionar carpeta izquierda","Sélectionner le dossier gauche","Linken Ordner wählen","Выбрать левую папку","左のフォルダを選択","왼쪽 폴더 선택");
+    add("Select Right Folder","选择右侧文件夹","選擇右側資料夾","Seleccionar carpeta derecha","Sélectionner le dossier droit","Rechten Ordner wählen","Выбрать правую папку","右のフォルダを選択","오른쪽 폴더 선택");
 
     // ---- Help ----
     add("&About Terminal++", "关于 Terminal++(&A)","關於 Terminal++(&A)","&Acerca de Terminal++","À &propos de Terminal++","&Über Terminal++","&О программе Terminal++","Terminal++について(&A)","Terminal++ 정보(&A)");

@@ -13,6 +13,11 @@
 #include "core/i18n.h"
 #include "core/cliphistory.h"
 #include "core/cliphistorydialog.h"
+#include "compare/comparedialog.h"
+#include "compare/textcomparetab.h"
+#include "compare/foldercomparetab.h"
+#include "compare/hexcomparetab.h"
+#include "compare/imagecomparetab.h"
 
 #include <QTabWidget>
 #include <QListWidget>
@@ -130,12 +135,12 @@ MainWindow::~MainWindow()
 // ------------------------------------------------------------------
 void MainWindow::createActions()
 {
-    m_actLineNumbers = new QAction(tr("Show &Line Numbers"), this);
+    m_actLineNumbers = new QAction(TR("Show &Line Numbers"), this);
     m_actLineNumbers->setCheckable(true);
     m_actLineNumbers->setChecked(true);
     connect(m_actLineNumbers, &QAction::toggled, this, &MainWindow::toggleLineNumbers);
 
-    m_actWordWrap = new QAction(tr("&Word Wrap"), this);
+    m_actWordWrap = new QAction(TR("&Word Wrap"), this);
     m_actWordWrap->setCheckable(true);
     connect(m_actWordWrap, &QAction::toggled, this, &MainWindow::toggleWordWrap);
 }
@@ -181,6 +186,9 @@ void MainWindow::createMenus()
 
     // ---------- View ----------
     m_viewMenu = menuBar()->addMenu(TR("&View"));
+    // Keep the two persistent toggle actions' text in sync with the language.
+    m_actLineNumbers->setText(TR("Show &Line Numbers"));
+    m_actWordWrap->setText(TR("&Word Wrap"));
     m_viewMenu->addAction(m_actLineNumbers);
     m_viewMenu->addAction(m_actWordWrap);
     m_viewMenu->addSeparator();
@@ -256,6 +264,33 @@ void MainWindow::createMenus()
     m_sessionsMenu = m_termMenu->addMenu(TR("SSH / Serial &Sessions"));
     rebuildSessionsMenu();
 
+    // ---------- Compare (Beyond Compare-style) ----------
+    m_compareMenu = menuBar()->addMenu(TR("&Compare"));
+    m_compareMenu->addAction(TR("&New Comparison..."), QKeySequence("Ctrl+Shift+K"),
+                             this, &MainWindow::newComparison);
+    m_compareMenu->addSeparator();
+    m_compareMenu->addAction(TR("&Text Compare..."), this, [this]() {
+        CompareDialog dlg(this);
+        // Pre-select Text; user still picks files.
+        if (dlg.exec() == QDialog::Accepted)
+            openTextCompare(dlg.leftPath(), dlg.rightPath());
+    });
+    m_compareMenu->addAction(TR("&Folder Compare..."), this, [this]() {
+        CompareDialog dlg(this);
+        if (dlg.exec() == QDialog::Accepted)
+            openFolderCompare(dlg.leftPath(), dlg.rightPath());
+    });
+    m_compareMenu->addAction(TR("&Hex Compare..."), this, [this]() {
+        CompareDialog dlg(this);
+        if (dlg.exec() == QDialog::Accepted)
+            openHexCompare(dlg.leftPath(), dlg.rightPath());
+    });
+    m_compareMenu->addAction(TR("&Picture Compare..."), this, [this]() {
+        CompareDialog dlg(this);
+        if (dlg.exec() == QDialog::Accepted)
+            openImageCompare(dlg.leftPath(), dlg.rightPath());
+    });
+
     // ---------- UI Language ----------
     m_uiLangMenu = menuBar()->addMenu(TR("&UI Language"));
     m_uiLangGroup = new QActionGroup(this);
@@ -303,36 +338,36 @@ void MainWindow::rebuildSessionsMenu()
     m_sessionsMenu->clear();
 
     // ---- SSH saved sessions ----
-    QMenu *sshMenu = m_sessionsMenu->addMenu(tr("SSH"));
-    sshMenu->addAction(tr("+ New SSH Session..."), this, &MainWindow::newSshSession);
+    QMenu *sshMenu = m_sessionsMenu->addMenu(TR("SSH"));
+    sshMenu->addAction(TR("+ New SSH Session..."), this, &MainWindow::newSshSession);
     sshMenu->addSeparator();
     const auto &ssh = m_sessions->sessions();
     if (ssh.isEmpty()) {
-        QAction *none = sshMenu->addAction(tr("(no saved SSH sessions)"));
+        QAction *none = sshMenu->addAction(TR("(no saved SSH sessions)"));
         none->setEnabled(false);
     } else {
         for (int i = 0; i < ssh.size(); ++i) {
             QMenu *item = sshMenu->addMenu(ssh[i].displayName());
             int idx = i;
-            item->addAction(tr("Open"), this, [this, idx]() { openSavedSshSession(idx); });
-            item->addAction(tr("Delete"), this, [this, idx]() { deleteSavedSshSession(idx); });
+            item->addAction(TR("Open"), this, [this, idx]() { openSavedSshSession(idx); });
+            item->addAction(TR("Delete"), this, [this, idx]() { deleteSavedSshSession(idx); });
         }
     }
 
     // ---- Serial saved sessions ----
-    QMenu *serMenu = m_sessionsMenu->addMenu(tr("Serial / UART"));
-    serMenu->addAction(tr("+ New Serial Session..."), this, &MainWindow::newSerialSession);
+    QMenu *serMenu = m_sessionsMenu->addMenu(TR("Serial / UART"));
+    serMenu->addAction(TR("+ New Serial Session..."), this, &MainWindow::newSerialSession);
     serMenu->addSeparator();
     const auto &ser = m_sessions->serialSessions();
     if (ser.isEmpty()) {
-        QAction *none = serMenu->addAction(tr("(no saved serial sessions)"));
+        QAction *none = serMenu->addAction(TR("(no saved serial sessions)"));
         none->setEnabled(false);
     } else {
         for (int i = 0; i < ser.size(); ++i) {
             QMenu *item = serMenu->addMenu(ser[i].displayName());
             int idx = i;
-            item->addAction(tr("Open"), this, [this, idx]() { openSavedSerialSession(idx); });
-            item->addAction(tr("Delete"), this, [this, idx]() { deleteSavedSerialSession(idx); });
+            item->addAction(TR("Open"), this, [this, idx]() { openSavedSerialSession(idx); });
+            item->addAction(TR("Delete"), this, [this, idx]() { deleteSavedSerialSession(idx); });
         }
     }
 }
@@ -845,6 +880,99 @@ void MainWindow::deleteSavedSerialSession(int index)
 }
 
 // ------------------------------------------------------------------
+// Compare (Beyond Compare-style)
+// ------------------------------------------------------------------
+void MainWindow::newComparison()
+{
+    CompareDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    const QString l = dlg.leftPath();
+    const QString r = dlg.rightPath();
+    switch (dlg.type()) {
+    case CompareDialog::TextCompare:   openTextCompare(l, r); break;
+    case CompareDialog::FolderCompare: openFolderCompare(l, r); break;
+    case CompareDialog::HexCompare:    openHexCompare(l, r); break;
+    case CompareDialog::ImageCompare:  openImageCompare(l, r); break;
+    }
+}
+
+void MainWindow::openTextCompare(const QString &left, const QString &right)
+{
+    if (left.isEmpty() || right.isEmpty())
+        return;
+    auto *tab = new TextCompareTab(this);
+    tab->applyTheme(m_themeManager.current());
+    tab->loadFiles(left, right);
+    connect(tab, &TextCompareTab::statusMessage, this, [this](const QString &m) {
+        statusBar()->showMessage(m, 4000);
+    });
+    int idx = m_tabs->addTab(tab, tr("Text: %1 ⟷ %2")
+                                      .arg(QFileInfo(left).fileName(),
+                                           QFileInfo(right).fileName()));
+    m_tabs->setCurrentIndex(idx);
+}
+
+void MainWindow::openFolderCompare(const QString &left, const QString &right)
+{
+    if (left.isEmpty() || right.isEmpty())
+        return;
+    auto *tab = new FolderCompareTab(this);
+    tab->applyTheme(m_themeManager.current());
+    tab->setFolders(left, right);
+    connect(tab, &FolderCompareTab::statusMessage, this, [this](const QString &m) {
+        statusBar()->showMessage(m, 4000);
+    });
+    // Double-clicking a differing file pair opens a text compare (auto-detects
+    // binary/image by extension could be added; default to text).
+    connect(tab, &FolderCompareTab::compareFiles, this,
+            [this](const QString &lf, const QString &rf) {
+        const QString ext = QFileInfo(lf).suffix().toLower();
+        static const QStringList imgExt = {"png","jpg","jpeg","bmp","gif","webp","ico","svg"};
+        if (imgExt.contains(ext))
+            openImageCompare(lf, rf);
+        else
+            openTextCompare(lf, rf);
+    });
+    int idx = m_tabs->addTab(tab, tr("Folders: %1 ⟷ %2")
+                                      .arg(QFileInfo(left).fileName(),
+                                           QFileInfo(right).fileName()));
+    m_tabs->setCurrentIndex(idx);
+}
+
+void MainWindow::openHexCompare(const QString &left, const QString &right)
+{
+    if (left.isEmpty() || right.isEmpty())
+        return;
+    auto *tab = new HexCompareTab(this);
+    tab->applyTheme(m_themeManager.current());
+    tab->loadFiles(left, right);
+    connect(tab, &HexCompareTab::statusMessage, this, [this](const QString &m) {
+        statusBar()->showMessage(m, 4000);
+    });
+    int idx = m_tabs->addTab(tab, tr("Hex: %1 ⟷ %2")
+                                      .arg(QFileInfo(left).fileName(),
+                                           QFileInfo(right).fileName()));
+    m_tabs->setCurrentIndex(idx);
+}
+
+void MainWindow::openImageCompare(const QString &left, const QString &right)
+{
+    if (left.isEmpty() || right.isEmpty())
+        return;
+    auto *tab = new ImageCompareTab(this);
+    tab->applyTheme(m_themeManager.current());
+    tab->loadFiles(left, right);
+    connect(tab, &ImageCompareTab::statusMessage, this, [this](const QString &m) {
+        statusBar()->showMessage(m, 4000);
+    });
+    int idx = m_tabs->addTab(tab, tr("Picture: %1 ⟷ %2")
+                                      .arg(QFileInfo(left).fileName(),
+                                           QFileInfo(right).fileName()));
+    m_tabs->setCurrentIndex(idx);
+}
+
+// ------------------------------------------------------------------
 // Clipboard history / auto-save / UI language
 // ------------------------------------------------------------------
 void MainWindow::showClipboardHistory()
@@ -918,6 +1046,7 @@ void MainWindow::retranslateUi()
     m_sessionsMenu = nullptr;
     m_fileMenu = m_editMenu = m_viewMenu = nullptr;
     m_langSyntaxMenu = m_encMenu = m_termMenu = nullptr;
+    m_compareMenu = nullptr;
     m_uiLangMenu = m_helpMenu = nullptr;
     m_actAutoSave = nullptr;
 

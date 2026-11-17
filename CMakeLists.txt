@@ -47,13 +47,29 @@ set(PROJECT_SOURCES
     src/mainwindow.cpp
     src/mainwindow.h
 
-    # --- Core (i18n, clipboard history, preferences) ---
+    # --- Core (i18n, clipboard history, preferences, secret storage) ---
     src/core/i18n.cpp
     src/core/i18n.h
     src/core/cliphistory.cpp
     src/core/cliphistory.h
     src/core/cliphistorydialog.cpp
     src/core/cliphistorydialog.h
+    src/core/secretstore.cpp
+    src/core/secretstore.h
+
+    # --- Compare (Beyond Compare-style) ---
+    src/compare/diffengine.cpp
+    src/compare/diffengine.h
+    src/compare/textcomparetab.cpp
+    src/compare/textcomparetab.h
+    src/compare/foldercomparetab.cpp
+    src/compare/foldercomparetab.h
+    src/compare/hexcomparetab.cpp
+    src/compare/hexcomparetab.h
+    src/compare/imagecomparetab.cpp
+    src/compare/imagecomparetab.h
+    src/compare/comparedialog.cpp
+    src/compare/comparedialog.h
 
     # --- Code editor ---
     src/editor/codeeditor.cpp
@@ -135,9 +151,9 @@ else()
     target_link_libraries(TerminalPP PRIVATE ssh2)
 endif()
 
-# Winsock on Windows (required by the native SSH socket code).
+# Winsock + DPAPI (CryptProtectData) on Windows.
 if (WIN32)
-    target_link_libraries(TerminalPP PRIVATE ws2_32)
+    target_link_libraries(TerminalPP PRIVATE ws2_32 crypt32)
 endif()
 
 # Installation / deployment

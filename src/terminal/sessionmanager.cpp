@@ -1,4 +1,5 @@
 #include "sessionmanager.h"
+#include "core/secretstore.h"
 
 #include <QStandardPaths>
 #include <QDir>
@@ -92,7 +93,9 @@ bool SessionManager::load()
         c.host = o.value("host").toString();
         c.port = o.value("port").toInt(22);
         c.username = o.value("username").toString();
-        c.password = o.value("password").toString();
+        // Passwords are stored encrypted (DPAPI on Windows, XOR+Base64 else);
+        // decrypt transparently. Legacy plain-text values pass through.
+        c.password = SecretStore::decrypt(o.value("password").toString());
         c.keyFile = o.value("keyFile").toString();
         c.tmuxName = o.value("tmuxName").toString();
         c.useTmux = o.value("useTmux").toBool(false);
@@ -126,7 +129,8 @@ bool SessionManager::save() const
         o["host"] = c.host;
         o["port"] = c.port;
         o["username"] = c.username;
-        o["password"] = c.password;
+        // Never write the password in plain text.
+        o["password"] = SecretStore::encrypt(c.password);
         o["keyFile"] = c.keyFile;
         o["tmuxName"] = c.tmuxName;
         o["useTmux"] = c.useTmux;

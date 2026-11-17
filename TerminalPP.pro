@@ -29,7 +29,7 @@ win32 {
         INCLUDEPATH += $$LIBSSH2_DIR/include
         LIBS += -L$$LIBSSH2_DIR/lib
     }
-    LIBS += -lssh2 -lws2_32
+    LIBS += -lssh2 -lws2_32 -lcrypt32
 }
 
 SOURCES += \
@@ -38,6 +38,13 @@ SOURCES += \
     src/core/i18n.cpp \
     src/core/cliphistory.cpp \
     src/core/cliphistorydialog.cpp \
+    src/core/secretstore.cpp \
+    src/compare/diffengine.cpp \
+    src/compare/textcomparetab.cpp \
+    src/compare/foldercomparetab.cpp \
+    src/compare/hexcomparetab.cpp \
+    src/compare/imagecomparetab.cpp \
+    src/compare/comparedialog.cpp \
     src/editor/codeeditor.cpp \
     src/editor/syntaxhighlighter.cpp \
     src/editor/finddialog.cpp \
@@ -59,6 +66,13 @@ HEADERS += \
     src/core/i18n.h \
     src/core/cliphistory.h \
     src/core/cliphistorydialog.h \
+    src/core/secretstore.h \
+    src/compare/diffengine.h \
+    src/compare/textcomparetab.h \
+    src/compare/foldercomparetab.h \
+    src/compare/hexcomparetab.h \
+    src/compare/imagecomparetab.h \
+    src/compare/comparedialog.h \
     src/editor/codeeditor.h \
     src/editor/syntaxhighlighter.h \
     src/editor/finddialog.h \

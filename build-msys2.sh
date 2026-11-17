@@ -32,7 +32,7 @@ RCC=/mingw64/share/qt6/bin/rcc.exe
 rm -rf "$OUT" "$DIST"
 mkdir -p "$OUT/moc" "$DIST/platforms" "$DIST/styles" "$DIST/imageformats"
 
-INCS="-I$SRC -I$QTINC -I$QTINC/QtCore -I$QTINC/QtGui -I$QTINC/QtWidgets \
+INCS="-I$SRC -I$OUT/moc -I$QTINC -I$QTINC/QtCore -I$QTINC/QtGui -I$QTINC/QtWidgets \
       -I$QTINC/QtNetwork -I$QTINC/QtPrintSupport -I$QTINC/QtSerialPort"
 DEFS="-DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB -DQT_NETWORK_LIB \
       -DQT_PRINTSUPPORT_LIB -DQT_SERIALPORT_LIB"
@@ -43,6 +43,9 @@ MOC_HEADERS=(
   "$SRC/mainwindow.h"
   "$SRC/core/i18n.h"              "$SRC/core/cliphistory.h"
   "$SRC/core/cliphistorydialog.h"
+  "$SRC/compare/textcomparetab.h"   "$SRC/compare/foldercomparetab.h"
+  "$SRC/compare/hexcomparetab.h"    "$SRC/compare/imagecomparetab.h"
+  "$SRC/compare/comparedialog.h"
   "$SRC/editor/codeeditor.h"      "$SRC/editor/syntaxhighlighter.h"
   "$SRC/editor/finddialog.h"      "$SRC/editor/gotodialog.h"
   "$SRC/editor/editortab.h"
@@ -57,6 +60,13 @@ for h in "${MOC_HEADERS[@]}"; do
     out="$OUT/moc/moc_$(basename "$h" .h).cpp"
     "$MOC" $DEFS $INCS "$h" -o "$out" || { echo "moc failed: $h"; exit 2; }
     MOC_CPP+=("$out")
+done
+
+# Some compare .cpp files declare inline Q_OBJECT classes and #include their
+# own "<base>.moc". Generate those into $OUT/moc so they are found via -I.
+for base in textcomparetab imagecomparetab; do
+    "$MOC" $DEFS $INCS "$SRC/compare/$base.cpp" -o "$OUT/moc/$base.moc" \
+        || { echo "moc (inline) failed: $base"; exit 2; }
 done
 
 # ---- 2) rcc (optional) ----
@@ -86,6 +96,7 @@ echo "[3/4] compile + link"
 SOURCES=(
   "$SRC/main.cpp" "$SRC/mainwindow.cpp"
   "$SRC"/core/*.cpp
+  "$SRC"/compare/*.cpp
   "$SRC"/editor/*.cpp
   "$SRC"/terminal/*.cpp
 )
@@ -94,7 +105,7 @@ SOURCES+=("${MOC_CPP[@]}")
 [ -n "$RES_OBJ" ] && SOURCES+=("$RES_OBJ")
 
 LIBS="-lQt6Widgets -lQt6Gui -lQt6Core -lQt6Network -lQt6PrintSupport \
-      -lQt6SerialPort -lssh2 -lws2_32 -lmswsock"
+      -lQt6SerialPort -lssh2 -lws2_32 -lmswsock -lcrypt32"
 
 g++ $CXXFLAGS -mwindows "${SOURCES[@]}" -o "$OUT/TerminalPP.exe" -L/mingw64/lib $LIBS \
     || { echo "link failed"; exit 3; }
