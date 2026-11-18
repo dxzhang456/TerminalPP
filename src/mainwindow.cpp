@@ -4,6 +4,7 @@
 #include "editor/codeeditor.h"
 #include "editor/finddialog.h"
 #include "editor/gotodialog.h"
+#include "editor/hexeditortab.h"
 #include "terminal/sshtab.h"
 #include "terminal/serialtab.h"
 #include "terminal/sessiondialog.h"
@@ -18,8 +19,12 @@
 #include "compare/foldercomparetab.h"
 #include "compare/hexcomparetab.h"
 #include "compare/imagecomparetab.h"
+#include "cloud/cloudconnectdialog.h"
+#include "cloud/cloudbrowsertab.h"
+#include "cloud/transferpanel.h"
 
 #include <QTabWidget>
+#include <QTabBar>
 #include <QListWidget>
 #include <QDockWidget>
 #include <QMenuBar>
@@ -32,6 +37,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QCloseEvent>
+#include <QMouseEvent>
 #include <QApplication>
 #include <QFileInfo>
 #include <QTextCursor>
@@ -99,9 +105,26 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onCurrentTabChanged);
     connect(m_tabs, &QTabWidget::tabCloseRequested,
             this, &MainWindow::onTabCloseRequested);
+    // Right-clicking a tab shows a context menu (close current/others/left/right).
+    m_tabs->tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_tabs->tabBar(), &QTabBar::customContextMenuRequested,
+            this, &MainWindow::onTabContextMenu);
+    // Double-clicking empty space on the tab bar (to the right of the last
+    // tab) opens a new file tab, like many editors (VS Code, Notepad++).
+    m_tabs->tabBar()->installEventFilter(this);
 
     m_sessions = new SessionManager();
     m_findDialog = new FindDialog(this);
+
+    // Dockable "Transfers" panel showing all cloud uploads/downloads.
+    m_transferDock = new QDockWidget(TR("Transfers"), this);
+    m_transferDock->setObjectName("TransfersDock");
+    m_transferPanel = new TransferPanel(m_transferDock);
+    m_transferDock->setWidget(m_transferPanel);
+    addDockWidget(Qt::BottomDockWidgetArea, m_transferDock);
+    m_transferDock->hide();   // shown on demand / when a transfer starts
+    connect(m_transferPanel, &TransferPanel::openLocalFile, this,
+            [this](const QString &lp) { openFile(lp); });
     connect(m_findDialog, &FindDialog::statusMessage, this, [this](const QString &m) {
         statusBar()->showMessage(m, 4000);
     });
@@ -120,7 +143,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     loadPreferences();
 
-    addEditorTab();
+    // No document is opened automatically at startup; the window starts empty
+    // (files are opened via File > Open / Open Recent / command line).
     updateWindowTitle();
     updateStatusBar();
 }
@@ -151,6 +175,9 @@ void MainWindow::createMenus()
     m_fileMenu = menuBar()->addMenu(TR("&File"));
     m_fileMenu->addAction(TR("&New"), QKeySequence::New, this, &MainWindow::newFile);
     m_fileMenu->addAction(TR("&Open..."), QKeySequence::Open, this, &MainWindow::openFileDialog);
+    m_fileMenu->addAction(TR("Open as &Hex..."), this, &MainWindow::openHexEditorDialog);
+    m_recentMenu = m_fileMenu->addMenu(TR("Open &Recent"));
+    rebuildRecentMenu();
     m_fileMenu->addAction(TR("&Save"), QKeySequence::Save, this, &MainWindow::saveFile);
     m_fileMenu->addAction(TR("Save &As..."), QKeySequence::SaveAs, this, &MainWindow::saveFileAs);
     m_fileMenu->addAction(TR("Save A&ll"), QKeySequence("Ctrl+Shift+S"), this, &MainWindow::saveAll);
@@ -192,14 +219,37 @@ void MainWindow::createMenus()
     m_viewMenu->addAction(m_actLineNumbers);
     m_viewMenu->addAction(m_actWordWrap);
     m_viewMenu->addSeparator();
-    m_viewMenu->addAction(TR("Zoom &In"), QKeySequence::ZoomIn, this, &MainWindow::zoomIn);
-    m_viewMenu->addAction(TR("Zoom &Out"), QKeySequence::ZoomOut, this, &MainWindow::zoomOut);
+    {
+        // QKeySequence::ZoomIn's default binding is unreliable on Windows: '+'
+        // is a shifted key on most layouts, so a plain Ctrl++ press often does
+        // not match it. Bind both the shifted (Ctrl++) and unshifted (Ctrl+=)
+        // physical-key variants explicitly, plus the standard key so platform
+        // conventions still work.
+        QAction *zIn = m_viewMenu->addAction(TR("Zoom &In"));
+        zIn->setShortcuts({ QKeySequence(Qt::CTRL | Qt::Key_Plus),
+                            QKeySequence(Qt::CTRL | Qt::Key_Equal),
+                            QKeySequence::ZoomIn });
+        connect(zIn, &QAction::triggered, this, &MainWindow::zoomIn);
+
+        QAction *zOut = m_viewMenu->addAction(TR("Zoom &Out"));
+        zOut->setShortcuts({ QKeySequence(Qt::CTRL | Qt::Key_Minus),
+                             QKeySequence::ZoomOut });
+        connect(zOut, &QAction::triggered, this, &MainWindow::zoomOut);
+    }
     m_viewMenu->addAction(TR("&Reset Zoom"), QKeySequence("Ctrl+0"), this, &MainWindow::zoomReset);
     m_viewMenu->addSeparator();
     // Auto-save toggle.
     m_actAutoSave = m_viewMenu->addAction(TR("&Auto Save"));
     m_actAutoSave->setCheckable(true);
     connect(m_actAutoSave, &QAction::toggled, this, &MainWindow::toggleAutoSave);
+    m_viewMenu->addSeparator();
+    // Show/hide the cloud Transfers dock. The dock provides its own
+    // toggleViewAction so the checkbox state tracks visibility automatically.
+    if (m_transferDock) {
+        QAction *showTransfers = m_transferDock->toggleViewAction();
+        showTransfers->setText(TR("Show &Transfers Panel"));
+        m_viewMenu->addAction(showTransfers);
+    }
 
     // Themes submenu.
     QMenu *themeMenu = m_viewMenu->addMenu(TR("&Theme"));
@@ -294,6 +344,12 @@ void MainWindow::createMenus()
             openImageCompare(dlg.leftPath(), dlg.rightPath());
     });
 
+    // ---------- Cloud ----------
+    // "Connect Cloud Drive..." followed by every saved drive; the entries are
+    // (re)built by rebuildCloudMenu() so they stay in sync after add/delete.
+    m_cloudMenu = menuBar()->addMenu(TR("Clou&d"));
+    rebuildCloudMenu();
+
     // ---------- UI Language ----------
     m_uiLangMenu = menuBar()->addMenu(TR("&UI Language"));
     m_uiLangGroup = new QActionGroup(this);
@@ -376,6 +432,38 @@ void MainWindow::rebuildSessionsMenu()
 }
 
 // ------------------------------------------------------------------
+// Cloud menu: "Connect Cloud Drive..." + one submenu per saved drive
+// ------------------------------------------------------------------
+void MainWindow::rebuildCloudMenu()
+{
+    if (!m_cloudMenu)
+        return;
+    m_cloudMenu->clear();
+
+    m_cloudMenu->addAction(TR("&Connect Cloud Drive..."), this,
+                           &MainWindow::connectCloudDrive);
+    m_cloudMenu->addSeparator();
+
+    const auto &drives = m_cloudDrives.drives();
+    if (drives.isEmpty()) {
+        QAction *none = m_cloudMenu->addAction(TR("(no connected cloud drives)"));
+        none->setEnabled(false);
+        return;
+    }
+    // One submenu per drive, labelled "BaiduPan-<name>", each offering the
+    // Open / Reconnect / Edit / Delete operations.
+    for (int i = 0; i < drives.size(); ++i) {
+        QMenu *item = m_cloudMenu->addMenu(drives[i].displayName());
+        const int idx = i;
+        item->addAction(TR("Open"), this, [this, idx]() { openSavedCloudDrive(idx); });
+        item->addAction(TR("Reconnect"), this, [this, idx]() { reconnectSavedCloudDrive(idx); });
+        item->addAction(TR("Edit..."), this, [this, idx]() { editSavedCloudDrive(idx); });
+        item->addSeparator();
+        item->addAction(TR("Delete"), this, [this, idx]() { deleteSavedCloudDrive(idx); });
+    }
+}
+
+// ------------------------------------------------------------------
 // Editor tab helpers
 // ------------------------------------------------------------------
 EditorTab *MainWindow::currentEditorTab() const
@@ -388,6 +476,11 @@ EditorTab *MainWindow::addEditorTab()
     EditorTab *tab = new EditorTab(this);
     tab->applyTheme(m_themeManager.current());
     tab->editor()->setShowLineNumbers(m_actLineNumbers->isChecked());
+    // Apply the current Word Wrap state so a newly opened file wraps
+    // immediately instead of requiring a manual toggle off/on.
+    tab->editor()->setLineWrapMode(m_actWordWrap->isChecked()
+                                       ? QPlainTextEdit::WidgetWidth
+                                       : QPlainTextEdit::NoWrap);
 
     int idx = m_tabs->addTab(tab, tab->fileName());
     m_tabs->setCurrentIndex(idx);
@@ -473,9 +566,69 @@ EditorTab *MainWindow::openFile(const QString &path)
     int i = m_tabs->indexOf(tab);
     m_tabs->setTabText(i, tab->fileName());
     m_tabs->setTabToolTip(i, tab->filePath());
+    addRecentFile(tab->filePath());   // remember in File > Open Recent
     updateWindowTitle();
     updateStatusBar();
     return tab;
+}
+
+// --------------------------------------------------------------------------
+// Recent files (File > Open Recent), capped at 20, persisted in QSettings.
+// --------------------------------------------------------------------------
+QStringList MainWindow::recentFiles() const
+{
+    QSettings s;
+    return s.value(QStringLiteral("recent/files")).toStringList();
+}
+
+void MainWindow::addRecentFile(const QString &path)
+{
+    if (path.isEmpty())
+        return;
+    QSettings s;
+    QStringList list = s.value(QStringLiteral("recent/files")).toStringList();
+    list.removeAll(path);           // de-dup
+    list.prepend(path);             // most-recent first
+    while (list.size() > 20)        // cap at 20
+        list.removeLast();
+    s.setValue(QStringLiteral("recent/files"), list);
+    rebuildRecentMenu();
+}
+
+void MainWindow::rebuildRecentMenu()
+{
+    if (!m_recentMenu)
+        return;
+    m_recentMenu->clear();
+    const QStringList list = recentFiles();
+    if (list.isEmpty()) {
+        QAction *none = m_recentMenu->addAction(TR("(no recent files)"));
+        none->setEnabled(false);
+        return;
+    }
+    for (const QString &p : list) {
+        QAction *a = m_recentMenu->addAction(p);
+        a->setData(p);
+        connect(a, &QAction::triggered, this, &MainWindow::openRecentFile);
+    }
+    m_recentMenu->addSeparator();
+    m_recentMenu->addAction(TR("Clear Recent Files"), this, &MainWindow::clearRecentFiles);
+}
+
+void MainWindow::openRecentFile()
+{
+    if (auto *a = qobject_cast<QAction *>(sender())) {
+        const QString path = a->data().toString();
+        if (!path.isEmpty())
+            openFile(path);
+    }
+}
+
+void MainWindow::clearRecentFiles()
+{
+    QSettings s;
+    s.remove(QStringLiteral("recent/files"));
+    rebuildRecentMenu();
 }
 
 void MainWindow::openFileDialog()
@@ -485,8 +638,63 @@ void MainWindow::openFileDialog()
         openFile(f);
 }
 
+void MainWindow::openHexEditorDialog()
+{
+    const QString f = QFileDialog::getOpenFileName(this, TR("Open as Hex"));
+    if (!f.isEmpty())
+        openHexEditor(f);
+}
+
+// Open a file in an editable hex-editor tab (view / edit bytes / save).
+void MainWindow::openHexEditor(const QString &path)
+{
+    auto *tab = new HexEditorTab(this);
+    tab->applyTheme(m_themeManager.current());
+    if (!tab->loadFile(path)) {
+        delete tab;
+        QMessageBox::warning(this, TR("Open"), TR("Cannot open file:\n%1").arg(path));
+        return;
+    }
+    connect(tab, &HexEditorTab::statusMessage, this, [this](const QString &m) {
+        statusBar()->showMessage(m, 4000);
+    });
+    connect(tab, &HexEditorTab::modificationChanged, this, [this, tab](bool mod) {
+        int i = m_tabs->indexOf(tab);
+        if (i >= 0) {
+            QString t = TR("Hex: %1").arg(QFileInfo(tab->filePath()).fileName());
+            m_tabs->setTabText(i, mod ? t + " *" : t);
+        }
+    });
+    int idx = m_tabs->addTab(tab, TR("Hex: %1").arg(QFileInfo(path).fileName()));
+    m_tabs->setTabToolTip(idx, path);
+    m_tabs->setCurrentIndex(idx);
+}
+
+void MainWindow::closeInitialEmptyTab()
+{
+    // The first tab is the auto-created empty document. If it is still an
+    // untitled, unmodified editor and there is more than one tab, drop it so
+    // opening a file from the command line doesn't leave a blank tab behind.
+    if (m_tabs->count() < 2)
+        return;
+    EditorTab *first = qobject_cast<EditorTab *>(m_tabs->widget(0));
+    if (first && first->isUntitled() && !first->isModified()) {
+        m_tabs->removeTab(0);
+        first->deleteLater();
+    }
+}
+
 bool MainWindow::saveFile()
 {
+    // Hex-editor tab: save the edited bytes back to disk.
+    if (auto *hex = qobject_cast<HexEditorTab *>(m_tabs->currentWidget())) {
+        if (hex->save()) {
+            statusBar()->showMessage(TR("Saved %1").arg(hex->filePath()), 3000);
+            return true;
+        }
+        QMessageBox::warning(this, TR("Save"), TR("Cannot write file."));
+        return false;
+    }
     EditorTab *tab = currentEditorTab();
     if (!tab)
         return false;
@@ -503,6 +711,21 @@ bool MainWindow::saveFile()
 
 bool MainWindow::saveFileAs()
 {
+    // Hex-editor tab: choose a new path and save the edited bytes.
+    if (auto *hex = qobject_cast<HexEditorTab *>(m_tabs->currentWidget())) {
+        QString path = QFileDialog::getSaveFileName(this, TR("Save As"),
+                                                    hex->filePath());
+        if (path.isEmpty())
+            return false;
+        if (!hex->saveAs(path)) {
+            QMessageBox::warning(this, TR("Save"), TR("Cannot write file."));
+            return false;
+        }
+        int i = m_tabs->indexOf(hex);
+        m_tabs->setTabText(i, TR("Hex: %1").arg(QFileInfo(path).fileName()));
+        m_tabs->setTabToolTip(i, path);
+        return true;
+    }
     EditorTab *tab = currentEditorTab();
     if (!tab)
         return false;
@@ -552,15 +775,26 @@ void MainWindow::closeCurrentTab()
     onTabCloseRequested(m_tabs->currentIndex());
 }
 
-void MainWindow::onTabCloseRequested(int index)
+// Close a single tab honouring unsaved-save prompts. Returns true if the tab
+// was actually closed (false if the user cancelled a save prompt).
+bool MainWindow::closeTabAt(int index)
 {
     QWidget *w = m_tabs->widget(index);
     if (!w)
-        return;
+        return false;
 
     if (EditorTab *tab = qobject_cast<EditorTab *>(w)) {
         if (!maybeSaveTab(tab))
-            return;
+            return false;
+    } else if (auto *hex = qobject_cast<HexEditorTab *>(w)) {
+        if (hex->isModified()) {
+            auto ret = QMessageBox::warning(this, TR("Terminal++"),
+                TR("The document \"%1\" has unsaved changes.\nDo you want to save?")
+                    .arg(QFileInfo(hex->filePath()).fileName()),
+                QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+            if (ret == QMessageBox::Cancel) return false;
+            if (ret == QMessageBox::Save) hex->save();
+        }
     } else if (SshTab *s = qobject_cast<SshTab *>(w)) {
         s->disconnectSession();
     } else if (SerialTab *s = qobject_cast<SerialTab *>(w)) {
@@ -569,11 +803,73 @@ void MainWindow::onTabCloseRequested(int index)
 
     m_tabs->removeTab(index);
     w->deleteLater();
+    return true;
+}
 
-    if (m_tabs->count() == 0)
-        addEditorTab();
+void MainWindow::onTabCloseRequested(int index)
+{
+    // Closing the last tab no longer re-creates an empty document — the window
+    // simply becomes empty.
+    closeTabAt(index);
     updateWindowTitle();
     updateStatusBar();
+}
+
+// --- Tab-bar context menu -------------------------------------------------
+void MainWindow::closeOtherTabs(int keepIndex)
+{
+    // Remember the kept widget; close everything else (right-to-left so indices
+    // stay valid). Stop if a save prompt is cancelled.
+    QWidget *keep = m_tabs->widget(keepIndex);
+    for (int i = m_tabs->count() - 1; i >= 0; --i) {
+        if (m_tabs->widget(i) == keep)
+            continue;
+        if (!closeTabAt(i))
+            break;
+    }
+    updateWindowTitle();
+    updateStatusBar();
+}
+
+void MainWindow::closeTabsToRight(int index)
+{
+    for (int i = m_tabs->count() - 1; i > index; --i)
+        if (!closeTabAt(i))
+            break;
+    updateWindowTitle();
+    updateStatusBar();
+}
+
+void MainWindow::closeTabsToLeft(int index)
+{
+    // Close indices [0 .. index-1]; go right-to-left within that range so the
+    // remaining indices don't shift under us.
+    for (int i = index - 1; i >= 0; --i)
+        if (!closeTabAt(i))
+            break;
+    updateWindowTitle();
+    updateStatusBar();
+}
+
+void MainWindow::onTabContextMenu(const QPoint &pos)
+{
+    const int index = m_tabs->tabBar()->tabAt(pos);
+    if (index < 0)
+        return;
+    QMenu menu(this);
+    menu.addAction(TR("Close"), this, [this, index]() {
+        closeTabAt(index); updateWindowTitle(); updateStatusBar();
+    });
+    QAction *others = menu.addAction(TR("Close Others"), this,
+                                     [this, index]() { closeOtherTabs(index); });
+    QAction *right  = menu.addAction(TR("Close to the Right"), this,
+                                     [this, index]() { closeTabsToRight(index); });
+    QAction *left   = menu.addAction(TR("Close to the Left"), this,
+                                     [this, index]() { closeTabsToLeft(index); });
+    others->setEnabled(m_tabs->count() > 1);
+    right->setEnabled(index < m_tabs->count() - 1);
+    left->setEnabled(index > 0);
+    menu.exec(m_tabs->tabBar()->mapToGlobal(pos));
 }
 
 // ------------------------------------------------------------------
@@ -639,14 +935,50 @@ void MainWindow::toggleWordWrap(bool on)
                                             : QPlainTextEdit::NoWrap);
 }
 
-void MainWindow::zoomIn()  { if (EditorTab *t = currentEditorTab()) t->editor()->zoomIn(1); }
-void MainWindow::zoomOut() { if (EditorTab *t = currentEditorTab()) t->editor()->zoomOut(1); }
+// Adjust the terminal (SSH/Serial) font point size by `delta`, clamped.
+static void zoomTerminalFont(TerminalWidget *term, int delta)
+{
+    QFont f = term->terminalFont();
+    int pt = f.pointSize();
+    if (pt <= 0) pt = 11;
+    pt = qBound(6, pt + delta, 48);
+    f.setPointSize(pt);
+    term->setTerminalFont(f);
+}
+
+void MainWindow::zoomIn()
+{
+    QWidget *w = m_tabs->currentWidget();
+    if (EditorTab *t = qobject_cast<EditorTab *>(w)) t->editor()->zoomIn(1);
+    else if (SshTab *s = qobject_cast<SshTab *>(w)) zoomTerminalFont(s->terminal(), +1);
+    else if (SerialTab *s = qobject_cast<SerialTab *>(w)) zoomTerminalFont(s->terminal(), +1);
+    else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) i->zoomIn();
+}
+
+void MainWindow::zoomOut()
+{
+    QWidget *w = m_tabs->currentWidget();
+    if (EditorTab *t = qobject_cast<EditorTab *>(w)) t->editor()->zoomOut(1);
+    else if (SshTab *s = qobject_cast<SshTab *>(w)) zoomTerminalFont(s->terminal(), -1);
+    else if (SerialTab *s = qobject_cast<SerialTab *>(w)) zoomTerminalFont(s->terminal(), -1);
+    else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) i->zoomOut();
+}
+
 void MainWindow::zoomReset()
 {
-    if (EditorTab *t = currentEditorTab()) {
+    QWidget *w = m_tabs->currentWidget();
+    if (EditorTab *t = qobject_cast<EditorTab *>(w)) {
         QFont f("Consolas", 11);
         f.setStyleHint(QFont::Monospace);
         t->editor()->setFont(f);
+    } else if (SshTab *s = qobject_cast<SshTab *>(w)) {
+        QFont f("Consolas", 11); f.setStyleHint(QFont::Monospace);
+        s->terminal()->setTerminalFont(f);
+    } else if (SerialTab *s = qobject_cast<SerialTab *>(w)) {
+        QFont f("Consolas", 11); f.setStyleHint(QFont::Monospace);
+        s->terminal()->setTerminalFont(f);
+    } else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) {
+        i->zoomFit();
     }
 }
 
@@ -695,7 +1027,21 @@ void MainWindow::setEncoding(const QString &enc)
     EditorTab *t = currentEditorTab();
     if (!t)
         return;
-    t->setEncoding(enc == "System" ? "UTF-8" : enc);
+    // Picking an encoding must actually re-interpret the bytes on disk,
+    // otherwise a mis-detected file (e.g. GBK Chinese text) stays garbled and
+    // only the status-bar label changes. "System" is kept as-is so the local
+    // ANSI codepage (CP936/GBK on Chinese Windows) is used — mapping it to
+    // UTF-8 was what made Chinese .txt files unreadable.
+    if (!t->filePath().isEmpty() && !t->isModified()) {
+        if (t->loadFile(t->filePath(), enc)) {
+            t->setEncoding(enc);
+            updateStatusBar();
+            statusBar()->showMessage(TR("Reopened with encoding: %1").arg(enc), 3000);
+            return;
+        }
+    }
+    // Unsaved/untitled document: just record the encoding for the next save.
+    t->setEncoding(enc);
     updateStatusBar();
 }
 
@@ -1010,6 +1356,164 @@ void MainWindow::openImageCompare(const QString &left, const QString &right)
 }
 
 // ------------------------------------------------------------------
+// Cloud drives
+// ------------------------------------------------------------------
+// Add a new cloud drive: ask for the provider + a drive name + credentials,
+// remember it (so it appears in the Cloud menu as "BaiduPan-<name>") and open
+// it right away.
+void MainWindow::connectCloudDrive()
+{
+    CloudConnectDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    const CloudDriveConfig cfg = dlg.config();
+    // Validate by building a provider once before storing the configuration.
+    CloudProvider *probe = createCloudProvider(cfg, nullptr);
+    if (!probe) {
+        QMessageBox::warning(this, TR("Cloud"),
+                             TR("Missing required connection details."));
+        return;
+    }
+    delete probe;   // the real provider is created by openCloudTab()
+
+    m_cloudDrives.add(cfg);     // persist (tokens encrypted via SecretStore)
+    rebuildCloudMenu();         // show it under Cloud > Connect Cloud Drive...
+    openSavedCloudDrive(m_cloudDrives.count() - 1);
+}
+
+// Create (or focus) a browser tab for one drive configuration.
+CloudBrowserTab *MainWindow::openCloudTab(const CloudDriveConfig &cfg)
+{
+    applyCloudProxy(cfg);       // honour the drive's proxy settings
+
+    CloudProvider *provider = createCloudProvider(cfg, nullptr);
+    if (!provider) {
+        QMessageBox::warning(this, TR("Cloud"),
+                             TR("Missing required connection details."));
+        return nullptr;
+    }
+
+    const QString label = cfg.displayName();
+    auto *tab = new CloudBrowserTab(provider, label, this);
+    tab->applyTheme(m_themeManager.current());
+    connect(tab, &CloudBrowserTab::statusMessage, this, [this](const QString &m) {
+        statusBar()->showMessage(m, 4000);
+    });
+    // A text file downloaded from the cloud opens in an internal editor tab.
+    connect(tab, &CloudBrowserTab::openTextFile, this, [this](const QString &lp) {
+        openFile(lp);
+    });
+    // An image file downloaded from the cloud opens in a picture view (compared
+    // against itself so the single-image viewer with zoom/pan is reused).
+    connect(tab, &CloudBrowserTab::openImageFileCompareNone, this,
+            [this](const QString &lp) { openImageCompare(lp, lp); });
+
+    int idx = m_tabs->addTab(tab, TR("☁ %1").arg(label));
+    m_tabs->setCurrentIndex(idx);
+    // Switching to this cloud tab reveals the Transfers dock via
+    // onCurrentTabChanged(); it is hidden again on every other tab type.
+    return tab;
+}
+
+// Close any already-open tab for this drive label.
+bool MainWindow::closeCloudTab(const QString &label)
+{
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto *c = qobject_cast<CloudBrowserTab *>(m_tabs->widget(i));
+        if (c && c->title() == label) {
+            QWidget *w = m_tabs->widget(i);
+            m_tabs->removeTab(i);
+            w->deleteLater();
+            return true;
+        }
+    }
+    return false;
+}
+
+// Open: focus the drive's tab if it is already open, otherwise create it.
+void MainWindow::openSavedCloudDrive(int index, bool forceNew)
+{
+    const auto &drives = m_cloudDrives.drives();
+    if (index < 0 || index >= drives.size())
+        return;
+    const CloudDriveConfig cfg = drives.at(index);
+
+    if (!forceNew) {
+        for (int i = 0; i < m_tabs->count(); ++i) {
+            auto *c = qobject_cast<CloudBrowserTab *>(m_tabs->widget(i));
+            if (c && c->title() == cfg.displayName()) {
+                m_tabs->setCurrentIndex(i);   // already open -> just focus it
+                return;
+            }
+        }
+    }
+    openCloudTab(cfg);
+}
+
+// Reconnect: drop the existing tab (and its provider/session) and open a fresh
+// one using the stored credentials.
+void MainWindow::reconnectSavedCloudDrive(int index)
+{
+    const auto &drives = m_cloudDrives.drives();
+    if (index < 0 || index >= drives.size())
+        return;
+    const CloudDriveConfig cfg = drives.at(index);
+    closeCloudTab(cfg.displayName());
+    if (openCloudTab(cfg))
+        statusBar()->showMessage(TR("Reconnected %1").arg(cfg.displayName()), 3000);
+}
+
+// Edit: reopen the connect dialog pre-filled with the stored values so the
+// name / token / proxy can be changed, then refresh the menu and any open tab.
+void MainWindow::editSavedCloudDrive(int index)
+{
+    const auto &drives = m_cloudDrives.drives();
+    if (index < 0 || index >= drives.size())
+        return;
+    const CloudDriveConfig oldCfg = drives.at(index);
+
+    CloudConnectDialog dlg(this);
+    dlg.setConfig(oldCfg);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    const CloudDriveConfig newCfg = dlg.config();
+    CloudProvider *probe = createCloudProvider(newCfg, nullptr);
+    if (!probe) {
+        QMessageBox::warning(this, TR("Cloud"),
+                             TR("Missing required connection details."));
+        return;
+    }
+    delete probe;
+
+    m_cloudDrives.update(index, newCfg);
+    rebuildCloudMenu();
+
+    // If the drive was open, reopen it so the new settings take effect.
+    if (closeCloudTab(oldCfg.displayName()))
+        openCloudTab(newCfg);
+    statusBar()->showMessage(TR("Updated %1").arg(newCfg.displayName()), 3000);
+}
+
+// Delete: confirm, close its tab, then forget the stored configuration.
+void MainWindow::deleteSavedCloudDrive(int index)
+{
+    const auto &drives = m_cloudDrives.drives();
+    if (index < 0 || index >= drives.size())
+        return;
+    const CloudDriveConfig cfg = drives.at(index);
+    if (QMessageBox::question(this, TR("Delete Cloud Drive"),
+            TR("Delete cloud drive \"%1\"?").arg(cfg.displayName()))
+        != QMessageBox::Yes)
+        return;
+    closeCloudTab(cfg.displayName());
+    m_cloudDrives.remove(index);
+    rebuildCloudMenu();
+    statusBar()->showMessage(TR("Deleted %1").arg(cfg.displayName()), 3000);
+}
+
+// ------------------------------------------------------------------
 // Clipboard history / auto-save / UI language
 // ------------------------------------------------------------------
 void MainWindow::showClipboardHistory()
@@ -1081,9 +1585,11 @@ void MainWindow::retranslateUi()
 
     // Reset menu pointers that will be recreated.
     m_sessionsMenu = nullptr;
+    m_recentMenu = nullptr;
     m_fileMenu = m_editMenu = m_viewMenu = nullptr;
     m_langSyntaxMenu = m_encMenu = m_termMenu = nullptr;
     m_compareMenu = nullptr;
+    m_cloudMenu = nullptr;
     m_uiLangMenu = m_helpMenu = nullptr;
     m_actAutoSave = nullptr;
 
@@ -1128,7 +1634,7 @@ void MainWindow::loadPreferences()
 void MainWindow::about()
 {
     const QString body =
-        "<h3>Terminal++ 1.0</h3>"
+        "<h3>Terminal++ 1.2</h3>"
         "<p>" + TR("A unified Qt 6 application combining:") + "</p>"
         "<ul>"
         "<li><b>" + TR("Code editor") + "</b> &mdash; " +
@@ -1159,6 +1665,12 @@ void MainWindow::onCurrentTabChanged(int)
         s->terminal()->setFocus();
     else if (SerialTab *s = qobject_cast<SerialTab *>(w))
         s->terminal()->setFocus();
+
+    // The Transfers panel is only relevant to cloud-drive browsing, so only
+    // show its dock while a cloud tab is active; hide it for every other tab
+    // type (editor/SSH/Serial/compare/hex) without losing its contents.
+    if (m_transferDock)
+        m_transferDock->setVisible(qobject_cast<CloudBrowserTab *>(w) != nullptr);
 }
 
 void MainWindow::updateStatusBar()
@@ -1197,6 +1709,21 @@ void MainWindow::updateWindowTitle()
     } else {
         setWindowTitle("Terminal++");
     }
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_tabs->tabBar() && event->type() == QEvent::MouseButtonDblClick) {
+        auto *me = static_cast<QMouseEvent *>(event);
+        // Only react when the double-click lands on empty tab-bar space (not
+        // on an existing tab), so double-clicking a tab itself still behaves
+        // normally (e.g. inline rename elsewhere is unaffected).
+        if (m_tabs->tabBar()->tabAt(me->pos()) == -1) {
+            newFile();
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

@@ -17,6 +17,8 @@ static inline QString TRc(const char *s) { return I18n::instance()->tr(QString::
 #include <QAction>
 #include <QFile>
 #include <QTextStream>
+#include <QStringDecoder>
+#include <QStringConverter>
 #include <QFileInfo>
 #include <QMouseEvent>
 #include <QKeyEvent>
@@ -327,17 +329,49 @@ TextCompareTab::TextCompareTab(QWidget *parent)
     m_right->setOtherLines(&m_leftLines);
 }
 
+// Decode a text file into lines. QTextStream defaults to UTF-8 in Qt 6, which
+// turns BOM-less GBK/GB2312 Chinese files into mojibake (乱码). Mirror the
+// editor's logic: honour a BOM, else accept UTF-8 only when it really is valid
+// UTF-8, otherwise fall back to the local ANSI codepage (CP936/GBK) and
+// finally to Latin-1 (which never fails, so no byte is lost).
+static QString decodeTextFile(const QByteArray &raw)
+{
+    auto encOpt = QStringConverter::encodingForData(raw);
+    if (encOpt.has_value()) {
+        QStringDecoder dec(encOpt.value());
+        return dec.decode(raw);
+    }
+    QStringDecoder utf8(QStringConverter::Utf8);
+    QString asUtf8 = utf8.decode(raw);
+    if (!utf8.hasError())
+        return asUtf8;
+    QStringDecoder sys(QStringConverter::System);
+    QString asSystem = sys.decode(raw);
+    if (!sys.hasError())
+        return asSystem;
+    QStringDecoder l1(QStringConverter::Latin1);
+    return l1.decode(raw);
+}
+
 static QStringList readLines(const QString &path, bool &ok)
 {
     QStringList lines;
     QFile f(path);
-    ok = f.open(QIODevice::ReadOnly | QIODevice::Text);
+    // Open in binary mode: the decoding and newline handling are done here so
+    // the encoding can be detected from the raw bytes.
+    ok = f.open(QIODevice::ReadOnly);
     if (!ok)
         return lines;
-    QTextStream ts(&f);
-    while (!ts.atEnd())
-        lines << ts.readLine();
+    QString text = decodeTextFile(f.readAll());
     f.close();
+    // Normalize line endings, then split (keeping empty lines intact).
+    text.replace("\r\n", "\n");
+    text.replace('\r', '\n');
+    lines = text.split('\n');
+    // A trailing newline yields one empty element; drop it so the line count
+    // matches what QTextStream::readLine() used to produce.
+    if (!lines.isEmpty() && lines.last().isEmpty())
+        lines.removeLast();
     return lines;
 }
 

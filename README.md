@@ -64,8 +64,21 @@
 - **十六进制比较**：左右 hex dump（偏移 | 16 字节 | ASCII），差异字节高亮、同步滚动、字节差异统计。
 - **图片比较**：左右同步平移/缩放（放大/缩小/适应/1:1）、逐像素差异叠加模式、尺寸与差异像素百分比统计。
 
-### 5. 共用框架
-- 统一标签页：编辑器 / SSH / 串口 / 各类比较可任意混排
+### 5. 云盘（网盘）浏览
+顶层 **Cloud** 菜单 → **Connect Cloud Drive...** 连接并浏览网盘：
+- **支持服务商**：OneDrive（Microsoft Graph）、Google Drive、Dropbox、百度网盘、阿里云盘、以及通用 **WebDAV**（可用于坚果云/Nutstore、自建服务器等）。
+- **认证**：REST 服务商用 OAuth2 访问令牌（access token），WebDAV 用 URL + 账号密码；不内置任何 client secret，不依赖 Qt NetworkAuth。
+- **浏览**：树状列出文件夹与文件（名称/大小/修改时间），双击进入子文件夹，支持后退/上级/刷新。
+- **右键菜单（Open with / 打开方式）**：
+  - **文本文件** → 内部编辑器打开；或「Open with VS Code」用 VS Code 打开（未装则回退内部编辑器）。
+  - **图片** → 内部图片查看器（可缩放/平移）。
+  - **视频/音频** → 「Stream（边下边播）」把解析出的临时直链交给系统播放器流式播放；无法流式时自动回退为先下载再播放。
+  - **其它类型文件** → 「Open With...」弹窗选择任意外部程序打开，或「Open（系统默认程序）」。这些都会**先下载到临时文件夹** `%TEMP%/TerminalPP-cloud/` 再打开。
+  - **Download...** → 下载到你指定的本地路径。
+- 云盘标签页同样跟随统一主题，界面全程多语言。
+
+### 6. 共用框架
+- 统一标签页：编辑器 / SSH / 串口 / 各类比较 / 云盘可任意混排
 - 统一菜单栏、工具栏、状态栏
 - 关闭时统一提示保存、统一断开所有连接
 - 跨平台：Windows 与 Linux（及 macOS）均可编译运行
@@ -194,21 +207,27 @@ cmake --build build -j
 ```
 
 ### 方式 C：官方 Qt 安装版（Qt Online Installer）
-若使用官方 Qt（含 MinGW Kit）而非 MSYS2，可用自带脚本：
+若使用官方 Qt（含 MinGW Kit）而非 MSYS2，用 CMake 构建：
 ```powershell
 cd TerminalPP
-.\build.ps1 -QtDir C:\Qt\6.6.0\mingw_64 -Libssh2Dir <libssh2 安装根目录> -Deploy
+cmake -S . -B build -G "MinGW Makefiles" ^
+    -DCMAKE_BUILD_TYPE=Release ^
+    -DCMAKE_PREFIX_PATH="C:\Qt\6.6.0\mingw_64;<libssh2 安装根目录>"
+cmake --build build -j
+windeployqt --release build\TerminalPP.exe   ::（可选）打包 Qt DLL/插件
 ```
-或 CMD：先在 `build.bat` 顶部设置 `QT_DIR` / `MINGW_DIR` / `LIBSSH2_DIR`，再 `build.bat deploy`。
-> 注意：官方 Qt 不含 libssh2，需另行准备（最简单是复用 MSYS2 的 `C:\msys64\mingw64`）。
+> 注意：官方 Qt 不含 libssh2，需另行准备（最简单是复用 MSYS2 的 `C:\msys64\mingw64`），
+> 并把其根目录加入 `CMAKE_PREFIX_PATH`；运行时还需把 `libssh2-1.dll` 拷到 exe 旁。
 
 ### 方式 D：Linux / macOS
 ```bash
 # Ubuntu: sudo apt install build-essential cmake qt6-base-dev qt6-serialport-dev libssh2-1-dev pkg-config
 cd TerminalPP
-chmod +x build.sh
-./build.sh           # 或 ./build.sh run / ./build.sh clean / ./build.sh qmake
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./build/TerminalPP
 ```
+> 或用 qmake：`qmake6 && make -j`。
 
 ### 方式 E：Qt Creator
 用 Qt Creator 打开 `TerminalPP/CMakeLists.txt` 或 `TerminalPP/TerminalPP.pro`，选 Qt6 Kit，点运行。
@@ -249,8 +268,7 @@ chmod +x build.sh
 TerminalPP/
 ├── CMakeLists.txt          # CMake 构建
 ├── TerminalPP.pro          # qmake 构建（备选）
-├── build.bat / build.ps1   # Windows 一键编译脚本
-├── build.sh                # Linux / macOS 一键编译脚本
+├── build-msys2.sh          # MSYS2 / MinGW-w64 一键编译 + 打包脚本（推荐）
 ├── resources/              # qrc 资源
 └── src/
     ├── main.cpp
@@ -260,6 +278,11 @@ TerminalPP/
     │   ├── cliphistory.{h,cpp}      # 剪贴板历史监听与持久化
     │   ├── cliphistorydialog.{h,cpp}# 剪贴板历史选择对话框
     │   └── secretstore.{h,cpp}      # SSH 密码加密（Windows DPAPI / XOR 回退）
+    ├── cloud/                        # ===== 云盘浏览 =====
+    │   ├── cloudprovider.h           # 云盘后端抽象接口
+    │   ├── restproviders.{h,cpp}     # OneDrive/GoogleDrive/Dropbox/百度/阿里/WebDAV
+    │   ├── cloudconnectdialog.{h,cpp}# 连接对话框（选服务商+令牌/凭据）
+    │   └── cloudbrowsertab.{h,cpp}   # 树状浏览 + 右键打开方式/流式/下载到临时
     ├── compare/                     # ===== 文件比较 =====
     │   ├── diffengine.{h,cpp}       # Myers O(ND) 行差异 + 字符级内联差异
     │   ├── textcomparetab.{h,cpp}   # 文本双栏比较视图

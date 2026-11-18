@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include "editor/thememanager.h"
 #include "editor/syntaxhighlighter.h"
+#include "cloud/clouddrivestore.h"
 
 class QTabWidget;
 class QListWidget;
@@ -17,6 +18,8 @@ class FindDialog;
 class SshTab;
 class SerialTab;
 class SessionManager;
+class CloudBrowserTab;
+class TransferPanel;
 
 // The application main window. Hosts a central tab widget that can contain:
 //   * Editor tabs (ndd / Notepad-- replica)
@@ -33,13 +36,22 @@ public:
     // Open a file into a new editor tab (used by command line + File menu).
     EditorTab *openFile(const QString &path);
 
+    // Remove the first tab if it is still the untouched default empty document
+    // (used after opening command-line files so no blank tab lingers).
+    void closeInitialEmptyTab();
+
 protected:
     void closeEvent(QCloseEvent *event) override;
+    // Catches double-clicks on empty tab-bar space to open a new file tab.
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
     // --- File / editor ---
     void newFile();
     void openFileDialog();
+    void openHexEditorDialog();     // pick a file and open it in the hex editor
+    void openRecentFile();          // open the file from a Recent menu action
+    void clearRecentFiles();
     bool saveFile();
     bool saveFileAs();
     bool saveAll();
@@ -79,6 +91,9 @@ private slots:
     // --- Terminal: Serial ---
     void newSerialSession();
 
+    // --- Cloud drives ---
+    void connectCloudDrive();
+
     // --- Compare ---
     void newComparison();
     void openTextCompare(const QString &left, const QString &right);
@@ -96,6 +111,7 @@ private slots:
     void about();
     void onCurrentTabChanged(int index);
     void onTabCloseRequested(int index);
+    void onTabContextMenu(const QPoint &pos);   // right-click a tab
     void updateStatusBar();
     void updateWindowTitle();
 
@@ -108,6 +124,21 @@ private:
 
     EditorTab *currentEditorTab() const;
     EditorTab *addEditorTab();
+    // Close a single tab by index (honours unsaved-save prompts). Returns true
+    // if the tab was actually closed (false if the user cancelled).
+    bool closeTabAt(int index);
+    // Tab-bar context menu helpers.
+    void closeOtherTabs(int keepIndex);
+    void closeTabsToRight(int index);
+    void closeTabsToLeft(int index);
+    // Open any file in an editable hex-editor tab (view + edit + save).
+    void openHexEditor(const QString &path);
+
+    // Recent-files list (most-recent first, capped at 20). Persisted in
+    // QSettings and rebuilt into the File > Open Recent submenu.
+    void addRecentFile(const QString &path);
+    void rebuildRecentMenu();
+    QStringList recentFiles() const;
     bool maybeSaveTab(EditorTab *tab);
 
     // Rebuild the Terminal > Sessions submenu from saved sessions.
@@ -117,9 +148,30 @@ private:
     void deleteSavedSshSession(int index);
     void deleteSavedSerialSession(int index);
 
+    // Rebuild the Cloud menu: "Connect Cloud Drive..." followed by one entry
+    // per saved drive (labelled "BaiduPan-<name>") with Open / Reconnect /
+    // Edit / Delete actions.
+    void rebuildCloudMenu();
+    // Open a saved drive in a new browser tab (reuses an existing tab if the
+    // same drive is already open unless `forceNew` is set).
+    void openSavedCloudDrive(int index, bool forceNew = false);
+    void reconnectSavedCloudDrive(int index);   // close the tab, then reopen
+    void editSavedCloudDrive(int index);        // re-open the dialog to edit
+    void deleteSavedCloudDrive(int index);
+    // Create (or focus) a browser tab for a drive configuration.
+    CloudBrowserTab *openCloudTab(const CloudDriveConfig &cfg);
+    // Close any open tab belonging to this drive label. Returns true if one
+    // was closed.
+    bool closeCloudTab(const QString &label);
+
     QTabWidget *m_tabs = nullptr;
 
     SessionManager *m_sessions = nullptr;   // SSH session persistence
+    CloudDriveStore m_cloudDrives;          // connected cloud-drive persistence
+
+    // Dockable cloud transfers panel (uploads/downloads with progress).
+    QDockWidget *m_transferDock = nullptr;
+    TransferPanel *m_transferPanel = nullptr;
 
     FindDialog *m_findDialog = nullptr;
     ThemeManager m_themeManager;
@@ -129,12 +181,14 @@ private:
 
     // Top-level menus kept so retranslateUi() can refresh their titles.
     QMenu *m_fileMenu = nullptr;
+    QMenu *m_recentMenu = nullptr;      // File > Open Recent submenu
     QMenu *m_editMenu = nullptr;
     QMenu *m_viewMenu = nullptr;
     QMenu *m_langSyntaxMenu = nullptr;  // syntax "Language" menu
     QMenu *m_encMenu = nullptr;
     QMenu *m_termMenu = nullptr;
     QMenu *m_compareMenu = nullptr;     // "Compare" menu
+    QMenu *m_cloudMenu = nullptr;       // "Cloud" menu
     QMenu *m_uiLangMenu = nullptr;      // "UI Language" menu
     QMenu *m_helpMenu = nullptr;
 

@@ -113,11 +113,21 @@ void I18n::loadTable()
     // ---- File menu ----
     add("&New",              "新建(&N)",  "新增(&N)",  "&Nuevo",       "&Nouveau",      "&Neu",          "&Создать",        "新規(&N)",      "새로 만들기(&N)");
     add("&Open...",          "打开(&O)...","開啟(&O)...","&Abrir...",   "&Ouvrir...",    "&Öffnen...",    "&Открыть...",     "開く(&O)...",   "열기(&O)...");
+    add("Open as &Hex...",   "以十六进制打开(&H)...","以十六進位開啟(&H)...","Abrir como &hex...","Ouvrir en &hex...","Als &Hex öffnen...","Открыть как &hex...","&Hexで開く...","&Hex로 열기...");
+    add("Open as Hex",       "以十六进制打开","以十六進位開啟","Abrir como hex","Ouvrir en hex","Als Hex öffnen","Открыть как hex","Hexで開く","Hex로 열기");
+    add("Open &Recent",      "打开最近(&R)","開啟最近(&R)","Abrir &reciente","Récemment &ouverts","&Zuletzt geöffnet","Открыть &недавние","最近開いた(&R)","최근 &열기");
+    add("(no recent files)", "(无最近文件)","(無最近檔案)","(sin archivos recientes)","(aucun fichier récent)","(keine zuletzt geöffneten Dateien)","(нет недавних файлов)","(最近のファイルなし)","(최근 파일 없음)");
+    add("Clear Recent Files","清除最近文件","清除最近檔案","Borrar archivos recientes","Effacer les fichiers récents","Zuletzt geöffnete löschen","Очистить недавние файлы","最近のファイルをクリア","최근 파일 지우기");
+    add("Hex: %1",           "十六进制：%1","十六進位：%1","Hex: %1",   "Hex : %1",      "Hex: %1",       "Hex: %1",         "Hex: %1",       "Hex: %1");
     add("&Save",             "保存(&S)",  "儲存(&S)",  "&Guardar",     "&Enregistrer",  "&Speichern",    "&Сохранить",      "保存(&S)",      "저장(&S)");
     add("Save &As...",       "另存为(&A)...","另存為(&A)...","Guardar &como...","Enregistrer &sous...","Speichern &unter...","Сохранить &как...","名前を付けて保存(&A)...","다른 이름으로 저장(&A)...");
     add("Save A&ll",         "全部保存(&L)","全部儲存(&L)","Guardar &todo","&Tout enregistrer","&Alle speichern","Сохранить &всё","すべて保存(&L)","모두 저장(&L)");
     add("&Print...",         "打印(&P)...","列印(&P)...","&Imprimir...","&Imprimer...", "&Drucken...",   "&Печать...",      "印刷(&P)...",   "인쇄(&P)...");
     add("&Close Tab",        "关闭标签(&C)","關閉分頁(&C)","&Cerrar pestaña","&Fermer l'onglet","Tab &schließen","&Закрыть вкладку","タブを閉じる(&C)","탭 닫기(&C)");
+    add("Close",             "关闭",      "關閉",      "Cerrar",       "Fermer",        "Schließen",     "Закрыть",         "閉じる",        "닫기");
+    add("Close Others",      "关闭其他",  "關閉其他",  "Cerrar otras", "Fermer les autres","Andere schließen","Закрыть другие","他を閉じる","다른 탭 닫기");
+    add("Close to the Right","关闭右侧",  "關閉右側",  "Cerrar a la derecha","Fermer à droite","Rechts schließen","Закрыть справа","右側を閉じる","오른쪽 닫기");
+    add("Close to the Left", "关闭左侧",  "關閉左側",  "Cerrar a la izquierda","Fermer à gauche","Links schließen","Закрыть слева","左側を閉じる","왼쪽 닫기");
     add("E&xit",             "退出(&X)",  "結束(&X)",  "&Salir",       "&Quitter",      "&Beenden",      "&Выход",          "終了(&X)",      "종료(&X)");
 
     // ---- Edit menu ----
@@ -263,6 +273,178 @@ void I18n::loadTable()
     add("Replaced %1 occurrence(s)","已替换 %1 处","已取代 %1 處","%1 reemplazo(s)","%1 remplacement(s)","%1 Vorkommen ersetzt","Заменено: %1","%1 件を置換","%1개 바꿈");
     add("Count: %1 occurrence(s)","计数：%1 处","計數：%1 處","Conteo: %1","Nombre : %1","Anzahl: %1","Количество: %1","件数: %1","개수: %1");
 
+    // ---- Cloud drives ----
+    add("Clou&d",            "云盘(&D)",  "雲端(&D)",  "&Nube",        "&Cloud",        "&Cloud",        "&Облако",         "クラウド(&D)",  "클라우드(&D)");
+    add("&Connect Cloud Drive...","连接云盘(&C)...","連接雲端(&C)...","&Conectar unidad en la nube...","&Connecter un disque cloud...","Cloud-Laufwerk &verbinden...","&Подключить облако...","クラウドに接続(&C)...","클라우드 연결(&C)...");
+    add("Connect to Cloud Drive","连接到云盘","連接到雲端","Conectar a la nube","Connexion au cloud","Mit Cloud verbinden","Подключение к облаку","クラウドに接続","클라우드에 연결");
+    add("Cloud",             "云盘",      "雲端",      "Nube",         "Cloud",         "Cloud",         "Облако",          "クラウド",      "클라우드");
+    add("Provider:",         "服务商：",  "服務商：",  "Proveedor:",   "Fournisseur :", "Anbieter:",     "Провайдер:",      "プロバイダ：",  "제공자:");
+    add("Drive Name:",       "云盘名称：","雲端名稱：","Nombre de unidad:","Nom du disque :","Laufwerksname:","Имя диска:","ドライブ名：","드라이브 이름:");
+    add("e.g. work, photos (shown as BaiduPan-work)",
+        "例如 work、照片（显示为 BaiduPan-work）",
+        "例如 work、照片（顯示為 BaiduPan-work）",
+        "p. ej. work, fotos (se muestra como BaiduPan-work)",
+        "p. ex. work, photos (affiché comme BaiduPan-work)",
+        "z. B. work, Fotos (angezeigt als BaiduPan-work)",
+        "например work, фото (отображается как BaiduPan-work)",
+        "例: work、写真（BaiduPan-work と表示）",
+        "예: work, 사진 (BaiduPan-work 으로 표시)");
+    add("(no connected cloud drives)","(无已连接的云盘)","(無已連接的雲端)","(sin unidades en la nube conectadas)","(aucun disque cloud connecté)","(keine verbundenen Cloud-Laufwerke)","(нет подключённых облаков)","(接続済みのクラウドなし)","(연결된 클라우드 없음)");
+    add("Reconnect",         "重新连接",  "重新連線",  "Reconectar",   "Reconnecter",   "Neu verbinden", "Переподключить",  "再接続",        "다시 연결");
+    add("Edit...",           "编辑...",   "編輯...",   "Editar...",    "Modifier...",   "Bearbeiten...", "Изменить...",     "編集...",       "편집...");
+    add("Delete Cloud Drive","删除云盘",  "刪除雲端",  "Eliminar unidad en la nube","Supprimer le disque cloud","Cloud-Laufwerk löschen","Удалить облако","クラウドを削除","클라우드 삭제");
+    add("Delete cloud drive \"%1\"?","确定删除云盘 \"%1\"？","確定刪除雲端 \"%1\"？","¿Eliminar la unidad en la nube \"%1\"?","Supprimer le disque cloud \"%1\" ?","Cloud-Laufwerk \"%1\" löschen?","Удалить облако \"%1\"?","クラウド \"%1\" を削除しますか？","클라우드 \"%1\" 을(를) 삭제할까요?");
+    add("Reconnected %1",    "已重新连接 %1","已重新連線 %1","Reconectado %1","Reconnecté %1","%1 neu verbunden","Переподключено %1","%1 を再接続しました","%1 다시 연결됨");
+    add("Updated %1",        "已更新 %1", "已更新 %1", "Actualizado %1","Mis à jour %1","%1 aktualisiert","Обновлено %1",   "%1 を更新しました","%1 업데이트됨");
+    add("Deleted %1",        "已删除 %1", "已刪除 %1", "Eliminado %1", "Supprimé %1",   "%1 gelöscht",   "Удалено %1",      "%1 を削除しました","%1 삭제됨");
+    add("Access Token:",     "访问令牌：","存取權杖：","Token de acceso:","Jeton d'accès :","Zugriffstoken:","Токен доступа:","アクセストークン：","액세스 토큰:");
+    add("Drive ID:",         "网盘 ID：", "雲端 ID：", "ID de unidad:","ID du disque :","Laufwerk-ID:",  "ID диска:",       "ドライブID：",  "드라이브 ID:");
+    add("WebDAV URL:",       "WebDAV 地址：","WebDAV 網址：","URL de WebDAV:","URL WebDAV :","WebDAV-URL:","URL WebDAV:","WebDAV URL：","WebDAV URL:");
+    add("Username:",         "用户名：",  "使用者名稱：","Usuario:",    "Utilisateur :", "Benutzername:", "Имя пользователя:","ユーザー名：", "사용자 이름:");
+    add("Password:",         "密码：",    "密碼：",    "Contraseña:",  "Mot de passe :","Passwort:",     "Пароль:",         "パスワード：",  "비밀번호:");
+    add("Missing required connection details.","缺少必要的连接信息。","缺少必要的連線資訊。","Faltan datos de conexión obligatorios.","Détails de connexion requis manquants.","Erforderliche Verbindungsdetails fehlen.","Отсутствуют обязательные данные подключения.","必要な接続情報が不足しています。","필수 연결 정보가 없습니다.");
+    add("Login in Browser (get token)","浏览器登录（获取令牌）","瀏覽器登入（取得權杖）","Iniciar sesión en el navegador (obtener token)","Se connecter dans le navigateur (obtenir le jeton)","Im Browser anmelden (Token holen)","Войти в браузере (получить токен)","ブラウザでログイン（トークン取得）","브라우저에서 로그인(토큰 받기)");
+    add("Proxy Server (optional)","代理服务器（可选）","代理伺服器（選用）","Servidor proxy (opcional)","Serveur proxy (facultatif)","Proxyserver (optional)","Прокси-сервер (необязательно)","プロキシサーバー（任意）","프록시 서버(선택)");
+    add("Type:",             "类型：",    "類型：",    "Tipo:",        "Type :",        "Typ:",          "Тип:",            "種類：",        "유형:");
+    add("None",              "无",        "無",        "Ninguno",      "Aucun",         "Keiner",        "Нет",             "なし",          "없음");
+    add("Host:",             "主机：",    "主機：",    "Host:",        "Hôte :",        "Host:",         "Хост:",           "ホスト：",      "호스트:");
+    add("Port:",             "端口：",    "連接埠：",  "Puerto:",      "Port :",        "Port:",         "Порт:",           "ポート：",      "포트:");
+    add("WebDAV uses URL + account credentials, no OAuth login.","WebDAV 使用 URL + 账号密码，无需 OAuth 登录。","WebDAV 使用 URL + 帳號密碼，無需 OAuth 登入。","WebDAV usa URL + credenciales, sin OAuth.","WebDAV utilise URL + identifiants, sans OAuth.","WebDAV nutzt URL + Zugangsdaten, kein OAuth.","WebDAV использует URL + учётные данные, без OAuth.","WebDAV は URL + 認証情報を使用し、OAuth ログインは不要です。","WebDAV는 URL+계정 자격증명을 사용하며 OAuth 로그인이 없습니다.");
+    add("A browser window opened for login (supports web / QR code). After authorizing, copy the access_token (and drive_id for Aliyun) from the redirect URL and paste it above. Replace YOUR_CLIENT_ID with your registered app id. The manual token field remains available.",
+        "已打开浏览器登录（支持网页/扫二维码）。授权后，从跳转 URL 中复制 access_token（阿里云盘还需 drive_id）粘贴到上方。请将 YOUR_CLIENT_ID 替换为你注册的应用 id。手动输入令牌的方式仍然保留。",
+        "已開啟瀏覽器登入（支援網頁/掃 QR）。授權後，從跳轉 URL 複製 access_token（阿里雲端另需 drive_id）貼到上方。請將 YOUR_CLIENT_ID 換成你註冊的應用 id。手動輸入權杖的方式仍保留。",
+        "Se abrió el navegador para iniciar sesión (web / código QR). Tras autorizar, copie el access_token (y drive_id para Aliyun) de la URL de redirección y péguelo arriba. Reemplace YOUR_CLIENT_ID por su id de app. El campo manual sigue disponible.",
+        "Un navigateur s'est ouvert pour la connexion (web / QR). Après autorisation, copiez l'access_token (et drive_id pour Aliyun) depuis l'URL de redirection et collez-le ci-dessus. Remplacez YOUR_CLIENT_ID par votre id d'app. Le champ manuel reste disponible.",
+        "Ein Browser wurde zum Anmelden geöffnet (Web / QR-Code). Nach der Autorisierung access_token (und drive_id für Aliyun) aus der Weiterleitungs-URL kopieren und oben einfügen. YOUR_CLIENT_ID durch Ihre App-ID ersetzen. Das manuelle Feld bleibt verfügbar.",
+        "Открыто окно браузера для входа (веб / QR-код). После авторизации скопируйте access_token (и drive_id для Aliyun) из URL перенаправления и вставьте выше. Замените YOUR_CLIENT_ID на свой id приложения. Поле ручного ввода остаётся доступным.",
+        "ログイン用のブラウザが開きました（Web / QR コード対応）。認可後、リダイレクト URL から access_token（Aliyun は drive_id も）をコピーして上に貼り付けてください。YOUR_CLIENT_ID は登録済みアプリ id に置き換えてください。手動入力欄も引き続き利用できます。",
+        "로그인용 브라우저 창이 열렸습니다(웹/QR 코드 지원). 인증 후 리디렉션 URL에서 access_token(아리윈은 drive_id도)을 복사해 위에 붙여넣으세요. YOUR_CLIENT_ID를 등록한 앱 id로 바꾸세요. 수동 토큰 입력란도 그대로 사용할 수 있습니다.");
+    // Browser tab actions
+    add("Back",              "后退",      "上一頁",    "Atrás",        "Retour",        "Zurück",        "Назад",           "戻る",          "뒤로");
+    add("Up",                "上级",      "上層",      "Arriba",       "Haut",          "Nach oben",     "Вверх",           "上へ",          "위로");
+    add("Open",              "打开",      "開啟",      "Abrir",        "Ouvrir",        "Öffnen",        "Открыть",         "開く",          "열기");
+    add("Open Folder",       "打开文件夹","開啟資料夾","Abrir carpeta","Ouvrir le dossier","Ordner öffnen","Открыть папку","フォルダを開く","폴더 열기");
+    add("Download...",       "下载...",   "下載...",   "Descargar...", "Télécharger...","Herunterladen...","Скачать...",   "ダウンロード...","다운로드...");
+    add("Download Folder...","下载文件夹...","下載資料夾...","Descargar carpeta...","Télécharger le dossier...","Ordner herunterladen...","Скачать папку...","フォルダをダウンロード...","폴더 다운로드...");
+    add("Open With...",      "打开方式...","開啟方式...","Abrir con...","Ouvrir avec...","Öffnen mit...","Открыть с помощью...","プログラムから開く...","연결 프로그램...");
+    add("Open with VS Code", "用 VS Code 打开","用 VS Code 開啟","Abrir con VS Code","Ouvrir avec VS Code","Mit VS Code öffnen","Открыть в VS Code","VS Codeで開く","VS Code로 열기");
+    add("Open as Text",      "作为文本打开","以文字開啟","Abrir como texto","Ouvrir comme texte","Als Text öffnen","Открыть как текст","テキストとして開く","텍스트로 열기");
+    add("Open (system default)","用系统默认程序打开","用系統預設程式開啟","Abrir (predeterminado del sistema)","Ouvrir (par défaut du système)","Öffnen (Systemstandard)","Открыть (по умолчанию)","既定のアプリで開く","시스템 기본으로 열기");
+    add("Stream (play while downloading)","流式播放（边下边播）","串流播放（邊下邊播）","Transmitir (reproducir mientras descarga)","Diffuser (lire pendant le téléchargement)","Streamen (beim Herunterladen abspielen)","Потоково (воспроизвод. при загрузке)","ストリーム再生（ダウンロードしながら）","스트리밍(다운로드하며 재생)");
+    add("Choose Program to Open With","选择打开程序","選擇開啟程式","Elegir programa para abrir","Choisir le programme","Programm zum Öffnen wählen","Выбрать программу","開くプログラムを選択","열 프로그램 선택");
+    add("Programs (*.exe);;All Files (*)","程序 (*.exe);;所有文件 (*)","程式 (*.exe);;所有檔案 (*)","Programas (*.exe);;Todos (*)","Programmes (*.exe);;Tous (*)","Programme (*.exe);;Alle (*)","Программы (*.exe);;Все (*)","プログラム (*.exe);;すべて (*)","프로그램 (*.exe);;모든 파일 (*)");
+    add(" Path: ",           " 路径： ",  " 路徑： ",  " Ruta: ",      " Chemin : ",    " Pfad: ",       " Путь: ",         " パス： ",      " 경로: ");
+    add("Loading…",          "加载中…",   "載入中…",   "Cargando…",    "Chargement…",   "Laden…",        "Загрузка…",       "読み込み中…",   "불러오는 중…");
+    add("%1 item(s)",        "%1 项",     "%1 項",     "%1 elemento(s)","%1 élément(s)","%1 Element(e)", "%1 элем.",        "%1 件",         "%1개 항목");
+    add("Error: %1",         "错误：%1",  "錯誤：%1",  "Error: %1",    "Erreur : %1",   "Fehler: %1",    "Ошибка: %1",      "エラー: %1",    "오류: %1");
+    add("Downloading %1…",   "正在下载 %1…","正在下載 %1…","Descargando %1…","Téléchargement de %1…","%1 wird heruntergeladen…","Загрузка %1…","%1 をダウンロード中…","%1 다운로드 중…");
+    add("Downloading… %1 / %2","下载中… %1 / %2","下載中… %1 / %2","Descargando… %1 / %2","Téléchargement… %1 / %2","Herunterladen… %1 / %2","Загрузка… %1 / %2","ダウンロード中… %1 / %2","다운로드 중… %1 / %2");
+    add("Downloaded to %1",  "已下载到 %1","已下載到 %1","Descargado en %1","Téléchargé vers %1","Heruntergeladen nach %1","Скачано в %1","%1 にダウンロード完了","%1 에 다운로드됨");
+    add("Streaming via system player…","正在用系统播放器流式播放…","正在用系統播放器串流…","Transmitiendo con el reproductor del sistema…","Diffusion via le lecteur système…","Streaming über Systemplayer…","Потоковое воспроизведение системным плеером…","システムプレーヤーでストリーミング中…","시스템 플레이어로 스트리밍 중…");
+    add("Streaming unavailable (%1); downloading first…","无法流式播放（%1）；改为先下载…","無法串流（%1）；改為先下載…","Transmisión no disponible (%1); descargando primero…","Diffusion indisponible (%1) ; téléchargement d'abord…","Streaming nicht verfügbar (%1); lade zuerst herunter…","Потоковое недоступно (%1); сначала загрузка…","ストリーミング不可（%1）。先にダウンロードします…","스트리밍 불가(%1); 먼저 다운로드 중…");
+    add("Local stream relay unavailable; downloading first…",
+        "本地流式中转启动失败；改为先下载…",
+        "本機串流中轉啟動失敗；改為先下載…",
+        "Relé de transmisión local no disponible; descargando primero…",
+        "Relais de diffusion local indisponible ; téléchargement d'abord…",
+        "Lokales Stream-Relay nicht verfügbar; lade zuerst herunter…",
+        "Локальный ретранслятор недоступен; сначала загрузка…",
+        "ローカル中継の起動に失敗しました。先にダウンロードします…",
+        "로컬 스트림 중계를 사용할 수 없음; 먼저 다운로드 중…");
+    add("VS Code (code) not found on PATH; opening internally.","PATH 中未找到 VS Code (code)；改为内部打开。","PATH 中找不到 VS Code (code)；改為內部開啟。","VS Code (code) no está en PATH; abriendo internamente.","VS Code (code) introuvable dans PATH ; ouverture interne.","VS Code (code) nicht im PATH; intern geöffnet.","VS Code (code) не найден в PATH; открываю внутри.","VS Code (code) が PATH にありません。内部で開きます。","PATH에 VS Code(code)가 없어 내부에서 엽니다.");
+
+    // ---- Cloud transfers (upload/download manager + panel) ----
+    add("Transfers",         "传输",      "傳輸",      "Transferencias","Transferts",   "Übertragungen", "Передачи",        "転送",          "전송");
+    add("Show &Transfers Panel","显示传输面板(&T)","顯示傳輸面板(&T)","Mostrar panel de &transferencias","Afficher le panneau de &transferts","&Übertragungspanel anzeigen","Показать панель &передач","転送パネルを表示(&T)","전송 패널 표시(&T)");
+    add("Upload Files...",   "上传文件...","上傳檔案...","Subir archivos...","Téléverser des fichiers...","Dateien hochladen...","Загрузить файлы...","ファイルをアップロード...","파일 업로드...");
+    add("Upload Folder...",  "上传文件夹...","上傳資料夾...","Subir carpeta...","Téléverser un dossier...","Ordner hochladen...","Загрузить папку...","フォルダをアップロード...","폴더 업로드...");
+    add("New Folder...",     "新建文件夹...","新增資料夾...","Nueva carpeta...","Nouveau dossier...","Neuer Ordner...","Новая папка...","新規フォルダ...","새 폴더...");
+    add("New Folder",        "新建文件夹","新增資料夾","Nueva carpeta","Nouveau dossier","Neuer Ordner","Новая папка","新規フォルダ","새 폴더");
+    add("Folder name:",      "文件夹名称：","資料夾名稱：","Nombre de carpeta:","Nom du dossier :","Ordnername:","Имя папки:","フォルダ名：","폴더 이름:");
+    add("Select Files to Upload","选择要上传的文件","選擇要上傳的檔案","Seleccionar archivos para subir","Sélectionner les fichiers à téléverser","Hochzuladende Dateien wählen","Выберите файлы для загрузки","アップロードするファイルを選択","업로드할 파일 선택");
+    add("Select Folder to Upload","选择要上传的文件夹","選擇要上傳的資料夾","Seleccionar carpeta para subir","Sélectionner le dossier à téléverser","Hochzuladenden Ordner wählen","Выберите папку для загрузки","アップロードするフォルダを選択","업로드할 폴더 선택");
+    add("Uploading %1 file(s)…","正在上传 %1 个文件…","正在上傳 %1 個檔案…","Subiendo %1 archivo(s)…","Téléversement de %1 fichier(s)…","%1 Datei(en) werden hochgeladen…","Загрузка %1 файла(ов)…","%1 件のファイルをアップロード中…","%1개 파일 업로드 중…");
+    add("Uploading folder %1…","正在上传文件夹 %1…","正在上傳資料夾 %1…","Subiendo la carpeta %1…","Téléversement du dossier %1…","Ordner %1 wird hochgeladen…","Загрузка папки %1…","フォルダ %1 をアップロード中…","폴더 %1 업로드 중…");
+    add("Cancel",            "取消",      "取消",      "Cancelar",     "Annuler",       "Abbrechen",     "Отмена",          "キャンセル",    "취소");
+    add("Retry",             "重试",      "重試",      "Reintentar",   "Réessayer",     "Wiederholen",   "Повторить",       "再試行",        "다시 시도");
+    add("Remove",            "移除",      "移除",      "Quitar",       "Retirer",       "Entfernen",     "Убрать",          "削除",          "제거");
+    add("Clear Finished",    "清除已完成","清除已完成","Borrar completados","Effacer les terminés","Abgeschlossene löschen","Очистить завершённые","完了分をクリア","완료 항목 지우기");
+    add("Copy",              "复制",      "複製",      "Copiar",       "Copier",        "Kopieren",      "Копировать",      "コピー",        "복사");
+    add("Copy Name",         "复制名称",  "複製名稱",  "Copiar nombre","Copier le nom", "Namen kopieren","Копировать имя",  "名前をコピー",  "이름 복사");
+    add("Copy Local Path",   "复制本地路径","複製本機路徑","Copiar ruta local","Copier le chemin local","Lokalen Pfad kopieren","Копировать локальный путь","ローカルパスをコピー","로컬 경로 복사");
+    add("Copy Remote Path",  "复制远程路径","複製遠端路徑","Copiar ruta remota","Copier le chemin distant","Remote-Pfad kopieren","Копировать удалённый путь","リモートパスをコピー","원격 경로 복사");
+    add("Type",              "类型",      "類型",      "Tipo",         "Type",          "Typ",           "Тип",             "種類",          "유형");
+    add("Progress",          "进度",      "進度",      "Progreso",     "Progression",   "Fortschritt",   "Прогресс",        "進捗",          "진행률");
+    add("Speed",             "速度",      "速度",      "Velocidad",    "Vitesse",       "Geschwindigkeit","Скорость",       "速度",          "속도");
+    add("Upload",            "上传",      "上傳",      "Subir",        "Téléverser",    "Hochladen",     "Загрузка",        "アップロード",  "업로드");
+    add("Download",          "下载",      "下載",      "Descargar",    "Télécharger",   "Herunterladen", "Скачивание",      "ダウンロード",  "다운로드");
+    add("Queued",            "排队中",    "排隊中",    "En cola",      "En file",       "In Warteschlange","В очереди",     "待機中",        "대기 중");
+    add("Running",           "进行中",    "進行中",    "En curso",     "En cours",      "Läuft",         "Выполняется",     "実行中",        "진행 중");
+    add("Paused",            "已暂停",    "已暫停",    "Pausado",      "En pause",      "Pausiert",      "Приостановлено",  "一時停止",      "일시 중지");
+    add("Completed",         "已完成",    "已完成",    "Completado",   "Terminé",       "Abgeschlossen", "Завершено",       "完了",          "완료");
+    add("Failed",            "失败",      "失敗",      "Fallido",      "Échoué",        "Fehlgeschlagen","Ошибка",          "失敗",          "실패");
+    add("Canceled",          "已取消",    "已取消",    "Cancelado",    "Annulé",        "Abgebrochen",   "Отменено",        "キャンセル済み","취소됨");
+    add("Active: %1   Completed: %2   Failed: %3",
+        "进行中：%1   已完成：%2   失败：%3",
+        "進行中：%1   已完成：%2   失敗：%3",
+        "Activos: %1   Completados: %2   Fallidos: %3",
+        "Actifs : %1   Terminés : %2   Échoués : %3",
+        "Aktiv: %1   Abgeschlossen: %2   Fehlgeschlagen: %3",
+        "Активно: %1   Завершено: %2   Ошибки: %3",
+        "実行中: %1   完了: %2   失敗: %3",
+        "진행 중: %1   완료: %2   실패: %3");
+
+    // ---- SSH session dialog ----
+    add("SSH Session",       "SSH 会话",  "SSH 工作階段","Sesión SSH",  "Session SSH",   "SSH-Sitzung",   "SSH-сеанс",       "SSHセッション", "SSH 세션");
+    add("Auto-attach tmux session","自动接入 tmux 会话","自動接入 tmux 工作階段","Adjuntar sesión tmux automáticamente","Attacher auto. la session tmux","tmux-Sitzung automatisch verbinden","Авто-подключение к сессии tmux","tmux セッションに自動接続","tmux 세션 자동 연결");
+    add("tmux session name (default: muxterm)","tmux 会话名（默认：muxterm）","tmux 工作階段名稱（預設：muxterm）","Nombre de sesión tmux (predet.: muxterm)","Nom de session tmux (défaut : muxterm)","tmux-Sitzungsname (Standard: muxterm)","Имя сессии tmux (по умолч.: muxterm)","tmux セッション名（既定: muxterm）","tmux 세션 이름(기본: muxterm)");
+    add("extra ssh arguments (optional)","额外 ssh 参数（可选）","額外 ssh 參數（選用）","Argumentos ssh adicionales (opcional)","Arguments ssh supplémentaires (facultatif)","Zusätzliche ssh-Argumente (optional)","Доп. аргументы ssh (необязательно)","追加の ssh 引数（任意）","추가 ssh 인자(선택)");
+    add("Name:",             "名称：",    "名稱：",    "Nombre:",      "Nom :",         "Name:",         "Имя:",            "名前：",        "이름:");
+    add("Private key:",      "私钥：",    "私鑰：",    "Clave privada:","Clé privée :", "Privater Schlüssel:","Закрытый ключ:","秘密鍵：",      "개인 키:");
+    add("tmux name:",        "tmux 名称：","tmux 名稱：","Nombre tmux:", "Nom tmux :",    "tmux-Name:",    "Имя tmux:",       "tmux 名：",     "tmux 이름:");
+    add("Extra args:",       "额外参数：","額外參數：","Args. extra:", "Args suppl. :", "Extra-Args:",   "Доп. аргументы:", "追加引数：",    "추가 인자:");
+    add("Select private key","选择私钥",  "選擇私鑰",  "Seleccionar clave privada","Sélectionner la clé privée","Privaten Schlüssel wählen","Выбрать закрытый ключ","秘密鍵を選択","개인 키 선택");
+
+    // ---- Serial / UART dialog ----
+    add("Serial / UART Configuration","串口 / UART 配置","序列 / UART 設定","Configuración serie / UART","Configuration série / UART","Seriell-/UART-Konfiguration","Настройка Serial / UART","シリアル / UART 設定","시리얼/UART 구성");
+    add("Even",              "偶校验",    "偶同位",    "Par",          "Paire",         "Gerade",        "Чётный",          "偶数",          "짝수");
+    add("Odd",               "奇校验",    "奇同位",    "Impar",        "Impaire",       "Ungerade",      "Нечётный",        "奇数",          "홀수");
+    add("Mark",              "标记",      "標記",      "Marca",        "Marque",        "Mark",          "Метка",           "マーク",        "마크");
+    add("Space",             "空格",      "空格",      "Espacio",      "Espace",        "Leerzeichen",   "Пробел",          "スペース",      "스페이스");
+    add("RTS/CTS",           "RTS/CTS",   "RTS/CTS",   "RTS/CTS",      "RTS/CTS",       "RTS/CTS",       "RTS/CTS",         "RTS/CTS",       "RTS/CTS");
+    add("XON/XOFF",          "XON/XOFF",  "XON/XOFF",  "XON/XOFF",     "XON/XOFF",      "XON/XOFF",      "XON/XOFF",        "XON/XOFF",      "XON/XOFF");
+    add("Local echo",        "本地回显",  "本機回應",  "Eco local",    "Écho local",    "Lokales Echo",  "Локальное эхо",   "ローカルエコー","로컬 에코");
+    add("Serial line:",      "串口线路：","序列線路：","Línea serie:", "Ligne série :", "Serielle Leitung:","Serial-линия:","シリアル回線：","시리얼 회선:");
+    add("Speed (baud):",     "速率（波特）：","速率（鮑率）：","Velocidad (baudios):","Vitesse (bauds) :","Geschwindigkeit (Baud):","Скорость (бод):","速度（ボー）：","속도(보드):");
+    add("Data bits:",        "数据位：",  "資料位元：","Bits de datos:","Bits de données :","Datenbits:",  "Биты данных:",    "データビット：","데이터 비트:");
+    add("Parity:",           "校验：",    "同位：",    "Paridad:",     "Parité :",      "Parität:",      "Чётность:",       "パリティ：",    "패리티:");
+    add("Stop bits:",        "停止位：",  "停止位元：","Bits de parada:","Bits d'arrêt :","Stoppbits:",  "Стоп-биты:",      "ストップビット：","정지 비트:");
+    add("Flow control:",     "流控：",    "流量控制：","Control de flujo:","Contrôle de flux :","Flusskontrolle:","Управление потоком:","フロー制御：","흐름 제어:");
+    add("Enter sends:",      "回车发送：","Enter 送出：","Enter envía:","Entrée envoie :","Enter sendet:", "Enter отправляет:","Enter 送信：", "Enter 전송:");
+
+    // ---- Find / Replace dialog ----
+    add("Find / Replace",    "查找 / 替换","尋找 / 取代","Buscar / Reemplazar","Rechercher / Remplacer","Suchen / Ersetzen","Найти / Заменить","検索 / 置換","찾기/바꾸기");
+    add("Match case",        "区分大小写","區分大小寫","Coincidir mayúsculas","Respecter la casse","Groß-/Kleinschreibung","Учитывать регистр","大文字小文字を区別","대소문자 구분");
+    add("Whole word only",   "全字匹配",  "全字匹配",  "Solo palabra completa","Mot entier seulement","Nur ganzes Wort","Только слово целиком","単語全体のみ","단어 전체만");
+    add("Regular expression","正则表达式","正規表達式","Expresión regular","Expression régulière","Regulärer Ausdruck","Регулярное выражение","正規表現","정규식");
+    add("Wrap around",       "循环查找",  "循環尋找",  "Buscar en bucle","Recherche circulaire","Umlaufend suchen","Искать по кругу","折り返して検索","순환 검색");
+    add("Find what:",        "查找内容：","尋找內容：","Buscar:",      "Rechercher :",  "Suchen nach:",  "Найти:",          "検索する文字列：","찾을 내용:");
+    add("Find Next",         "查找下一个","尋找下一個","Buscar siguiente","Suivant",     "Weitersuchen",  "Найти далее",     "次を検索",      "다음 찾기");
+    add("Find Previous",     "查找上一个","尋找上一個","Buscar anterior","Précédent",    "Vorheriges",    "Найти ранее",     "前を検索",      "이전 찾기");
+    add("Replace with:",     "替换为：",  "取代為：",  "Reemplazar con:","Remplacer par :","Ersetzen durch:","Заменить на:","置換後の文字列：","바꿀 내용:");
+    add("Replace",           "替换",      "取代",      "Reemplazar",   "Remplacer",     "Ersetzen",      "Заменить",        "置換",          "바꾸기");
+    add("Replace All",       "全部替换",  "全部取代",  "Reemplazar todo","Tout remplacer","Alle ersetzen","Заменить всё","すべて置換","모두 바꾸기");
+    add("Find",              "查找",      "尋找",      "Buscar",       "Rechercher",    "Suchen",        "Найти",           "検索",          "찾기");
+    add("Options",           "选项",      "選項",      "Opciones",     "Options",       "Optionen",      "Параметры",       "オプション",    "옵션");
+    add("Close",             "关闭",      "關閉",      "Cerrar",       "Fermer",        "Schließen",     "Закрыть",         "閉じる",        "닫기");
+    add("Invalid regular expression.","正则表达式无效。","正規表達式無效。","Expresión regular no válida.","Expression régulière non valide.","Ungültiger regulärer Ausdruck.","Недопустимое регулярное выражение.","正規表現が無効です。","잘못된 정규식입니다.");
+    add("Count",             "计数",      "計數",      "Conteo",       "Nombre",        "Anzahl",        "Количество",      "件数",          "개수");
+    add("%1 occurrence(s) found.","找到 %1 处。","找到 %1 處。","%1 coincidencia(s) encontrada(s).","%1 occurrence(s) trouvée(s).","%1 Treffer gefunden.","Найдено совпадений: %1.","%1 件見つかりました。","%1개를 찾았습니다.");
+
+    // ---- Go To Line dialog ----
+    add("Go To Line",        "跳转到行",  "跳至行",    "Ir a la línea","Aller à la ligne","Gehe zu Zeile","Перейти к строке","行へ移動","줄로 이동");
+    add("Line number (1 - %1):","行号（1 - %1）：","行號（1 - %1）：","Número de línea (1 - %1):","Numéro de ligne (1 - %1) :","Zeilennummer (1 - %1):","Номер строки (1 - %1):","行番号（1 - %1）：","줄 번호(1 - %1):");
+
     // ---- Help ----
     add("&About Terminal++", "关于 Terminal++(&A)","關於 Terminal++(&A)","&Acerca de Terminal++","À &propos de Terminal++","&Über Terminal++","&О программе Terminal++","Terminal++について(&A)","Terminal++ 정보(&A)");
     add("About Terminal++",  "关于 Terminal++","關於 Terminal++","Acerca de Terminal++","À propos de Terminal++","Über Terminal++","О программе Terminal++","Terminal++について","Terminal++ 정보");
@@ -332,6 +514,15 @@ void I18n::loadTable()
     add("Plain Text",        "纯文本",    "純文字",    "Texto plano",  "Texte brut",    "Nur-Text",      "Простой текст",   "プレーンテキスト","일반 텍스트");
     add("Terminal",          "终端",      "終端",      "Terminal",     "Terminal",      "Terminal",      "Терминал",        "端末",          "터미널");
     add("Line Ending",       "行尾",      "行尾",      "Fin de línea", "Fin de ligne",  "Zeilenende",    "Конец строки",    "改行コード",    "줄 끝");
+    add("Reopened with encoding: %1",
+        "已用编码重新打开：%1",
+        "已用編碼重新開啟：%1",
+        "Reabierto con la codificación: %1",
+        "Rouvert avec l'encodage : %1",
+        "Mit Kodierung neu geöffnet: %1",
+        "Открыт заново в кодировке: %1",
+        "エンコードを変えて再読み込み: %1",
+        "인코딩으로 다시 열기: %1");
     add("Windows (CRLF)",    "Windows (CRLF)","Windows (CRLF)","Windows (CRLF)","Windows (CRLF)","Windows (CRLF)","Windows (CRLF)","Windows (CRLF)","Windows (CRLF)");
     add("Unix (LF)",         "Unix (LF)", "Unix (LF)", "Unix (LF)",    "Unix (LF)",     "Unix (LF)",     "Unix (LF)",       "Unix (LF)",     "Unix (LF)");
     add("Mac (CR)",          "Mac (CR)",  "Mac (CR)",  "Mac (CR)",     "Mac (CR)",      "Mac (CR)",      "Mac (CR)",        "Mac (CR)",      "Mac (CR)");
@@ -344,6 +535,8 @@ void I18n::loadTable()
     add("Open Files",        "打开文件",  "開啟檔案",  "Abrir archivos","Ouvrir des fichiers","Dateien öffnen","Открыть файлы","ファイルを開く","파일 열기");
     add("Save As",           "另存为",    "另存為",    "Guardar como", "Enregistrer sous","Speichern unter","Сохранить как","名前を付けて保存","다른 이름으로 저장");
     add("Clipboard History", "剪贴板历史","剪貼簿歷史","Historial del portapapeles","Historique du presse-papiers","Zwischenablage-Verlauf","История буфера обмена","クリップボード履歴","클립보드 기록");
+    add("Clear",             "清空",      "清除",      "Borrar",       "Effacer",       "Leeren",        "Очистить",        "クリア",        "지우기");
+    add("Cancel",            "取消",      "取消",      "Cancelar",     "Annuler",       "Abbrechen",     "Отмена",          "キャンセル",    "취소");
     add("Language changed. Some elements update immediately; reopen dialogs to fully refresh.",
         "语言已更改。部分界面立即更新；重新打开对话框以完全刷新。",
         "語言已變更。部分介面立即更新；重新開啟對話方塊以完全重新整理。",

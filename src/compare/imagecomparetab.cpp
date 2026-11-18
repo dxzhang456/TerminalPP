@@ -12,6 +12,7 @@ static inline QString TRc(const char *s) { return I18n::instance()->tr(QString::
 #include <QAction>
 #include <QFileInfo>
 #include <QPainter>
+#include <QTimer>
 
 // A simple zoomable image view backed by a QLabel inside a QScrollArea.
 class ImageView : public QScrollArea
@@ -155,7 +156,10 @@ bool ImageCompareTab::loadFiles(const QString &leftPath, const QString &rightPat
     rebuildDiff();
     m_left->setImage(m_leftImg);
     m_right->setImage(m_diffMode ? m_diffImg : m_rightImg);
-    zoomReset();
+    // Fit the image into the visible area on open so a large picture is scaled
+    // down to the viewport instead of overflowing. Deferred one event-loop turn
+    // so the view already has its final size when we compute the fit scale.
+    QTimer::singleShot(0, this, [this]() { zoomFit(); });
     updateStats();
     return !m_leftImg.isNull() && !m_rightImg.isNull();
 }

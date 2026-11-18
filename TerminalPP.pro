@@ -45,11 +45,19 @@ SOURCES += \
     src/compare/hexcomparetab.cpp \
     src/compare/imagecomparetab.cpp \
     src/compare/comparedialog.cpp \
+    src/cloud/clouddrivestore.cpp \
+    src/cloud/restproviders.cpp \
+    src/cloud/cloudconnectdialog.cpp \
+    src/cloud/cloudbrowsertab.cpp \
+    src/cloud/streamproxy.cpp \
+    src/cloud/transfermanager.cpp \
+    src/cloud/transferpanel.cpp \
     src/editor/codeeditor.cpp \
     src/editor/syntaxhighlighter.cpp \
     src/editor/finddialog.cpp \
     src/editor/gotodialog.cpp \
     src/editor/editortab.cpp \
+    src/editor/hexeditortab.cpp \
     src/editor/thememanager.cpp \
     src/terminal/terminalwidget.cpp \
     src/terminal/ansiparser.cpp \
@@ -73,11 +81,20 @@ HEADERS += \
     src/compare/hexcomparetab.h \
     src/compare/imagecomparetab.h \
     src/compare/comparedialog.h \
+    src/cloud/cloudprovider.h \
+    src/cloud/clouddrivestore.h \
+    src/cloud/restproviders.h \
+    src/cloud/cloudconnectdialog.h \
+    src/cloud/cloudbrowsertab.h \
+    src/cloud/streamproxy.h \
+    src/cloud/transfermanager.h \
+    src/cloud/transferpanel.h \
     src/editor/codeeditor.h \
     src/editor/syntaxhighlighter.h \
     src/editor/finddialog.h \
     src/editor/gotodialog.h \
     src/editor/editortab.h \
+    src/editor/hexeditortab.h \
     src/editor/thememanager.h \
     src/terminal/terminalwidget.h \
     src/terminal/ansiparser.h \

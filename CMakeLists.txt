@@ -71,6 +71,23 @@ set(PROJECT_SOURCES
     src/compare/comparedialog.cpp
     src/compare/comparedialog.h
 
+    # --- Cloud drives ---
+    src/cloud/cloudprovider.h
+    src/cloud/clouddrivestore.cpp
+    src/cloud/clouddrivestore.h
+    src/cloud/restproviders.cpp
+    src/cloud/restproviders.h
+    src/cloud/cloudconnectdialog.cpp
+    src/cloud/cloudconnectdialog.h
+    src/cloud/cloudbrowsertab.cpp
+    src/cloud/cloudbrowsertab.h
+    src/cloud/streamproxy.cpp
+    src/cloud/streamproxy.h
+    src/cloud/transfermanager.cpp
+    src/cloud/transfermanager.h
+    src/cloud/transferpanel.cpp
+    src/cloud/transferpanel.h
+
     # --- Code editor ---
     src/editor/codeeditor.cpp
     src/editor/codeeditor.h
@@ -82,6 +99,8 @@ set(PROJECT_SOURCES
     src/editor/gotodialog.h
     src/editor/editortab.cpp
     src/editor/editortab.h
+    src/editor/hexeditortab.cpp
+    src/editor/hexeditortab.h
     src/editor/thememanager.cpp
     src/editor/thememanager.h
 

@@ -11,6 +11,21 @@ static inline QString TRc(const char *s){ return I18n::instance()->tr(QString::f
 #include <QStringEncoder>
 #include <QStringConverter>
 #include <QPalette>
+#include <optional>
+
+// Map an encoding name from the UI/status bar onto a Qt 6 QStringConverter
+// encoding. Qt 6 dropped QTextCodec, so the Chinese multi-byte names are
+// served by the System codec (CP936/GBK on Chinese Windows); mapping them to
+// UTF-8 instead would corrupt the text.
+static QStringConverter::Encoding encodingFromName(const QString &name)
+{
+    const QString norm = name.trimmed().toUpper();
+    if (norm == "SYSTEM" || norm == "GB18030" || norm == "GBK"
+        || norm == "GB2312" || norm == "ANSI")
+        return QStringConverter::System;
+    auto enc = QStringConverter::encodingForName(name.toUtf8().constData());
+    return enc.value_or(QStringConverter::Utf8);
+}
 
 EditorTab::EditorTab(QWidget *parent)
     : QWidget(parent)
@@ -63,24 +78,56 @@ bool EditorTab::loadFile(const QString &path, const QString &encoding)
     QByteArray raw = file.readAll();
     file.close();
 
-    // Detect BOM / encoding.
+    // Decode the bytes into text.
     QString text;
     QString usedEncoding = encoding;
     if (usedEncoding.isEmpty()) {
+        // encodingForData() only recognises a BOM (and UTF-16/32 patterns). A
+        // BOM-less GBK/GB18030/Shift-JIS file therefore reports "unknown", so
+        // decoding it as UTF-8 would produce mojibake (乱码) — exactly what
+        // happens with Chinese .txt files downloaded from a cloud drive.
+        // Strategy: honour a BOM if present, otherwise verify the data really
+        // is valid UTF-8 and fall back to the local 8-bit codec when it is not.
         auto encOpt = QStringConverter::encodingForData(raw);
         if (encOpt.has_value()) {
             QStringDecoder dec(encOpt.value());
             text = dec.decode(raw);
             usedEncoding = QStringConverter::nameForEncoding(encOpt.value());
         } else {
-            QStringDecoder dec(QStringConverter::Utf8);
-            text = dec.decode(raw);
-            usedEncoding = "UTF-8";
+            QStringDecoder utf8(QStringConverter::Utf8);
+            QString asUtf8 = utf8.decode(raw);
+            if (!utf8.hasError()) {
+                text = asUtf8;             // genuinely valid UTF-8
+                usedEncoding = "UTF-8";
+            } else {
+                // Not UTF-8 -> decode with the system ANSI codepage (CP936 /
+                // GBK on Chinese Windows, which covers GB2312/GBK text).
+                QStringDecoder sys(QStringConverter::System);
+                QString asSystem = sys.decode(raw);
+                if (!sys.hasError()) {
+                    text = asSystem;
+                    usedEncoding = "System";
+                } else {
+                    // Last resort: Latin-1 never fails, so no byte is lost.
+                    QStringDecoder l1(QStringConverter::Latin1);
+                    text = l1.decode(raw);
+                    usedEncoding = "ISO-8859-1";
+                }
+            }
         }
     } else {
-        auto enc = QStringConverter::encodingForName(encoding.toUtf8().constData());
-        QStringDecoder dec(enc.value_or(QStringConverter::Utf8));
+        // Explicit encoding requested by the user. Qt 6's QStringConverter only
+        // provides UTF-8/16/32, Latin-1 and System, so map the Chinese
+        // multi-byte names onto System (the local ANSI codepage) instead of
+        // silently falling back to UTF-8 and mangling the text.
+        QStringDecoder dec(encodingFromName(encoding));
         text = dec.decode(raw);
+        if (dec.hasError()) {
+            // The chosen codec cannot represent these bytes; keep them intact
+            // via Latin-1 rather than inserting replacement characters.
+            QStringDecoder l1(QStringConverter::Latin1);
+            text = l1.decode(raw);
+        }
     }
     m_encoding = usedEncoding;
 
@@ -119,8 +166,9 @@ bool EditorTab::saveFile(const QString &path)
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
         return false;
 
-    auto enc = QStringConverter::encodingForName(m_encoding.toUtf8().constData());
-    QStringEncoder encoder(enc.value_or(QStringConverter::Utf8));
+    // Write back with the same encoding the file was loaded/selected with, so a
+    // GBK file stays GBK instead of silently becoming UTF-8.
+    QStringEncoder encoder(encodingFromName(m_encoding));
     QByteArray out = encoder.encode(text);
     file.write(out);
     file.close();
