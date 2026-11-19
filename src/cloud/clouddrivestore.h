@@ -14,7 +14,10 @@ enum CloudBackend {
     CB_GoogleDrive,
     CB_Dropbox,
     CB_BaiduPan,
-    CB_WebDAV
+    CB_WebDAV,
+    CB_SmbShare,   // Windows / Samba shared folder (any SMB1/2/3 server)
+    CB_Sftp,       // SFTP over SSH (libssh2)
+    CB_Ftp         // plain FTP
 };
 
 // Everything needed to re-create a cloud-drive connection without asking the
@@ -28,9 +31,14 @@ struct CloudDriveConfig
     QString clientId;      // registered app client_id / API key
     QString secretKey;     // Baidu SecretKey (app secret)
     QString token;         // OAuth access token
-    QString extra;         // Aliyun drive_id, or WebDAV base URL
-    QString user;          // WebDAV user
-    QString pass;          // WebDAV password
+    QString extra;         // WebDAV base URL, or SMB UNC path (\\server\share)
+    QString user;          // WebDAV / SMB / SFTP / FTP username
+    QString pass;          // WebDAV / SMB / SFTP / FTP password
+
+    // SFTP / FTP connection details.
+    QString host;           // server hostname or IP
+    int     port = 0;       // 0 => provider default (22 for SFTP, 21 for FTP)
+    QString keyPath;        // SFTP: optional private key file (empty = password auth)
 
     int     proxyType = 0; // 0 = None, 1 = HTTP, 2 = SOCKS5
     QString proxyHost;

@@ -50,6 +50,11 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
+    // Routes IME-committed text (Chinese/Japanese/Korean input) into the
+    // column insertion path while column (box) mode is active, so CJK input
+    // is distributed across every selected row instead of landing at a
+    // single cursor position.
+    void inputMethodEvent(QInputMethodEvent *event) override;
 
 private slots:
     void updateLineNumberAreaWidth(int newBlockCount);
@@ -75,6 +80,10 @@ private:
     void insertIntoColumn(const QString &text);
     // Paste a (possibly multi-line) string line-by-line into the block rows.
     void pasteColumn(const QString &text);
+    // VS Code style keyboard column selection: Ctrl+Shift+Up/Down starts (if
+    // not already active) or extends the column (box) selection by one line,
+    // keeping the same character column. dy is -1 (up) or +1 (down).
+    void extendColumnSelectionVertically(int dy);
 
     LineNumberArea *m_lineNumberArea = nullptr;
     bool   m_showLineNumbers = true;

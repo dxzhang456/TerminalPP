@@ -158,11 +158,23 @@ QString CodeEditor::currentIndent() const
 
 void CodeEditor::keyPressEvent(QKeyEvent *event)
 {
+    const int key = event->key();
+    const Qt::KeyboardModifiers mods = event->modifiers();
+
+    // ---- VS Code style keyboard column selection --------------------------
+    // Ctrl+Shift+Up / Ctrl+Shift+Down starts (or extends) a column (box)
+    // selection one line at a time, independent of whether Alt+drag column
+    // mode is already active. Checked first so it always takes priority over
+    // the "any other key cancels column mode" fallthrough below.
+    if (mods == (Qt::ControlModifier | Qt::ShiftModifier)
+        && (key == Qt::Key_Up || key == Qt::Key_Down)) {
+        extendColumnSelectionVertically(key == Qt::Key_Up ? -1 : +1);
+        event->accept();
+        return;
+    }
+
     // ---- Column (block) selection mode handling --------------------------
     if (m_columnMode) {
-        const int key = event->key();
-        const Qt::KeyboardModifiers mods = event->modifiers();
-
         // Escape leaves column mode.
         if (key == Qt::Key_Escape) {
             clearColumnSelection();
@@ -439,6 +451,62 @@ void CodeEditor::insertIntoColumn(const QString &text)
     m_colAnchorCol = m_colCaretCol = newCol;
     m_colValid = true;
     viewport()->update();
+}
+
+// VS Code style keyboard column selection: Ctrl+Shift+Up/Down starts (if not
+// already active) or extends the column (box) selection by one line, keeping
+// the same character column as the anchor/caret. This mirrors VS Code's
+// "Column Selection" (Ctrl+Shift+Up/Down) so users familiar with that editor
+// get the same muscle-memory shortcut instead of having to Alt+drag.
+void CodeEditor::extendColumnSelectionVertically(int dy)
+{
+    if (!m_columnMode) {
+        // Start a fresh column selection anchored at the current text cursor.
+        QTextCursor cur = textCursor();
+        m_colAnchorBlk = m_colCaretBlk = cur.blockNumber();
+        m_colAnchorCol = m_colCaretCol = cur.positionInBlock();
+        m_columnMode = true;
+        m_colValid = false;
+        emit columnModeChanged(true);
+    }
+
+    const int maxBlk = document()->blockCount() - 1;
+    m_colCaretBlk = qBound(0, m_colCaretBlk + dy, maxBlk);
+    m_colValid = (m_colAnchorBlk != m_colCaretBlk) || (m_colAnchorCol != m_colCaretCol);
+
+    // Move the real text cursor to follow the caret row/column so scrolling
+    // (ensureCursorVisible) and the status bar position indicator stay in
+    // sync with the keyboard-driven selection.
+    QTextBlock blk = document()->findBlockByNumber(m_colCaretBlk);
+    if (blk.isValid()) {
+        QTextCursor c(blk);
+        const int pos = qMin(m_colCaretCol, blk.length() - 1);
+        c.setPosition(blk.position() + qMax(0, pos));
+        setTextCursor(c);
+        ensureCursorVisible();
+    }
+    viewport()->update();
+}
+
+// IME-committed text (Chinese/Japanese/Korean input via the system input
+// method) does not arrive through keyPressEvent() — Qt delivers it here
+// instead. Without this override, typing Chinese while a column (box)
+// selection is active would insert the composed text only at the single
+// QPlainTextEdit cursor position, ignoring every other selected row. Route
+// it through the same insertIntoColumn()/deleteColumnSelection() path used
+// for regular ASCII keystrokes so CJK input (and IME-driven deletion via an
+// empty commit string with a preceding backspace) is distributed correctly
+// across the whole column selection.
+void CodeEditor::inputMethodEvent(QInputMethodEvent *event)
+{
+    if (m_columnMode && !event->commitString().isEmpty()) {
+        if (m_colValid && m_colAnchorCol != m_colCaretCol)
+            deleteColumnSelection();
+        insertIntoColumn(event->commitString());
+        event->accept();
+        return;
+    }
+    QPlainTextEdit::inputMethodEvent(event);
 }
 
 // Paste clipboard content line-by-line down the block rows.

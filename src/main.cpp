@@ -5,10 +5,15 @@
 #include "mainwindow.h"
 #include "core/i18n.h"
 #include "core/cliphistory.h"
+#include "cloud/cloudprovider.h"
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+
+    // Needed so QVector<CloudEntry> can be queued across threads (used by
+    // SftpProvider's worker-thread model for list() results).
+    qRegisterMetaType<QVector<CloudEntry>>("QVector<CloudEntry>");
     QApplication::setApplicationName("TerminalPP");
     QApplication::setOrganizationName("TerminalPP");
     QApplication::setApplicationVersion("1.0.0");

@@ -142,6 +142,15 @@ void I18n::loadTable()
     add("&Go To Line...",    "跳转到行(&G)...","跳至行(&G)...","&Ir a la línea...","&Aller à la ligne...","&Gehe zu Zeile...","&Перейти к строке...","行へ移動(&G)...","줄로 이동(&G)...");
     add("Clipboard &History","剪贴板历史(&H)","剪貼簿歷史(&H)","&Historial del portapapeles","&Historique du presse-papiers","Zwischenablage-&Verlauf","&История буфера обмена","クリップボード履歴(&H)","클립보드 기록(&H)");
     add("Column / Block Edit (Alt+Drag)","列/块编辑 (Alt+拖动)","欄/區塊編輯 (Alt+拖曳)","Edición de columna/bloque (Alt+Arrastrar)","Édition colonne/bloc (Alt+Glisser)","Spalten-/Blockbearbeitung (Alt+Ziehen)","Редактирование столбца/блока (Alt+перетаскивание)","列/ブロック編集 (Alt+ドラッグ)","열/블록 편집 (Alt+드래그)");
+    add("Column / Block Edit (Alt+Drag or Ctrl+Shift+Up/Down)",
+        "列/块编辑（Alt+拖动 或 Ctrl+Shift+上/下）",
+        "欄/區塊編輯（Alt+拖曳 或 Ctrl+Shift+上/下）",
+        "Edición de columna/bloque (Alt+Arrastrar o Ctrl+Shift+Arriba/Abajo)",
+        "Édition colonne/bloc (Alt+Glisser ou Ctrl+Maj+Haut/Bas)",
+        "Spalten-/Blockbearbeitung (Alt+Ziehen oder Strg+Umschalt+Hoch/Runter)",
+        "Редактирование столбца/блока (Alt+перетаскивание или Ctrl+Shift+Вверх/Вниз)",
+        "列/ブロック編集（Alt+ドラッグ または Ctrl+Shift+上/下）",
+        "열/블록 편집(Alt+드래그 또는 Ctrl+Shift+위/아래)");
 
     // ---- View menu ----
     add("Show &Line Numbers","显示行号(&L)","顯示行號(&L)","Mostrar números de &línea","Afficher les numéros de &ligne","&Zeilennummern anzeigen","Показать &номера строк","行番号を表示(&L)","줄 번호 표시(&L)");
@@ -273,8 +282,60 @@ void I18n::loadTable()
     add("Replaced %1 occurrence(s)","已替换 %1 处","已取代 %1 處","%1 reemplazo(s)","%1 remplacement(s)","%1 Vorkommen ersetzt","Заменено: %1","%1 件を置換","%1개 바꿈");
     add("Count: %1 occurrence(s)","计数：%1 处","計數：%1 處","Conteo: %1","Nombre : %1","Anzahl: %1","Количество: %1","件数: %1","개수: %1");
 
-    // ---- Cloud drives ----
-    add("Clou&d",            "云盘(&D)",  "雲端(&D)",  "&Nube",        "&Cloud",        "&Cloud",        "&Облако",         "クラウド(&D)",  "클라우드(&D)");
+    // ---- Connect menu (cloud drives / shared folders / SFTP-FTP) ----
+    add("Co&nnect",          "连接(&N)",  "連接(&N)",  "C&onectar",    "Co&nnecter",    "&Verbinden",    "&Подключить",     "接続(&N)",      "연결(&N)");
+    add("Connect S&hared Folder...","连接共享文件夹(&H)...","連接共用資料夾(&H)...","Conectar carpeta c&ompartida...","Connecter un dossier &partagé...","Freigegebenen Ordner &verbinden...","Подключить &общую папку...","共有フォルダに接続(&H)...","공유 폴더 연결(&H)...");
+    add("Connect SFTP/&FTP...","连接 SFTP/FTP(&F)...","連接 SFTP/FTP(&F)...","Conectar SFTP/&FTP...","Connecter SFTP/&FTP...","SFTP/&FTP verbinden...","Подключить SFTP/&FTP...","SFTP/FTPに接続(&F)...","SFTP/FTP 연결(&F)...");
+    add("Connect Shared Folder","连接共享文件夹","連接共用資料夾","Conectar carpeta compartida","Connecter un dossier partagé","Freigegebenen Ordner verbinden","Подключить общую папку","共有フォルダに接続","공유 폴더 연결");
+    add("Connect SFTP/FTP",  "连接 SFTP/FTP","連接 SFTP/FTP","Conectar SFTP/FTP","Connecter SFTP/FTP","SFTP/FTP verbinden","Подключить SFTP/FTP","SFTP/FTPに接続","SFTP/FTP 연결");
+    add("Shared Folder (SMB/Samba)","共享文件夹（SMB/Samba）","共用資料夾（SMB/Samba）","Carpeta compartida (SMB/Samba)","Dossier partagé (SMB/Samba)","Freigegebener Ordner (SMB/Samba)","Общая папка (SMB/Samba)","共有フォルダ（SMB/Samba）","공유 폴더(SMB/Samba)");
+    add("Share Path (UNC):", "共享路径（UNC）：","共用路徑（UNC）：","Ruta compartida (UNC):","Chemin partagé (UNC) :","Freigabepfad (UNC):","Путь к общей папке (UNC):","共有パス（UNC）：","공유 경로(UNC):");
+    add("e.g. \\\\server\\share or //server/share",
+        "例如 \\\\server\\share 或 //server/share",
+        "例如 \\\\server\\share 或 //server/share",
+        "p. ej. \\\\server\\share o //server/share",
+        "p. ex. \\\\server\\share ou //server/share",
+        "z. B. \\\\server\\share oder //server/share",
+        "например \\\\server\\share или //server/share",
+        "例: \\\\server\\share または //server/share",
+        "예: \\\\server\\share 또는 //server/share");
+    add("server address, e.g. 192.168.1.10 or ftp.example.com",
+        "服务器地址，例如 192.168.1.10 或 ftp.example.com",
+        "伺服器位址，例如 192.168.1.10 或 ftp.example.com",
+        "dirección del servidor, p. ej. 192.168.1.10 o ftp.example.com",
+        "adresse du serveur, p. ex. 192.168.1.10 ou ftp.example.com",
+        "Serveradresse, z. B. 192.168.1.10 oder ftp.example.com",
+        "адрес сервера, например 192.168.1.10 или ftp.example.com",
+        "サーバーアドレス、例: 192.168.1.10 または ftp.example.com",
+        "서버 주소, 예: 192.168.1.10 또는 ftp.example.com");
+    add("Private Key (optional):","私钥（可选）：","私密金鑰（選用）：","Clave privada (opcional):","Clé privée (facultative) :","Privater Schlüssel (optional):","Закрытый ключ (необязательно):","秘密鍵（任意）：","개인 키(선택):");
+    add("Enter a Windows/Samba share path, e.g. \\\\server\\share or //server/share. Works against any SMB dialect (SMB1/CIFS, SMB2, SMB3) the server offers — Windows negotiates it automatically. Username/password are used to authenticate the share if needed.",
+        "输入 Windows/Samba 共享路径，例如 \\\\server\\share 或 //server/share。可与服务器提供的任意 SMB 协议版本（SMB1/CIFS、SMB2、SMB3）通信——Windows 会自动协商；如需要可用用户名/密码验证该共享。",
+        "輸入 Windows/Samba 共用路徑，例如 \\\\server\\share 或 //server/share。可與伺服器提供的任意 SMB 版本（SMB1/CIFS、SMB2、SMB3）通訊——Windows 會自動協商；如需要可用使用者名稱/密碼驗證該共用。",
+        "Introduzca una ruta de compartición Windows/Samba, p. ej. \\\\server\\share o //server/share. Funciona con cualquier dialecto SMB (SMB1/CIFS, SMB2, SMB3) que ofrezca el servidor — Windows lo negocia automáticamente. Usuario/contraseña se usan para autenticar la compartición si es necesario.",
+        "Entrez un chemin de partage Windows/Samba, p. ex. \\\\server\\share ou //server/share. Fonctionne avec tout dialecte SMB (SMB1/CIFS, SMB2, SMB3) offert par le serveur — Windows le négocie automatiquement. Le nom d'utilisateur/mot de passe servent à authentifier le partage si nécessaire.",
+        "Geben Sie einen Windows/Samba-Freigabepfad ein, z. B. \\\\server\\share oder //server/share. Funktioniert mit jedem vom Server angebotenen SMB-Dialekt (SMB1/CIFS, SMB2, SMB3) — Windows handelt dies automatisch aus. Benutzername/Passwort dienen bei Bedarf zur Authentifizierung der Freigabe.",
+        "Введите путь общей папки Windows/Samba, например \\\\server\\share или //server/share. Работает с любым диалектом SMB (SMB1/CIFS, SMB2, SMB3), который предлагает сервер — Windows согласовывает это автоматически. Имя пользователя/пароль используются для аутентификации общей папки при необходимости.",
+        "Windows/Samba の共有パスを入力してください。例: \\\\server\\share または //server/share。サーバーが提供する任意の SMB 方式（SMB1/CIFS、SMB2、SMB3）に対応——Windows が自動的に調整します。必要に応じてユーザー名/パスワードで共有を認証します。",
+        "Windows/Samba 공유 경로를 입력하세요. 예: \\\\server\\share 또는 //server/share. 서버가 제공하는 모든 SMB 방식(SMB1/CIFS, SMB2, SMB3)과 작동합니다 — Windows가 자동으로 협상합니다. 필요한 경우 사용자 이름/비밀번호로 공유를 인증합니다.");
+    add("Enter the SFTP server host and port (default 22), your username, and either a password or a private key file. Uses the same native libssh2 client as the SSH terminal feature — no external sftp.exe.",
+        "输入 SFTP 服务器地址和端口（默认 22）、用户名，以及密码或私钥文件。使用与 SSH 终端功能相同的原生 libssh2 客户端——无需外部 sftp.exe。",
+        "輸入 SFTP 伺服器位址與連接埠（預設 22）、使用者名稱，以及密碼或私密金鑰檔案。使用與 SSH 終端功能相同的原生 libssh2 客戶端——不需要外部 sftp.exe。",
+        "Introduzca el host y puerto del servidor SFTP (predet. 22), su usuario, y una contraseña o un archivo de clave privada. Usa el mismo cliente nativo libssh2 que la función de terminal SSH — sin sftp.exe externo.",
+        "Entrez l'hôte et le port du serveur SFTP (défaut 22), votre nom d'utilisateur, et un mot de passe ou un fichier de clé privée. Utilise le même client natif libssh2 que la fonction terminal SSH — pas de sftp.exe externe.",
+        "Geben Sie Host und Port des SFTP-Servers (Standard 22), Ihren Benutzernamen sowie ein Passwort oder eine private Schlüsseldatei ein. Nutzt denselben nativen libssh2-Client wie die SSH-Terminal-Funktion — kein externes sftp.exe.",
+        "Введите хост и порт SFTP-сервера (по умолчанию 22), имя пользователя, и пароль или файл закрытого ключа. Использует тот же нативный клиент libssh2, что и функция SSH-терминала — без внешнего sftp.exe.",
+        "SFTP サーバーのホストとポート（既定 22）、ユーザー名、パスワードまたは秘密鍵ファイルを入力してください。SSH 端末機能と同じネイティブ libssh2 クライアントを使用——外部の sftp.exe は不要です。",
+        "SFTP 서버 호스트와 포트(기본 22), 사용자 이름, 비밀번호 또는 개인 키 파일을 입력하세요. SSH 터미널 기능과 동일한 네이티브 libssh2 클라이언트를 사용합니다 — 외부 sftp.exe가 필요 없습니다.");
+    add("Enter the FTP server host and port (default 21) and your account credentials. Uses passive-mode (PASV) data connections.",
+        "输入 FTP 服务器地址和端口（默认 21）以及账号密码。使用被动模式（PASV）数据连接。",
+        "輸入 FTP 伺服器位址與連接埠（預設 21）以及帳號密碼。使用被動模式（PASV）資料連線。",
+        "Introduzca el host y puerto del servidor FTP (predet. 21) y sus credenciales. Usa conexiones de datos en modo pasivo (PASV).",
+        "Entrez l'hôte et le port du serveur FTP (défaut 21) et vos identifiants. Utilise des connexions de données en mode passif (PASV).",
+        "Geben Sie Host und Port des FTP-Servers (Standard 21) und Ihre Zugangsdaten ein. Nutzt passive (PASV) Datenverbindungen.",
+        "Введите хост и порт FTP-сервера (по умолчанию 21) и учётные данные. Использует пассивные (PASV) подключения данных.",
+        "FTP サーバーのホストとポート（既定 21）とアカウント情報を入力してください。パッシブモード（PASV）のデータ接続を使用します。",
+        "FTP 서버 호스트와 포트(기본 21), 계정 정보를 입력하세요. 패시브 모드(PASV) 데이터 연결을 사용합니다.");
     add("&Connect Cloud Drive...","连接云盘(&C)...","連接雲端(&C)...","&Conectar unidad en la nube...","&Connecter un disque cloud...","Cloud-Laufwerk &verbinden...","&Подключить облако...","クラウドに接続(&C)...","클라우드 연결(&C)...");
     add("Connect to Cloud Drive","连接到云盘","連接到雲端","Conectar a la nube","Connexion au cloud","Mit Cloud verbinden","Подключение к облаку","クラウドに接続","클라우드에 연결");
     add("Cloud",             "云盘",      "雲端",      "Nube",         "Cloud",         "Cloud",         "Облако",          "クラウド",      "클라우드");
@@ -369,6 +430,31 @@ void I18n::loadTable()
     add("Retry",             "重试",      "重試",      "Reintentar",   "Réessayer",     "Wiederholen",   "Повторить",       "再試行",        "다시 시도");
     add("Remove",            "移除",      "移除",      "Quitar",       "Retirer",       "Entfernen",     "Убрать",          "削除",          "제거");
     add("Clear Finished",    "清除已完成","清除已完成","Borrar completados","Effacer les terminés","Abgeschlossene löschen","Очистить завершённые","完了分をクリア","완료 항목 지우기");
+    add("Rename...",         "重命名...", "重新命名...","Renombrar...", "Renommer...",   "Umbenennen...", "Переименовать...","名前を変更...","이름 바꾸기...");
+    add("Rename",            "重命名",    "重新命名",  "Renombrar",    "Renommer",      "Umbenennen",    "Переименовать",   "名前を変更",    "이름 바꾸기");
+    add("New name:",         "新名称：",  "新名稱：",  "Nuevo nombre:","Nouveau nom :", "Neuer Name:",   "Новое имя:",      "新しい名前：",  "새 이름:");
+    add("Delete folder \"%1\" and all its contents?",
+        "确定删除文件夹 \"%1\" 及其全部内容？",
+        "確定刪除資料夾 \"%1\" 及其所有內容？",
+        "¿Eliminar la carpeta \"%1\" y todo su contenido?",
+        "Supprimer le dossier \"%1\" et tout son contenu ?",
+        "Ordner \"%1\" und seinen gesamten Inhalt löschen?",
+        "Удалить папку \"%1\" и всё её содержимое?",
+        "フォルダ \"%1\" とその中身をすべて削除しますか？",
+        "폴더 \"%1\" 와 그 안의 모든 내용을 삭제할까요?");
+    add("Delete \"%1\"?",    "确定删除 \"%1\"？","確定刪除 \"%1\"？","¿Eliminar \"%1\"?","Supprimer \"%1\" ?","\"%1\" löschen?","Удалить \"%1\"?","\"%1\" を削除しますか？","\"%1\" 을(를) 삭제할까요?");
+    add("Deleted \"%1\".",   "已删除 \"%1\"。","已刪除 \"%1\"。","Se eliminó \"%1\".","\"%1\" supprimé.","\"%1\" gelöscht.","Удалено \"%1\".","\"%1\" を削除しました。","\"%1\" 삭제됨.");
+    add("Delete failed: %1", "删除失败：%1","刪除失敗：%1","Error al eliminar: %1","Échec de la suppression : %1","Löschen fehlgeschlagen: %1","Ошибка удаления: %1","削除に失敗しました：%1","삭제 실패: %1");
+    add("Renamed \"%1\" to \"%2\".",
+        "已将 \"%1\" 重命名为 \"%2\"。",
+        "已將 \"%1\" 重新命名為 \"%2\"。",
+        "Se renombró \"%1\" a \"%2\".",
+        "\"%1\" renommé en \"%2\".",
+        "\"%1\" wurde in \"%2\" umbenannt.",
+        "\"%1\" переименовано в \"%2\".",
+        "\"%1\" を \"%2\" に名前変更しました。",
+        "\"%1\" 을(를) \"%2\" 로 이름을 바꿨습니다.");
+    add("Rename failed: %1", "重命名失败：%1","重新命名失敗：%1","Error al renombrar: %1","Échec du renommage : %1","Umbenennen fehlgeschlagen: %1","Ошибка переименования: %1","名前変更に失敗しました：%1","이름 바꾸기 실패: %1");
     add("Copy",              "复制",      "複製",      "Copiar",       "Copier",        "Kopieren",      "Копировать",      "コピー",        "복사");
     add("Copy Name",         "复制名称",  "複製名稱",  "Copiar nombre","Copier le nom", "Namen kopieren","Копировать имя",  "名前をコピー",  "이름 복사");
     add("Copy Local Path",   "复制本地路径","複製本機路徑","Copiar ruta local","Copier le chemin local","Lokalen Pfad kopieren","Копировать локальный путь","ローカルパスをコピー","로컬 경로 복사");
@@ -456,15 +542,15 @@ void I18n::loadTable()
         "Eine einheitliche Qt-6-Anwendung mit:","Единое Qt 6 приложение, объединяющее:",
         "次を統合した Qt 6 アプリケーション：","다음을 결합한 통합 Qt 6 애플리케이션:");
     add("Code editor", "代码编辑器","程式碼編輯器","Editor de código","Éditeur de code","Code-Editor","Редактор кода","コードエディタ","코드 편집기");
-    add("multi-tab editor with syntax highlighting, themes, find/replace, encodings, column/block edit, clipboard history, auto-save.",
-        "多标签编辑器，含语法高亮、主题、查找/替换、编码、列/块编辑、剪贴板历史、自动保存。",
-        "多分頁編輯器，含語法高亮、佈景主題、尋找/取代、編碼、欄/區塊編輯、剪貼簿歷史、自動儲存。",
-        "editor de varias pestañas con resaltado de sintaxis, temas, buscar/reemplazar, codificaciones, edición de columna/bloque, historial del portapapeles, autoguardado.",
-        "éditeur multi-onglets avec coloration syntaxique, thèmes, rechercher/remplacer, encodages, édition colonne/bloc, historique du presse-papiers, enregistrement auto.",
-        "Multi-Tab-Editor mit Syntaxhervorhebung, Designs, Suchen/Ersetzen, Kodierungen, Spalten-/Blockbearbeitung, Zwischenablage-Verlauf, Autospeichern.",
-        "многовкладочный редактор с подсветкой синтаксиса, темами, поиском/заменой, кодировками, редактированием столбцов/блоков, историей буфера, автосохранением.",
-        "構文強調・テーマ・検索/置換・エンコード・列/ブロック編集・クリップボード履歴・自動保存を備えたマルチタブエディタ。",
-        "구문 강조, 테마, 찾기/바꾸기, 인코딩, 열/블록 편집, 클립보드 기록, 자동 저장을 갖춘 다중 탭 편집기.");
+    add("multi-tab editor with syntax highlighting, themes, find/replace, encodings, column/block edit, clipboard history, auto-save, a built-in hex viewer/editor, and a tab-bar context menu (close / close others / close to the left or right).",
+        "多标签编辑器，含语法高亮、主题、查找/替换、编码、列/块编辑、剪贴板历史、自动保存、内置十六进制查看/编辑器，以及标签右键菜单（关闭/关闭其他/关闭左侧或右侧）。",
+        "多分頁編輯器，含語法高亮、佈景主題、尋找/取代、編碼、欄/區塊編輯、剪貼簿歷史、自動儲存、內建十六進位檢視/編輯器，以及分頁右鍵選單（關閉/關閉其他/關閉左側或右側）。",
+        "editor de varias pestañas con resaltado de sintaxis, temas, buscar/reemplazar, codificaciones, edición de columna/bloque, historial del portapapeles, autoguardado, un visor/editor hexadecimal integrado y un menú contextual de pestañas (cerrar / cerrar otras / cerrar a la izquierda o derecha).",
+        "éditeur multi-onglets avec coloration syntaxique, thèmes, rechercher/remplacer, encodages, édition colonne/bloc, historique du presse-papiers, enregistrement auto, un visualiseur/éditeur hexadécimal intégré et un menu contextuel d'onglets (fermer / fermer les autres / fermer à gauche ou à droite).",
+        "Multi-Tab-Editor mit Syntaxhervorhebung, Designs, Suchen/Ersetzen, Kodierungen, Spalten-/Blockbearbeitung, Zwischenablage-Verlauf, Autospeichern, integriertem Hex-Viewer/-Editor und einem Tab-Kontextmenü (Schließen / Andere schließen / Links oder rechts schließen).",
+        "многовкладочный редактор с подсветкой синтаксиса, темами, поиском/заменой, кодировками, редактированием столбцов/блоков, историей буфера, автосохранением, встроенным hex-просмотрщиком/редактором и контекстным меню вкладок (закрыть / закрыть другие / закрыть слева или справа).",
+        "構文強調・テーマ・検索/置換・エンコード・列/ブロック編集・クリップボード履歴・自動保存・内蔵Hexビューア/エディタ・タブ右クリックメニュー（閉じる/他を閉じる/左右を閉じる）を備えたマルチタブエディタ。",
+        "구문 강조, 테마, 찾기/바꾸기, 인코딩, 열/블록 편집, 클립보드 기록, 자동 저장, 내장 Hex 뷰어/편집기, 탭 우클릭 메뉴(닫기/다른 탭 닫기/왼쪽·오른쪽 닫기)를 갖춘 다중 탭 편집기.");
     add("SSH terminal", "SSH 终端","SSH 終端","Terminal SSH","Terminal SSH","SSH-Terminal","SSH-терминал","SSH 端末","SSH 터미널");
     add("native libssh2 SSH sessions with tmux support and VT100/256-color rendering; passwords encrypted with Windows DPAPI.",
         "基于 libssh2 的原生 SSH 会话，支持 tmux 与 VT100/256 色渲染；密码使用 Windows DPAPI 加密。",
@@ -494,6 +580,16 @@ void I18n::loadTable()
         "параллельное сравнение текста, папок, hex и изображений.",
         "テキスト・フォルダ・Hex・画像の並列比較。",
         "텍스트, 폴더, 16진수, 사진의 나란히 비교.");
+    add("Cloud Drives",      "云盘",      "雲端",      "Unidades en la nube","Disques cloud","Cloud-Laufwerke","Облачные диски","クラウドドライブ","클라우드 드라이브");
+    add("Baidu Pan and WebDAV browsing, upload/download (files and folders), rename, delete, and streaming playback, with a Transfers panel showing live progress and history.",
+        "支持百度网盘与 WebDAV 浏览、上传/下载（文件与文件夹）、重命名、删除与边下边播，并配有实时显示进度与历史的传输面板。",
+        "支援百度網盤與 WebDAV 瀏覽、上傳/下載（檔案與資料夾）、重新命名、刪除與串流播放，並配有即時顯示進度與歷史的傳輸面板。",
+        "navegación por Baidu Pan y WebDAV, subida/descarga (archivos y carpetas), renombrar, eliminar y reproducción en streaming, con un panel de transferencias que muestra progreso e historial en vivo.",
+        "navigation Baidu Pan et WebDAV, téléversement/téléchargement (fichiers et dossiers), renommage, suppression et lecture en streaming, avec un panneau de transferts affichant la progression et l'historique en direct.",
+        "Baidu Pan- und WebDAV-Browsing, Hoch-/Herunterladen (Dateien und Ordner), Umbenennen, Löschen und Streaming-Wiedergabe, mit einem Übertragungspanel für Live-Fortschritt und Verlauf.",
+        "просмотр Baidu Pan и WebDAV, загрузка/скачивание (файлов и папок), переименование, удаление и потоковое воспроизведение, с панелью передач, показывающей прогресс и историю в реальном времени.",
+        "Baidu Pan と WebDAV の参照、アップロード/ダウンロード（ファイル・フォルダ）、名前変更、削除、ストリーミング再生に対応し、進捗と履歴をリアルタイム表示する転送パネルを備える。",
+        "Baidu Pan 및 WebDAV 탐색, 업로드/다운로드(파일 및 폴더), 이름 바꾸기, 삭제, 스트리밍 재생을 지원하며 실시간 진행률과 기록을 보여주는 전송 패널을 제공합니다.");
     add("Multi-language UI (9 languages), VS Code-like themes applied across all tabs.",
         "多语言界面（9 种语言），VS Code 系主题应用于所有标签页。",
         "多語言介面（9 種語言），VS Code 系佈景主題套用於所有分頁。",

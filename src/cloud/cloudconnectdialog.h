@@ -18,9 +18,17 @@ class CloudConnectDialog : public QDialog
 {
     Q_OBJECT
 public:
-    enum Backend { OneDrive, GoogleDrive, Dropbox, BaiduPan, WebDAV };
+    enum Backend { OneDrive, GoogleDrive, Dropbox, BaiduPan, WebDAV, SmbShare, Sftp, Ftp };
 
-    explicit CloudConnectDialog(QWidget *parent = nullptr);
+    // Restricts which backends the combo box offers, so the same dialog class
+    // serves three distinct "Connect ..." menu entries without duplicating
+    // all the field-layout code:
+    //   ModeCloud  -> Baidu Pan / WebDAV            ("Connect Cloud Drive...")
+    //   ModeShare  -> Shared Folder (SMB/Samba)      ("Connect Shared Folder...")
+    //   ModeFtp    -> SFTP / FTP                     ("Connect SFTP/FTP...")
+    enum Mode { ModeCloud, ModeShare, ModeFtp };
+
+    explicit CloudConnectDialog(Mode mode, QWidget *parent = nullptr);
 
     // Create a provider from the entered values (caller owns it). Returns
     // nullptr if required fields are missing.
@@ -49,14 +57,20 @@ private slots:
     void onProxyTypeChanged(int index);
 
 private:
+    Mode m_mode = ModeCloud;
+
     QComboBox *m_backend = nullptr;
     QLineEdit *m_name = nullptr;        // user-chosen drive name
     QLineEdit *m_clientId = nullptr;    // your registered app's client_id / API key
     QLineEdit *m_secretKey = nullptr;   // Baidu SecretKey (app secret)
     QLineEdit *m_token = nullptr;       // OAuth access token (REST backends)
-    QLineEdit *m_extra = nullptr;       // Aliyun drive_id, or WebDAV URL
-    QLineEdit *m_user = nullptr;        // WebDAV user
-    QLineEdit *m_pass = nullptr;        // WebDAV password
+    QLineEdit *m_extra = nullptr;       // WebDAV URL, or SMB UNC path
+    QLineEdit *m_user = nullptr;        // WebDAV / SMB / SFTP / FTP username
+    QLineEdit *m_pass = nullptr;        // WebDAV / SMB / SFTP / FTP password
+    QLineEdit *m_host = nullptr;        // SFTP / FTP host
+    QLineEdit *m_port = nullptr;        // SFTP / FTP port
+    QLineEdit *m_keyPath = nullptr;     // SFTP private key file path (optional)
+    QPushButton *m_browseKey = nullptr; // "Browse..." for the SFTP key file
     QLabel *m_nameLabel = nullptr;
     QLabel *m_clientIdLabel = nullptr;
     QLabel *m_secretKeyLabel = nullptr;
@@ -64,6 +78,9 @@ private:
     QLabel *m_extraLabel = nullptr;
     QLabel *m_userLabel = nullptr;
     QLabel *m_passLabel = nullptr;
+    QLabel *m_hostLabel = nullptr;
+    QLabel *m_portLabel = nullptr;
+    QLabel *m_keyPathLabel = nullptr;
     QLabel *m_hint = nullptr;
     QPushButton *m_loginBtn = nullptr;  // "Login in Browser" (OAuth)
 

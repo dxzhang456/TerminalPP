@@ -207,6 +207,36 @@ void OneDriveProvider::makeDir(const QString &remoteDir, const QString &name)
     });
 }
 
+void OneDriveProvider::remove(const QString &remotePath)
+{
+    const QString p = remotePath.startsWith('/') ? remotePath : "/" + remotePath;
+    QNetworkRequest req(QUrl(QString("https://graph.microsoft.com/v1.0/me/drive/root:%1").arg(p)));
+    req.setRawHeader("Authorization", ("Bearer " + m_token).toUtf8());
+    QNetworkReply *reply = m_net->deleteResource(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
+void OneDriveProvider::rename(const QString &remotePath, const QString &newName)
+{
+    const QString p = remotePath.startsWith('/') ? remotePath : "/" + remotePath;
+    QNetworkRequest req(QUrl(QString("https://graph.microsoft.com/v1.0/me/drive/root:%1").arg(p)));
+    req.setRawHeader("Authorization", ("Bearer " + m_token).toUtf8());
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    QJsonObject body;
+    body["name"] = newName;
+    QNetworkReply *reply = m_net->sendCustomRequest(
+        req, "PATCH", QJsonDocument(body).toJson());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
 // ===========================================================================
 //  Google Drive — Drive v3 (folders addressed by id)
 // ===========================================================================
@@ -317,6 +347,36 @@ void GoogleDriveProvider::makeDir(const QString &remoteDir, const QString &name)
     if (!remoteDir.isEmpty() && remoteDir != "root")
         body["parents"] = QJsonArray{ remoteDir };
     QNetworkReply *reply = m_net->post(req, QJsonDocument(body).toJson());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
+void GoogleDriveProvider::remove(const QString &remotePath)
+{
+    // Drive "delete" is permanent; use trash update instead (safer default)
+    // would require an extra call, so we issue a real delete as requested.
+    QNetworkRequest req(QUrl(QString("https://www.googleapis.com/drive/v3/files/%1").arg(remotePath)));
+    req.setRawHeader("Authorization", ("Bearer " + m_token).toUtf8());
+    QNetworkReply *reply = m_net->deleteResource(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
+void GoogleDriveProvider::rename(const QString &remotePath, const QString &newName)
+{
+    QNetworkRequest req(QUrl(QString("https://www.googleapis.com/drive/v3/files/%1").arg(remotePath)));
+    req.setRawHeader("Authorization", ("Bearer " + m_token).toUtf8());
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    QJsonObject body;
+    body["name"] = newName;
+    QNetworkReply *reply = m_net->sendCustomRequest(
+        req, "PATCH", QJsonDocument(body).toJson());
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
         else emit operationFinished();
@@ -447,6 +507,42 @@ void DropboxProvider::makeDir(const QString &remoteDir, const QString &name)
     req.setRawHeader("Authorization", ("Bearer " + m_token).toUtf8());
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     QJsonObject body; body["path"] = path;
+    QNetworkReply *reply = m_net->post(req, QJsonDocument(body).toJson());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
+void DropboxProvider::remove(const QString &remotePath)
+{
+    QNetworkRequest req(QUrl("https://api.dropboxapi.com/2/files/delete_v2"));
+    req.setRawHeader("Authorization", ("Bearer " + m_token).toUtf8());
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    QJsonObject body; body["path"] = remotePath;
+    QNetworkReply *reply = m_net->post(req, QJsonDocument(body).toJson());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
+void DropboxProvider::rename(const QString &remotePath, const QString &newName)
+{
+    // Move the file within its own parent folder, giving it a new name.
+    QString parent = remotePath;
+    int idx = parent.lastIndexOf('/');
+    parent = (idx <= 0) ? "" : parent.left(idx);
+    const QString newPath = parent + "/" + newName;
+
+    QNetworkRequest req(QUrl("https://api.dropboxapi.com/2/files/move_v2"));
+    req.setRawHeader("Authorization", ("Bearer " + m_token).toUtf8());
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    QJsonObject body;
+    body["from_path"] = remotePath;
+    body["to_path"] = newPath;
     QNetworkReply *reply = m_net->post(req, QJsonDocument(body).toJson());
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
@@ -709,6 +805,58 @@ void BaiduPanProvider::makeDir(const QString &remoteDir, const QString &name)
     });
 }
 
+void BaiduPanProvider::remove(const QString &remotePath)
+{
+    QUrl url("https://pan.baidu.com/rest/2.0/xpan/file");
+    QUrlQuery q;
+    q.addQueryItem("method", "filemanager");
+    q.addQueryItem("access_token", m_token);
+    q.addQueryItem("opera", "delete");
+    url.setQuery(q);
+
+    QUrlQuery form;
+    form.addQueryItem("async", "0");
+    form.addQueryItem("filelist", QString("[\"%1\"]").arg(remotePath));
+
+    QNetworkRequest req(url);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    QNetworkReply *reply = m_net->post(req, form.toString(QUrl::FullyEncoded).toUtf8());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
+void BaiduPanProvider::rename(const QString &remotePath, const QString &newName)
+{
+    QUrl url("https://pan.baidu.com/rest/2.0/xpan/file");
+    QUrlQuery q;
+    q.addQueryItem("method", "filemanager");
+    q.addQueryItem("access_token", m_token);
+    q.addQueryItem("opera", "rename");
+    url.setQuery(q);
+
+    QJsonObject item;
+    item["path"] = remotePath;
+    item["newname"] = newName;
+    QJsonArray arr; arr.append(item);
+
+    QUrlQuery form;
+    form.addQueryItem("async", "0");
+    form.addQueryItem("filelist",
+        QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact)));
+
+    QNetworkRequest req(url);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    QNetworkReply *reply = m_net->post(req, form.toString(QUrl::FullyEncoded).toUtf8());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
 // ===========================================================================
 //  WebDAV — PROPFIND for listing, GET for download
 // ===========================================================================
@@ -814,6 +962,39 @@ void WebDavProvider::makeDir(const QString &remoteDir, const QString &name)
     QNetworkRequest req((QUrl(absUrl(dir + name))));
     req.setRawHeader("Authorization", basicAuthHeader());
     QNetworkReply *reply = m_net->sendCustomRequest(req, "MKCOL");
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
+void WebDavProvider::remove(const QString &remotePath)
+{
+    QNetworkRequest req((QUrl(absUrl(remotePath))));
+    req.setRawHeader("Authorization", basicAuthHeader());
+    QNetworkReply *reply = m_net->sendCustomRequest(req, "DELETE");
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
+        else emit operationFinished();
+        reply->deleteLater();
+    });
+}
+
+void WebDavProvider::rename(const QString &remotePath, const QString &newName)
+{
+    // WebDAV rename = MOVE within the same parent folder.
+    QString parent = remotePath;
+    if (parent.endsWith('/')) parent.chop(1);
+    int idx = parent.lastIndexOf('/');
+    parent = (idx <= 0) ? "/" : parent.left(idx + 1);
+    const QString destUrl = absUrl(parent + newName);
+
+    QNetworkRequest req((QUrl(absUrl(remotePath))));
+    req.setRawHeader("Authorization", basicAuthHeader());
+    req.setRawHeader("Destination", destUrl.toUtf8());
+    req.setRawHeader("Overwrite", "F");
+    QNetworkReply *reply = m_net->sendCustomRequest(req, "MOVE");
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         if (reply->error() != QNetworkReply::NoError) emit errorOccurred(reply->errorString());
         else emit operationFinished();

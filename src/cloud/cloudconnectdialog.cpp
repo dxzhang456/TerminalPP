@@ -1,5 +1,8 @@
 #include "cloudconnectdialog.h"
 #include "restproviders.h"
+#include "smbprovider.h"
+#include "sftpprovider.h"
+#include "ftpprovider.h"
 #include "core/i18n.h"
 
 #include <QComboBox>
@@ -16,6 +19,7 @@
 #include <QNetworkProxy>
 #include <QSettings>
 #include <QMessageBox>
+#include <QFileDialog>
 
 static QString TRc(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
 
@@ -26,20 +30,30 @@ static const QString kBaiduClientId = QStringLiteral("UOnlv2lSJt3ykY5sbVSQTrvK7p
 // and refresh). Pre-filled, editable. Replace with your own if needed.
 static const QString kBaiduSecretKey = QStringLiteral("PIQ0tncydrB8PMHp5dKYLa2mlUOB3e3H");
 
-CloudConnectDialog::CloudConnectDialog(QWidget *parent)
-    : QDialog(parent)
+CloudConnectDialog::CloudConnectDialog(Mode mode, QWidget *parent)
+    : QDialog(parent), m_mode(mode)
 {
     setWindowTitle(TRc("Connect to Cloud Drive"));
-    resize(600, 440);
+    resize(600, 480);
 
     auto *grid = new QGridLayout();
 
     grid->addWidget(new QLabel(TRc("Provider:"), this), 0, 0);
     m_backend = new QComboBox(this);
-    // Only Baidu Pan and WebDAV are offered. The other providers remain in the
-    // code base but are intentionally not selectable here.
-    m_backend->addItem("Baidu Pan", BaiduPan);
-    m_backend->addItem("WebDAV", WebDAV);
+    // Only the backends relevant to this dialog's mode are offered.
+    switch (m_mode) {
+    case ModeCloud:
+        m_backend->addItem("Baidu Pan", BaiduPan);
+        m_backend->addItem("WebDAV", WebDAV);
+        break;
+    case ModeShare:
+        m_backend->addItem(TRc("Shared Folder (SMB/Samba)"), SmbShare);
+        break;
+    case ModeFtp:
+        m_backend->addItem("SFTP", Sftp);
+        m_backend->addItem("FTP", Ftp);
+        break;
+    }
     grid->addWidget(m_backend, 0, 1);
     // Login-in-browser button: opens the provider's OAuth page so the user can
     // authorize via web / QR / running app and copy back the access token.
@@ -78,21 +92,48 @@ CloudConnectDialog::CloudConnectDialog(QWidget *parent)
     grid->addWidget(m_tokenLabel, 4, 0);
     grid->addWidget(m_token, 4, 1, 1, 2);
 
+    // Host + Port: SFTP / FTP only.
+    m_hostLabel = new QLabel(TRc("Host:"), this);
+    m_host = new QLineEdit(this);
+    m_host->setPlaceholderText(TRc("server address, e.g. 192.168.1.10 or ftp.example.com"));
+    grid->addWidget(m_hostLabel, 5, 0);
+    grid->addWidget(m_host, 5, 1, 1, 1);
+    m_portLabel = new QLabel(TRc("Port:"), this);
+    m_port = new QLineEdit(this);
+    m_port->setMaximumWidth(80);
+    grid->addWidget(m_portLabel, 5, 2);
+    grid->addWidget(m_port, 5, 3);
+
+    // "Extra": WebDAV base URL, or SMB UNC share path.
     m_extraLabel = new QLabel(TRc("Drive ID:"), this);
     m_extra = new QLineEdit(this);
-    grid->addWidget(m_extraLabel, 5, 0);
-    grid->addWidget(m_extra, 5, 1, 1, 2);
+    m_extra->setPlaceholderText(TRc("e.g. \\\\server\\share or //server/share"));
+    grid->addWidget(m_extraLabel, 6, 0);
+    grid->addWidget(m_extra, 6, 1, 1, 3);
 
     m_userLabel = new QLabel(TRc("Username:"), this);
     m_user = new QLineEdit(this);
-    grid->addWidget(m_userLabel, 6, 0);
-    grid->addWidget(m_user, 6, 1, 1, 2);
+    grid->addWidget(m_userLabel, 7, 0);
+    grid->addWidget(m_user, 7, 1, 1, 3);
 
     m_passLabel = new QLabel(TRc("Password:"), this);
     m_pass = new QLineEdit(this);
     m_pass->setEchoMode(QLineEdit::Password);
-    grid->addWidget(m_passLabel, 7, 0);
-    grid->addWidget(m_pass, 7, 1, 1, 2);
+    grid->addWidget(m_passLabel, 8, 0);
+    grid->addWidget(m_pass, 8, 1, 1, 3);
+
+    // SFTP-only: optional private key file (password auth is used when empty).
+    m_keyPathLabel = new QLabel(TRc("Private Key (optional):"), this);
+    m_keyPath = new QLineEdit(this);
+    grid->addWidget(m_keyPathLabel, 9, 0);
+    grid->addWidget(m_keyPath, 9, 1, 1, 2);
+    m_browseKey = new QPushButton(TRc("Browse..."), this);
+    connect(m_browseKey, &QPushButton::clicked, this, [this]() {
+        const QString f = QFileDialog::getOpenFileName(this, TRc("Select private key"));
+        if (!f.isEmpty())
+            m_keyPath->setText(f);
+    });
+    grid->addWidget(m_browseKey, 9, 3);
 
     m_hint = new QLabel(this);
     m_hint->setWordWrap(true);
@@ -123,6 +164,11 @@ CloudConnectDialog::CloudConnectDialog(QWidget *parent)
     pg->addWidget(m_proxyPass, 2, 3);
     connect(m_proxyType, &QComboBox::currentIndexChanged,
             this, &CloudConnectDialog::onProxyTypeChanged);
+    // Proxy settings only make sense for REST/cloud backends (HTTP traffic);
+    // SMB/SFTP/FTP use their own native protocols and ignore the app-wide
+    // QNetworkProxy, so hide the group entirely outside ModeCloud to avoid
+    // implying it has any effect there.
+    proxyBox->setVisible(m_mode == ModeCloud);
 
     auto *buttons = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
@@ -156,6 +202,8 @@ void CloudConnectDialog::onProxyTypeChanged(int)
 
 void CloudConnectDialog::applyProxyToApplication() const
 {
+    if (m_mode != ModeCloud)
+        return;   // SMB/SFTP/FTP don't use the app-wide HTTP/SOCKS proxy
     const int t = m_proxyType->currentIndex();
     if (t == 0) {
         QNetworkProxy::setApplicationProxy(QNetworkProxy::NoProxy);
@@ -235,6 +283,8 @@ void CloudConnectDialog::onLoginInBrowser()
               "?client_id=%1&response_type=token"
               "&redirect_uri=oob&scope=basic,netdisk&display=page&qrcode=1").arg(ec);
         break;
+    default:
+        break;
     }
     QDesktopServices::openUrl(QUrl(url));
     m_hint->setText(TRc("A browser window opened for login (supports web / QR code). "
@@ -247,20 +297,21 @@ void CloudConnectDialog::onBackendChanged(int)
 {
     const int b = m_backend->currentData().toInt();
     const bool isWebDav = (b == WebDAV);
+    const bool isBaidu  = (b == BaiduPan);
+    const bool isSmb    = (b == SmbShare);
+    const bool isSftp   = (b == Sftp);
+    const bool isFtp    = (b == Ftp);
+    const bool isHostBased = isSftp || isFtp;   // needs Host + Port
+    const bool isRest = (b == OneDrive || b == GoogleDrive || b == Dropbox || isBaidu);
 
-    const bool isBaidu = (b == BaiduPan);
-
-    // Token row + login button: all REST backends (not WebDAV).
-    m_tokenLabel->setVisible(!isWebDav);
-    m_token->setVisible(!isWebDav);
-    m_loginBtn->setVisible(!isWebDav);
-    // Client ID field: shown for all REST backends (including Baidu now).
-    const bool showClientId = !isWebDav;
-    m_clientIdLabel->setVisible(showClientId);
-    m_clientId->setVisible(showClientId);
-    // Restore the previously-used client id for this provider; for Baidu,
-    // default to the built-in AppKey when nothing was saved before.
-    if (showClientId) {
+    // Token row + login button: REST/OAuth backends only.
+    m_tokenLabel->setVisible(isRest);
+    m_token->setVisible(isRest);
+    m_loginBtn->setVisible(isRest);
+    // Client ID field: REST backends only.
+    m_clientIdLabel->setVisible(isRest);
+    m_clientId->setVisible(isRest);
+    if (isRest) {
         QSettings s;
         QString saved = s.value(QStringLiteral("cloud/clientId/%1").arg(b)).toString();
         if (saved.isEmpty() && isBaidu)
@@ -279,16 +330,30 @@ void CloudConnectDialog::onBackendChanged(int)
         m_secretKey->setText(sk);
     }
 
-    // Extra row: WebDAV base URL.
-    m_extra->setVisible(isWebDav);
-    m_extraLabel->setVisible(isWebDav);
-    m_extraLabel->setText(TRc("WebDAV URL:"));
+    // Host + Port rows: SFTP / FTP only.
+    m_hostLabel->setVisible(isHostBased);
+    m_host->setVisible(isHostBased);
+    m_portLabel->setVisible(isHostBased);
+    m_port->setVisible(isHostBased);
+    if (isHostBased && m_port->text().isEmpty())
+        m_port->setText(isSftp ? "22" : "21");
 
-    // User/password rows: WebDAV only.
-    m_userLabel->setVisible(isWebDav);
-    m_user->setVisible(isWebDav);
-    m_passLabel->setVisible(isWebDav);
-    m_pass->setVisible(isWebDav);
+    // "Extra" row: WebDAV base URL, or SMB UNC path.
+    m_extra->setVisible(isWebDav || isSmb);
+    m_extraLabel->setVisible(isWebDav || isSmb);
+    m_extraLabel->setText(isSmb ? TRc("Share Path (UNC):") : TRc("WebDAV URL:"));
+
+    // Username/password: WebDAV, SMB, SFTP, FTP.
+    const bool showUserPass = isWebDav || isSmb || isHostBased;
+    m_userLabel->setVisible(showUserPass);
+    m_user->setVisible(showUserPass);
+    m_passLabel->setVisible(showUserPass);
+    m_pass->setVisible(showUserPass);
+
+    // SFTP-only private key row.
+    m_keyPathLabel->setVisible(isSftp);
+    m_keyPath->setVisible(isSftp);
+    m_browseKey->setVisible(isSftp);
 
     switch (b) {
     case OneDrive:
@@ -317,6 +382,21 @@ void CloudConnectDialog::onBackendChanged(int)
     case WebDAV:
         m_hint->setText(TRc("Enter the WebDAV base URL (e.g. https://dav.jianguoyun.com/dav/) "
                             "and your account credentials. Works with Nutstore and self-hosted servers."));
+        break;
+    case SmbShare:
+        m_hint->setText(TRc("Enter a Windows/Samba share path, e.g. \\\\server\\share or "
+                            "//server/share. Works against any SMB dialect (SMB1/CIFS, SMB2, "
+                            "SMB3) the server offers — Windows negotiates it automatically. "
+                            "Username/password are used to authenticate the share if needed."));
+        break;
+    case Sftp:
+        m_hint->setText(TRc("Enter the SFTP server host and port (default 22), your username, "
+                            "and either a password or a private key file. Uses the same native "
+                            "libssh2 client as the SSH terminal feature — no external sftp.exe."));
+        break;
+    case Ftp:
+        m_hint->setText(TRc("Enter the FTP server host and port (default 21) and your account "
+                            "credentials. Uses passive-mode (PASV) data connections."));
         break;
     }
 }
@@ -353,6 +433,30 @@ CloudProvider *CloudConnectDialog::createProvider(QObject *parent) const
                        m_user->text(), m_pass->text());
         return p;
     }
+    case SmbShare: {
+        if (m_extra->text().trimmed().isEmpty())
+            return nullptr;
+        auto *p = new SmbShareProvider(parent);
+        p->setEndpoint(m_extra->text().trimmed(), m_user->text(), m_pass->text());
+        return p;
+    }
+    case Sftp: {
+        if (m_host->text().trimmed().isEmpty() || m_user->text().trimmed().isEmpty())
+            return nullptr;
+        auto *p = new SftpProvider(parent);
+        const int port = m_port->text().toInt() > 0 ? m_port->text().toInt() : 22;
+        p->setEndpoint(m_host->text().trimmed(), port, m_user->text(),
+                       m_pass->text(), m_keyPath->text().trimmed());
+        return p;
+    }
+    case Ftp: {
+        if (m_host->text().trimmed().isEmpty())
+            return nullptr;
+        auto *p = new FtpProvider(parent);
+        const int port = m_port->text().toInt() > 0 ? m_port->text().toInt() : 21;
+        p->setEndpoint(m_host->text().trimmed(), port, m_user->text(), m_pass->text());
+        return p;
+    }
     }
     return nullptr;
 }
@@ -379,6 +483,9 @@ CloudDriveConfig CloudConnectDialog::config() const
     c.extra     = m_extra->text().trimmed();
     c.user      = m_user->text();
     c.pass      = m_pass->text();
+    c.host      = m_host->text().trimmed();
+    c.port      = m_port->text().toInt();
+    c.keyPath   = m_keyPath->text().trimmed();
     c.proxyType = m_proxyType->currentIndex();
     c.proxyHost = m_proxyHost->text().trimmed();
     c.proxyPort = m_proxyPort->text().toInt();
@@ -404,6 +511,9 @@ void CloudConnectDialog::setConfig(const CloudDriveConfig &cfg)
     m_extra->setText(cfg.extra);
     m_user->setText(cfg.user);
     m_pass->setText(cfg.pass);
+    m_host->setText(cfg.host);
+    m_port->setText(cfg.port > 0 ? QString::number(cfg.port) : QString());
+    m_keyPath->setText(cfg.keyPath);
 
     m_proxyType->setCurrentIndex(cfg.proxyType);
     m_proxyHost->setText(cfg.proxyHost);

@@ -56,6 +56,8 @@ public:
     void resolveStreamUrl(const QString &remotePath) override;
     void upload(const QString &localPath, const QString &remoteDir) override;
     void makeDir(const QString &remoteDir, const QString &name) override;
+    void remove(const QString &remotePath) override;
+    void rename(const QString &remotePath, const QString &newName) override;
 };
 
 // ---- Google Drive (Drive v3) ----
@@ -72,6 +74,8 @@ public:
     void resolveStreamUrl(const QString &fileId) override;
     void upload(const QString &localPath, const QString &remoteDir) override;
     void makeDir(const QString &remoteDir, const QString &name) override;
+    void remove(const QString &remotePath) override;
+    void rename(const QString &remotePath, const QString &newName) override;
     // The media endpoint needs the bearer token; the StreamProxy injects it.
     QList<QPair<QByteArray, QByteArray>> streamHeaders() const override {
         return {{ "Authorization", ("Bearer " + m_token).toUtf8() }};
@@ -90,6 +94,8 @@ public:
     void resolveStreamUrl(const QString &remotePath) override;
     void upload(const QString &localPath, const QString &remoteDir) override;
     void makeDir(const QString &remoteDir, const QString &name) override;
+    void remove(const QString &remotePath) override;
+    void rename(const QString &remotePath, const QString &newName) override;
 };
 
 // ---- Baidu Pan (PCS / OpenAPI) ----
@@ -110,6 +116,8 @@ public:
     }
     void upload(const QString &localPath, const QString &remoteDir) override;
     void makeDir(const QString &remoteDir, const QString &name) override;
+    void remove(const QString &remotePath) override;
+    void rename(const QString &remotePath, const QString &newName) override;
 private:
     // Resolve a file's temporary download link (dlink) from its fs_id, then
     // invoke `onDlink(url)`. Baidu needs the fs_id, not the path.
@@ -134,6 +142,8 @@ public:
     void resolveStreamUrl(const QString &remotePath) override;
     void upload(const QString &localPath, const QString &remoteDir) override;
     void makeDir(const QString &remoteDir, const QString &name) override;
+    void remove(const QString &remotePath) override;
+    void rename(const QString &remotePath, const QString &newName) override;
 private:
     QByteArray basicAuthHeader() const;
     QString absUrl(const QString &path) const;

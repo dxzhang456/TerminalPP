@@ -17,7 +17,6 @@ class QToolBar;
 //   * Download a file to a chosen local path
 //   * Open internally: text -> editor tab, image -> image view
 //   * Open With...: download to temp, launch an external program the user picks
-//   * Open text with VS Code (if `code` is on PATH)
 //   * Stream video: hand a resolved URL to the system/default player
 //   * non text/image files are downloaded to a temp folder before opening
 class CloudBrowserTab : public QWidget
@@ -66,9 +65,10 @@ private:
     void actionOpenInternal(const CloudEntry &e);     // text/image
     void actionOpenAsText(const CloudEntry &e);       // force internal editor
     void actionOpenWith(const CloudEntry &e);         // external picker
-    void actionOpenWithVSCode(const CloudEntry &e);   // text -> VS Code
     void actionStream(const CloudEntry &e);           // video/audio -> player
     void actionOpenDefault(const CloudEntry &e);      // OS default app
+    void actionDelete(const CloudEntry &e);           // delete, with confirmation
+    void actionRename(const CloudEntry &e);           // rename (file or folder)
 
     // Download `e` to a local path, then run `after(localPath)`.
     void downloadThen(const CloudEntry &e, const QString &localPath,

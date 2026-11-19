@@ -87,6 +87,12 @@ set(PROJECT_SOURCES
     src/cloud/transfermanager.h
     src/cloud/transferpanel.cpp
     src/cloud/transferpanel.h
+    src/cloud/smbprovider.cpp
+    src/cloud/smbprovider.h
+    src/cloud/sftpprovider.cpp
+    src/cloud/sftpprovider.h
+    src/cloud/ftpprovider.cpp
+    src/cloud/ftpprovider.h
 
     # --- Code editor ---
     src/editor/codeeditor.cpp
@@ -170,9 +176,10 @@ else()
     target_link_libraries(TerminalPP PRIVATE ssh2)
 endif()
 
-# Winsock + DPAPI (CryptProtectData) on Windows.
+# Winsock + DPAPI (CryptProtectData) + Mpr (WNetAddConnection2 for the SMB
+# shared-folder provider) on Windows.
 if (WIN32)
-    target_link_libraries(TerminalPP PRIVATE ws2_32 crypt32)
+    target_link_libraries(TerminalPP PRIVATE ws2_32 crypt32 mpr)
 endif()
 
 # Installation / deployment

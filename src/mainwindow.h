@@ -20,6 +20,7 @@ class SerialTab;
 class SessionManager;
 class CloudBrowserTab;
 class TransferPanel;
+class QShortcut;
 
 // The application main window. Hosts a central tab widget that can contain:
 //   * Editor tabs (ndd / Notepad-- replica)
@@ -91,8 +92,10 @@ private slots:
     // --- Terminal: Serial ---
     void newSerialSession();
 
-    // --- Cloud drives ---
-    void connectCloudDrive();
+    // --- Cloud drives / shared folders / SFTP-FTP ---
+    void connectCloudDrive();        // Baidu Pan / WebDAV
+    void connectSharedFolder();      // Windows/Samba SMB share
+    void connectSftpFtp();           // SFTP or FTP
 
     // --- Compare ---
     void newComparison();
@@ -188,7 +191,7 @@ private:
     QMenu *m_encMenu = nullptr;
     QMenu *m_termMenu = nullptr;
     QMenu *m_compareMenu = nullptr;     // "Compare" menu
-    QMenu *m_cloudMenu = nullptr;       // "Cloud" menu
+    QMenu *m_cloudMenu = nullptr;       // "Connect" menu (cloud drives, shared folders, SFTP/FTP)
     QMenu *m_uiLangMenu = nullptr;      // "UI Language" menu
     QMenu *m_helpMenu = nullptr;
 
@@ -210,6 +213,14 @@ private:
     QTimer *m_autoSaveTimer = nullptr;
     bool m_autoSaveEnabled = false;
     int  m_autoSaveIntervalSec = 30;
+
+    // Dedicated zoom shortcuts (registered once; see createMenus()). Using
+    // plain QShortcut objects instead of QAction shortcuts avoids ambiguous-
+    // shortcut conflicts that previously broke Ctrl+- after fixing Ctrl++.
+    QShortcut *m_zoomInShortcut = nullptr;
+    QShortcut *m_zoomInShortcut2 = nullptr;
+    QShortcut *m_zoomOutShortcut = nullptr;
+    QShortcut *m_zoomResetShortcut = nullptr;
 };
 
 #endif // MAINWINDOW_H

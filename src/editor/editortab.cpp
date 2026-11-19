@@ -27,6 +27,34 @@ static QStringConverter::Encoding encodingFromName(const QString &name)
     return enc.value_or(QStringConverter::Utf8);
 }
 
+// QStringDecoder::hasError() only flags *malformed* UTF-8 (bad continuation
+// bytes, overlong sequences, etc.). It does NOT catch the case where a
+// non-UTF-8 byte stream (e.g. GBK Chinese text) happens, by coincidence, to
+// form a sequence of *well-formed* multi-byte UTF-8 code points — the decode
+// "succeeds" with no error, but every resulting character is wrong (silent
+// mojibake). This is exactly what makes GBK Chinese .txt files downloaded
+// from a cloud drive look garbled in both Terminal++ and Windows Notepad —
+// both correctly see "valid UTF-8" and render it, producing nonsense text.
+// Guard against this by rejecting the UTF-8 interpretation when it contains
+// an implausibly high share of the Unicode replacement character / stray
+// control characters, which is the practical signature of mis-decoded GBK.
+static bool looksLikePlausibleUtf8Text(const QString &decoded)
+{
+    if (decoded.isEmpty())
+        return true;
+    int bad = 0;
+    for (QChar c : decoded) {
+        if (c == QChar(0xFFFD))                       // U+FFFD replacement char
+            ++bad;
+        else if (c.unicode() < 0x20 && c != QLatin1Char('\t')
+                 && c != QLatin1Char('\n') && c != QLatin1Char('\r'))
+            ++bad;                                      // stray control char
+    }
+    // Allow a tiny amount of noise; anything beyond ~0.5% strongly suggests
+    // the bytes are not actually UTF-8 despite being well-formed as such.
+    return bad * 200 < decoded.size();
+}
+
 EditorTab::EditorTab(QWidget *parent)
     : QWidget(parent)
 {
@@ -96,7 +124,7 @@ bool EditorTab::loadFile(const QString &path, const QString &encoding)
         } else {
             QStringDecoder utf8(QStringConverter::Utf8);
             QString asUtf8 = utf8.decode(raw);
-            if (!utf8.hasError()) {
+            if (!utf8.hasError() && looksLikePlausibleUtf8Text(asUtf8)) {
                 text = asUtf8;             // genuinely valid UTF-8
                 usedEncoding = "UTF-8";
             } else {

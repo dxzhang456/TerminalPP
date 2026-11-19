@@ -1,5 +1,8 @@
 #include "clouddrivestore.h"
 #include "restproviders.h"
+#include "smbprovider.h"
+#include "sftpprovider.h"
+#include "ftpprovider.h"
 #include "core/secretstore.h"
 
 #include <QJsonDocument>
@@ -21,6 +24,9 @@ QString CloudDriveConfig::backendName() const
     case CB_Dropbox:     return QStringLiteral("Dropbox");
     case CB_BaiduPan:    return QStringLiteral("BaiduPan");
     case CB_WebDAV:      return QStringLiteral("WebDAV");
+    case CB_SmbShare:    return QStringLiteral("SharedFolder");
+    case CB_Sftp:        return QStringLiteral("SFTP");
+    case CB_Ftp:         return QStringLiteral("FTP");
     }
     return QStringLiteral("Cloud");
 }
@@ -91,6 +97,9 @@ void CloudDriveStore::load()
         c.extra     = o.value("extra").toString();
         c.user      = o.value("user").toString();
         c.pass      = SecretStore::decrypt(o.value("pass").toString());
+        c.host      = o.value("host").toString();
+        c.port      = o.value("port").toInt();
+        c.keyPath   = o.value("keyPath").toString();
         c.proxyType = o.value("proxyType").toInt();
         c.proxyHost = o.value("proxyHost").toString();
         c.proxyPort = o.value("proxyPort").toInt();
@@ -113,6 +122,9 @@ void CloudDriveStore::save() const
         o["extra"]     = c.extra;
         o["user"]      = c.user;
         o["pass"]      = SecretStore::encrypt(c.pass);
+        o["host"]      = c.host;
+        o["port"]      = c.port;
+        o["keyPath"]   = c.keyPath;
         o["proxyType"] = c.proxyType;
         o["proxyHost"] = c.proxyHost;
         o["proxyPort"] = c.proxyPort;
@@ -156,6 +168,29 @@ CloudProvider *createCloudProvider(const CloudDriveConfig &cfg, QObject *parent)
             return nullptr;          // WebDAV requires a base URL
         auto *p = new WebDavProvider(parent);
         p->setEndpoint(cfg.extra.trimmed(), cfg.user, cfg.pass);
+        return p;
+    }
+    case CB_SmbShare: {
+        if (cfg.extra.trimmed().isEmpty())
+            return nullptr;          // requires a UNC/share path
+        auto *p = new SmbShareProvider(parent);
+        p->setEndpoint(cfg.extra.trimmed(), cfg.user, cfg.pass);
+        return p;
+    }
+    case CB_Sftp: {
+        if (cfg.host.trimmed().isEmpty() || cfg.user.trimmed().isEmpty())
+            return nullptr;          // requires host + user
+        auto *p = new SftpProvider(parent);
+        const int port = cfg.port > 0 ? cfg.port : 22;
+        p->setEndpoint(cfg.host.trimmed(), port, cfg.user, cfg.pass, cfg.keyPath);
+        return p;
+    }
+    case CB_Ftp: {
+        if (cfg.host.trimmed().isEmpty())
+            return nullptr;          // requires host
+        auto *p = new FtpProvider(parent);
+        const int port = cfg.port > 0 ? cfg.port : 21;
+        p->setEndpoint(cfg.host.trimmed(), port, cfg.user, cfg.pass);
         return p;
     }
     }

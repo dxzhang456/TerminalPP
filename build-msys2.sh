@@ -82,6 +82,8 @@ MOC_HEADERS=(
   "$SRC/cloud/cloudconnectdialog.h" "$SRC/cloud/cloudbrowsertab.h"
   "$SRC/cloud/streamproxy.h"
   "$SRC/cloud/transfermanager.h"    "$SRC/cloud/transferpanel.h"
+  "$SRC/cloud/smbprovider.h"        "$SRC/cloud/sftpprovider.h"
+  "$SRC/cloud/ftpprovider.h"
   "$SRC/editor/codeeditor.h"      "$SRC/editor/syntaxhighlighter.h"
   "$SRC/editor/finddialog.h"      "$SRC/editor/gotodialog.h"
   "$SRC/editor/editortab.h"       "$SRC/editor/hexeditortab.h"
@@ -102,7 +104,8 @@ done
 
 # Some .cpp files declare inline Q_OBJECT classes and #include their own
 # "<base>.moc". Generate those into $OUT/moc so they are found via -I.
-for pair in "compare/textcomparetab" "compare/imagecomparetab" "editor/hexeditortab"; do
+for pair in "compare/textcomparetab" "compare/imagecomparetab" "editor/hexeditortab" \
+           "cloud/sftpprovider" "cloud/ftpprovider"; do
     base="$(basename "$pair")"
     mocout="$OUT/moc/$base.moc"
     if newer_than "$SRC/$pair.cpp" "$mocout"; then
@@ -175,7 +178,7 @@ done
 echo "  ($compiled source(s) (re)compiled)"
 
 LIBS="-lQt6Widgets -lQt6Gui -lQt6Core -lQt6Network -lQt6PrintSupport \
-      -lQt6SerialPort -lssh2 -lws2_32 -lmswsock -lcrypt32"
+      -lQt6SerialPort -lssh2 -lws2_32 -lmswsock -lcrypt32 -lmpr"
 
 # Link only if something changed or the exe is missing.
 EXE="$OUT/TerminalPP.exe"

@@ -29,7 +29,7 @@ win32 {
         INCLUDEPATH += $$LIBSSH2_DIR/include
         LIBS += -L$$LIBSSH2_DIR/lib
     }
-    LIBS += -lssh2 -lws2_32 -lcrypt32
+    LIBS += -lssh2 -lws2_32 -lcrypt32 -lmpr
 }
 
 SOURCES += \
@@ -52,6 +52,9 @@ SOURCES += \
     src/cloud/streamproxy.cpp \
     src/cloud/transfermanager.cpp \
     src/cloud/transferpanel.cpp \
+    src/cloud/smbprovider.cpp \
+    src/cloud/sftpprovider.cpp \
+    src/cloud/ftpprovider.cpp \
     src/editor/codeeditor.cpp \
     src/editor/syntaxhighlighter.cpp \
     src/editor/finddialog.cpp \
@@ -89,6 +92,9 @@ HEADERS += \
     src/cloud/streamproxy.h \
     src/cloud/transfermanager.h \
     src/cloud/transferpanel.h \
+    src/cloud/smbprovider.h \
+    src/cloud/sftpprovider.h \
+    src/cloud/ftpprovider.h \
     src/editor/codeeditor.h \
     src/editor/syntaxhighlighter.h \
     src/editor/finddialog.h \

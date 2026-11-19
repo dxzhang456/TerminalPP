@@ -8,6 +8,7 @@
 #include <QList>
 #include <QPair>
 #include <QByteArray>
+#include <QMetaType>
 
 // One entry (file or folder) in a cloud drive listing.
 struct CloudEntry {
@@ -92,6 +93,13 @@ public:
         emit errorOccurred(tr("Create folder not supported by this provider."));
     }
 
+    // Rename/move a file or folder to a new name within the same parent
+    // directory. Emits operationFinished().
+    virtual void rename(const QString &remotePath, const QString &newName) {
+        Q_UNUSED(remotePath); Q_UNUSED(newName);
+        emit errorOccurred(tr("Rename not supported by this provider."));
+    }
+
 signals:
     void listed(const QString &path, const QVector<CloudEntry> &entries);
     void downloadProgress(qint64 received, qint64 total);
@@ -103,5 +111,9 @@ signals:
     void streamUrlReady(const QString &remotePath, const QString &url);
     void errorOccurred(const QString &message);
 };
+
+// Registered so QVector<CloudEntry> can cross thread boundaries in queued
+// signal/slot connections (needed by SftpProvider's worker-thread model).
+Q_DECLARE_METATYPE(QVector<CloudEntry>)
 
 #endif // CLOUDPROVIDER_H

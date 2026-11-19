@@ -281,6 +281,9 @@ void CloudBrowserTab::onContextMenu(const QPoint &pos)
             navigateTo(e.path);
         });
         menu.addAction(TRc("Download Folder..."), this, [this, e]() { actionDownload(e); });
+        menu.addSeparator();
+        menu.addAction(TRc("Rename..."), this, [this, e]() { actionRename(e); });
+        menu.addAction(TRc("Delete"), this, [this, e]() { actionDelete(e); });
     } else {
         const Kind k = classify(e.name);
         // Open (internal) for text/image.
@@ -290,10 +293,6 @@ void CloudBrowserTab::onContextMenu(const QPoint &pos)
         if (k == Video || k == Audio)
             menu.addAction(TRc("Stream (play while downloading)"), this,
                            [this, e]() { actionStream(e); });
-        // Open text in VS Code.
-        if (k == Text)
-            menu.addAction(TRc("Open with VS Code"), this,
-                           [this, e]() { actionOpenWithVSCode(e); });
         // Unknown type: offer both "Open" (sniffs the content and opens text
         // in the editor) and an explicit "Open as Text".
         if (k == Other)
@@ -311,6 +310,9 @@ void CloudBrowserTab::onContextMenu(const QPoint &pos)
                        [this, e]() { actionOpenDefault(e); });
         menu.addSeparator();
         menu.addAction(TRc("Download..."), this, [this, e]() { actionDownload(e); });
+        menu.addSeparator();
+        menu.addAction(TRc("Rename..."), this, [this, e]() { actionRename(e); });
+        menu.addAction(TRc("Delete"), this, [this, e]() { actionDelete(e); });
     }
     menu.exec(m_tree->viewport()->mapToGlobal(pos));
 }
@@ -540,18 +542,6 @@ void CloudBrowserTab::actionOpenWith(const CloudEntry &e)
     });
 }
 
-void CloudBrowserTab::actionOpenWithVSCode(const CloudEntry &e)
-{
-    const QString local = tempDownloadPath(e.name);
-    downloadThen(e, local, [this](const QString &lp) {
-        // Try `code <file>`; fall back to internal editor if not found.
-        if (!QProcess::startDetached("code", { lp })) {
-            emit statusMessage(TRc("VS Code (code) not found on PATH; opening internally."));
-            emit openTextFile(lp);
-        }
-    });
-}
-
 void CloudBrowserTab::actionStream(const CloudEntry &e)
 {
     // Resolve a temporary direct URL and hand it to the system default handler
@@ -609,6 +599,75 @@ void CloudBrowserTab::actionOpenDefault(const CloudEntry &e)
     downloadThen(e, local, [](const QString &lp) {
         QDesktopServices::openUrl(QUrl::fromLocalFile(lp));
     });
+}
+
+// Delete a file or folder after explicit user confirmation. The confirmation
+// text and resulting status message are both run through TRc() so they are
+// shown in whichever UI language is currently selected.
+void CloudBrowserTab::actionDelete(const CloudEntry &e)
+{
+    const QString question = e.isDir
+        ? TRc("Delete folder \"%1\" and all its contents?").arg(e.name)
+        : TRc("Delete \"%1\"?").arg(e.name);
+    if (QMessageBox::question(this, TRc("Delete"), question,
+                              QMessageBox::Yes | QMessageBox::No,
+                              QMessageBox::No) != QMessageBox::Yes)
+        return;
+
+    auto *okConn = new QMetaObject::Connection();
+    auto *errConn = new QMetaObject::Connection();
+    auto cleanup = [okConn, errConn]() {
+        QObject::disconnect(*okConn);
+        QObject::disconnect(*errConn);
+        delete okConn; delete errConn;
+    };
+    *okConn = connect(m_provider, &CloudProvider::operationFinished, this,
+        [this, e, cleanup]() {
+            cleanup();
+            emit statusMessage(TRc("Deleted \"%1\".").arg(e.name));
+            refresh();
+        });
+    *errConn = connect(m_provider, &CloudProvider::errorOccurred, this,
+        [this, cleanup](const QString &msg) {
+            cleanup();
+            emit statusMessage(TRc("Delete failed: %1").arg(msg));
+        });
+    m_provider->remove(e.path);
+}
+
+// Rename a file or folder. Prompts for the new name (pre-filled with the
+// current one) and reports success/failure via the (multilingual) status bar.
+void CloudBrowserTab::actionRename(const CloudEntry &e)
+{
+    bool ok = false;
+    const QString newName = QInputDialog::getText(
+        this, TRc("Rename"), TRc("New name:"),
+        QLineEdit::Normal, e.name, &ok);
+    if (!ok)
+        return;
+    const QString trimmed = newName.trimmed();
+    if (trimmed.isEmpty() || trimmed == e.name)
+        return;
+
+    auto *okConn = new QMetaObject::Connection();
+    auto *errConn = new QMetaObject::Connection();
+    auto cleanup = [okConn, errConn]() {
+        QObject::disconnect(*okConn);
+        QObject::disconnect(*errConn);
+        delete okConn; delete errConn;
+    };
+    *okConn = connect(m_provider, &CloudProvider::operationFinished, this,
+        [this, e, trimmed, cleanup]() {
+            cleanup();
+            emit statusMessage(TRc("Renamed \"%1\" to \"%2\".").arg(e.name, trimmed));
+            refresh();
+        });
+    *errConn = connect(m_provider, &CloudProvider::errorOccurred, this,
+        [this, cleanup](const QString &msg) {
+            cleanup();
+            emit statusMessage(TRc("Rename failed: %1").arg(msg));
+        });
+    m_provider->rename(e.path, trimmed);
 }
 
 void CloudBrowserTab::applyTheme(const EditorTheme &t)

@@ -51,6 +51,7 @@
 #include <QTimer>
 #include <QSettings>
 #include <QPalette>
+#include <QShortcut>
 
 // Shorthand for the runtime UI translator.
 static inline QString TR(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
@@ -206,8 +207,10 @@ void MainWindow::createMenus()
                           this, &MainWindow::showClipboardHistory);
     {
         // Column (block / rectangular) editing: a non-clickable hint entry so
-        // users discover the Alt+drag gesture.
-        QAction *colHint = m_editMenu->addAction(TR("Column / Block Edit (Alt+Drag)"));
+        // users discover both the Alt+drag gesture and the VS Code style
+        // Ctrl+Shift+Up/Down keyboard shortcut.
+        QAction *colHint = m_editMenu->addAction(
+            TR("Column / Block Edit (Alt+Drag or Ctrl+Shift+Up/Down)"));
         colHint->setEnabled(false);
     }
 
@@ -219,24 +222,34 @@ void MainWindow::createMenus()
     m_viewMenu->addAction(m_actLineNumbers);
     m_viewMenu->addAction(m_actWordWrap);
     m_viewMenu->addSeparator();
-    {
-        // QKeySequence::ZoomIn's default binding is unreliable on Windows: '+'
-        // is a shifted key on most layouts, so a plain Ctrl++ press often does
-        // not match it. Bind both the shifted (Ctrl++) and unshifted (Ctrl+=)
-        // physical-key variants explicitly, plus the standard key so platform
-        // conventions still work.
-        QAction *zIn = m_viewMenu->addAction(TR("Zoom &In"));
-        zIn->setShortcuts({ QKeySequence(Qt::CTRL | Qt::Key_Plus),
-                            QKeySequence(Qt::CTRL | Qt::Key_Equal),
-                            QKeySequence::ZoomIn });
-        connect(zIn, &QAction::triggered, this, &MainWindow::zoomIn);
+    // Zoom In/Out/Reset: the menu actions carry NO keyboard shortcut of their
+    // own (mouse-clickable only). The actual accelerators are registered once,
+    // below, as plain QShortcut objects — this avoids any chance of duplicate/
+    // ambiguous shortcut registration between the action and other widgets,
+    // which previously made Ctrl+- stop working after Ctrl++ was fixed.
+    QAction *zIn = m_viewMenu->addAction(TR("Zoom &In"), this, &MainWindow::zoomIn);
+    QAction *zOut = m_viewMenu->addAction(TR("Zoom &Out"), this, &MainWindow::zoomOut);
+    QAction *zReset = m_viewMenu->addAction(TR("&Reset Zoom"), this, &MainWindow::zoomReset);
+    Q_UNUSED(zIn); Q_UNUSED(zOut); Q_UNUSED(zReset);
+    if (!m_zoomInShortcut) {
+        // '+' is a shifted key on most layouts (Ctrl+Shift+Equal physically),
+        // while '=' is unshifted; register both physical-key variants so
+        // Ctrl++ always works regardless of keyboard layout/driver quirks.
+        m_zoomInShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Plus), this);
+        m_zoomInShortcut->setContext(Qt::ApplicationShortcut);
+        connect(m_zoomInShortcut, &QShortcut::activated, this, &MainWindow::zoomIn);
+        m_zoomInShortcut2 = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this);
+        m_zoomInShortcut2->setContext(Qt::ApplicationShortcut);
+        connect(m_zoomInShortcut2, &QShortcut::activated, this, &MainWindow::zoomIn);
 
-        QAction *zOut = m_viewMenu->addAction(TR("Zoom &Out"));
-        zOut->setShortcuts({ QKeySequence(Qt::CTRL | Qt::Key_Minus),
-                             QKeySequence::ZoomOut });
-        connect(zOut, &QAction::triggered, this, &MainWindow::zoomOut);
+        m_zoomOutShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus), this);
+        m_zoomOutShortcut->setContext(Qt::ApplicationShortcut);
+        connect(m_zoomOutShortcut, &QShortcut::activated, this, &MainWindow::zoomOut);
+
+        m_zoomResetShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this);
+        m_zoomResetShortcut->setContext(Qt::ApplicationShortcut);
+        connect(m_zoomResetShortcut, &QShortcut::activated, this, &MainWindow::zoomReset);
     }
-    m_viewMenu->addAction(TR("&Reset Zoom"), QKeySequence("Ctrl+0"), this, &MainWindow::zoomReset);
     m_viewMenu->addSeparator();
     // Auto-save toggle.
     m_actAutoSave = m_viewMenu->addAction(TR("&Auto Save"));
@@ -344,10 +357,11 @@ void MainWindow::createMenus()
             openImageCompare(dlg.leftPath(), dlg.rightPath());
     });
 
-    // ---------- Cloud ----------
-    // "Connect Cloud Drive..." followed by every saved drive; the entries are
-    // (re)built by rebuildCloudMenu() so they stay in sync after add/delete.
-    m_cloudMenu = menuBar()->addMenu(TR("Clou&d"));
+    // ---------- Connect (cloud drives / shared folders / SFTP-FTP) ----------
+    // Three "Connect ..." entries followed by every saved connection; the
+    // entries are (re)built by rebuildCloudMenu() so they stay in sync after
+    // add/delete, regardless of which backend type they are.
+    m_cloudMenu = menuBar()->addMenu(TR("Co&nnect"));
     rebuildCloudMenu();
 
     // ---------- UI Language ----------
@@ -440,18 +454,25 @@ void MainWindow::rebuildCloudMenu()
         return;
     m_cloudMenu->clear();
 
+    // Three distinct "Connect ..." entries, one per CloudConnectDialog mode.
     m_cloudMenu->addAction(TR("&Connect Cloud Drive..."), this,
                            &MainWindow::connectCloudDrive);
+    m_cloudMenu->addAction(TR("Connect S&hared Folder..."), this,
+                           &MainWindow::connectSharedFolder);
+    m_cloudMenu->addAction(TR("Connect SFTP/&FTP..."), this,
+                           &MainWindow::connectSftpFtp);
     m_cloudMenu->addSeparator();
 
+    // Every saved connection (cloud drive, shared folder, or SFTP/FTP) is
+    // listed the same way, e.g. "BaiduPan-dx", "SharedFolder-nas",
+    // "SFTP-server1", each with Open / Reconnect / Edit / Delete.
     const auto &drives = m_cloudDrives.drives();
     if (drives.isEmpty()) {
         QAction *none = m_cloudMenu->addAction(TR("(no connected cloud drives)"));
         none->setEnabled(false);
         return;
     }
-    // One submenu per drive, labelled "BaiduPan-<name>", each offering the
-    // Open / Reconnect / Edit / Delete operations.
+    m_cloudMenu->addSeparator();
     for (int i = 0; i < drives.size(); ++i) {
         QMenu *item = m_cloudMenu->addMenu(drives[i].displayName());
         const int idx = i;
@@ -460,6 +481,18 @@ void MainWindow::rebuildCloudMenu()
         item->addAction(TR("Edit..."), this, [this, idx]() { editSavedCloudDrive(idx); });
         item->addSeparator();
         item->addAction(TR("Delete"), this, [this, idx]() { deleteSavedCloudDrive(idx); });
+    }
+}
+
+// Maps a stored backend id to the CloudConnectDialog mode whose combo box
+// offers it, so editSavedCloudDrive() reopens the dialog in the right mode.
+static CloudConnectDialog::Mode modeForBackend(int backend)
+{
+    switch (backend) {
+    case CB_SmbShare: return CloudConnectDialog::ModeShare;
+    case CB_Sftp:
+    case CB_Ftp:      return CloudConnectDialog::ModeFtp;
+    default:          return CloudConnectDialog::ModeCloud;
     }
 }
 
@@ -1363,7 +1396,7 @@ void MainWindow::openImageCompare(const QString &left, const QString &right)
 // it right away.
 void MainWindow::connectCloudDrive()
 {
-    CloudConnectDialog dlg(this);
+    CloudConnectDialog dlg(CloudConnectDialog::ModeCloud, this);
     if (dlg.exec() != QDialog::Accepted)
         return;
 
@@ -1378,7 +1411,52 @@ void MainWindow::connectCloudDrive()
     delete probe;   // the real provider is created by openCloudTab()
 
     m_cloudDrives.add(cfg);     // persist (tokens encrypted via SecretStore)
-    rebuildCloudMenu();         // show it under Cloud > Connect Cloud Drive...
+    rebuildCloudMenu();         // show it under Connect > Connect Cloud Drive...
+    openSavedCloudDrive(m_cloudDrives.count() - 1);
+}
+
+// Connect a Windows/Samba shared folder (SMB1/CIFS, SMB2, SMB3 — any dialect
+// the server offers; negotiated transparently by the OS once given a UNC
+// path). Saved and listed in the Connect menu exactly like a cloud drive.
+void MainWindow::connectSharedFolder()
+{
+    CloudConnectDialog dlg(CloudConnectDialog::ModeShare, this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    const CloudDriveConfig cfg = dlg.config();
+    CloudProvider *probe = createCloudProvider(cfg, nullptr);
+    if (!probe) {
+        QMessageBox::warning(this, TR("Connect Shared Folder"),
+                             TR("Missing required connection details."));
+        return;
+    }
+    delete probe;
+
+    m_cloudDrives.add(cfg);
+    rebuildCloudMenu();
+    openSavedCloudDrive(m_cloudDrives.count() - 1);
+}
+
+// Connect an SFTP (native libssh2) or plain FTP server. Saved and listed in
+// the Connect menu exactly like a cloud drive / shared folder.
+void MainWindow::connectSftpFtp()
+{
+    CloudConnectDialog dlg(CloudConnectDialog::ModeFtp, this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    const CloudDriveConfig cfg = dlg.config();
+    CloudProvider *probe = createCloudProvider(cfg, nullptr);
+    if (!probe) {
+        QMessageBox::warning(this, TR("Connect SFTP/FTP"),
+                             TR("Missing required connection details."));
+        return;
+    }
+    delete probe;
+
+    m_cloudDrives.add(cfg);
+    rebuildCloudMenu();
     openSavedCloudDrive(m_cloudDrives.count() - 1);
 }
 
@@ -1473,7 +1551,7 @@ void MainWindow::editSavedCloudDrive(int index)
         return;
     const CloudDriveConfig oldCfg = drives.at(index);
 
-    CloudConnectDialog dlg(this);
+    CloudConnectDialog dlg(modeForBackend(oldCfg.backend), this);
     dlg.setConfig(oldCfg);
     if (dlg.exec() != QDialog::Accepted)
         return;
@@ -1634,12 +1712,14 @@ void MainWindow::loadPreferences()
 void MainWindow::about()
 {
     const QString body =
-        "<h3>Terminal++ 1.2</h3>"
+        "<h3>Terminal++ 1.4</h3>"
         "<p>" + TR("A unified Qt 6 application combining:") + "</p>"
         "<ul>"
         "<li><b>" + TR("Code editor") + "</b> &mdash; " +
             TR("multi-tab editor with syntax highlighting, themes, find/replace, "
-               "encodings, column/block edit, clipboard history, auto-save.") + "</li>"
+               "encodings, column/block edit, clipboard history, auto-save, "
+               "a built-in hex viewer/editor, and a tab-bar context menu "
+               "(close / close others / close to the left or right).") + "</li>"
         "<li><b>" + TR("SSH terminal") + "</b> &mdash; " +
             TR("native libssh2 SSH sessions with tmux support and VT100/256-color "
                "rendering; passwords encrypted with Windows DPAPI.") + "</li>"
@@ -1647,6 +1727,10 @@ void MainWindow::about()
             TR("configurable serial console sharing the same ANSI engine.") + "</li>"
         "<li><b>" + TR("File Compare") + "</b> &mdash; " +
             TR("Side-by-side text, folder, hex and picture comparison.") + "</li>"
+        "<li><b>" + TR("Cloud Drives") + "</b> &mdash; " +
+            TR("Baidu Pan and WebDAV browsing, upload/download (files and "
+               "folders), rename, delete, and streaming playback, with a "
+               "Transfers panel showing live progress and history.") + "</li>"
         "</ul>"
         "<p>" + TR("Multi-language UI (9 languages), VS Code-like themes applied "
                    "across all tabs.") + "</p>"
