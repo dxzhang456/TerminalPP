@@ -480,6 +480,8 @@ void I18n::loadTable()
     add("Copy Name",         "复制名称",  "複製名稱",  "Copiar nombre","Copier le nom", "Namen kopieren","Копировать имя",  "名前をコピー",  "이름 복사");
     add("Copy Local Path",   "复制本地路径","複製本機路徑","Copiar ruta local","Copier le chemin local","Lokalen Pfad kopieren","Копировать локальный путь","ローカルパスをコピー","로컬 경로 복사");
     add("Copy Remote Path",  "复制远程路径","複製遠端路徑","Copiar ruta remota","Copier le chemin distant","Remote-Pfad kopieren","Копировать удалённый путь","リモートパスをコピー","원격 경로 복사");
+    add("Copy Status",       "复制状态",  "複製狀態",  "Copiar estado","Copier le statut","Status kopieren","Копировать статус","状態をコピー","상태 복사");
+    add("Copy All",          "复制全部",  "複製全部",  "Copiar todo",  "Tout copier",   "Alles kopieren","Копировать всё",  "すべてコピー",  "모두 복사");
     add("Type",              "类型",      "類型",      "Tipo",         "Type",          "Typ",           "Тип",             "種類",          "유형");
     add("Progress",          "进度",      "進度",      "Progreso",     "Progression",   "Fortschritt",   "Прогресс",        "進捗",          "진행률");
     add("Speed",             "速度",      "速度",      "Velocidad",    "Vitesse",       "Geschwindigkeit","Скорость",       "速度",          "속도");

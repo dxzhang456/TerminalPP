@@ -233,6 +233,32 @@ void TransferPanel::onContextMenu(const QPoint &pos)
     copyMenu->addAction(TRc("Copy Remote Path"), this, [t]() {
         QApplication::clipboard()->setText(t->remotePath);
     });
+    // Copy the current status text (e.g. "Running", "Completed",
+    // "Failed: <error>").
+    copyMenu->addAction(TRc("Copy Status"), this, [t]() {
+        const QString status =
+            (t->state == TransferItem::Failed && !t->error.isEmpty())
+                ? (t->stateText() + ": " + t->error)
+                : t->stateText();
+        QApplication::clipboard()->setText(status);
+    });
+    // Copy a full, human-readable summary of this transfer (all columns).
+    copyMenu->addAction(TRc("Copy All"), this, [t]() {
+        const QString status =
+            (t->state == TransferItem::Failed && !t->error.isEmpty())
+                ? (t->stateText() + ": " + t->error)
+                : t->stateText();
+        const QString all = QStringLiteral(
+                "%1: %2\n%3: %4\n%5: %6\n%7: %8\n%9: %10\n%11: %12\n%13: %14")
+            .arg(TRc("Type"),          t->directionText(),
+                 TRc("Name"),          t->name,
+                 TRc("Cloud"),         t->driveLabel,
+                 TRc("Size"),          humanBytes(t->bytesTotal),
+                 TRc("Copy Local Path"),  t->localPath,
+                 TRc("Copy Remote Path"), t->remotePath,
+                 TRc("Status"),        status);
+        QApplication::clipboard()->setText(all);
+    });
     menu.addSeparator();
     menu.addAction(TRc("Remove"), this,
                    [id]() { TransferManager::instance()->remove(id); });

@@ -435,6 +435,10 @@ void CloudBrowserTab::uploadFolder()
     QString childRemote = m_currentPath;
     if (!childRemote.endsWith('/')) childRemote += '/';
     childRemote += folderName;
+    // Collapse accidental double slashes (root "/" + "/name" -> "//name"),
+    // which some providers (e.g. Baidu xpan) reject as an invalid path.
+    while (childRemote.contains("//"))
+        childRemote.replace("//", "/");
     uploadDirectory(dir, childRemote);
 }
 
@@ -452,6 +456,8 @@ void CloudBrowserTab::uploadDirectory(const QString &localDir, const QString &re
             QString childRemote = remoteParent;
             if (!childRemote.endsWith('/')) childRemote += '/';
             childRemote += fi.fileName();
+            while (childRemote.contains("//"))
+                childRemote.replace("//", "/");
             m_provider->makeDir(remoteParent, fi.fileName());
             uploadDirectory(fi.absoluteFilePath(), childRemote);
         } else {

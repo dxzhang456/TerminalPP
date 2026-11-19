@@ -711,7 +711,12 @@ void BaiduPanProvider::upload(const QString &localPath, const QString &remoteDir
     const QString name = QFileInfo(localPath).fileName();
     QString dir = remoteDir.isEmpty() ? "/" : remoteDir;
     if (!dir.endsWith('/')) dir += '/';
-    const QString remotePath = dir + name;
+    QString remotePath = dir + name;
+    // Collapse any accidental double slashes (e.g. root "/" + "/folder/file"
+    // produced "//folder/file"), which Baidu's xpan API rejects as an invalid
+    // path and reports via an empty uploadid at precreate.
+    while (remotePath.contains("//"))
+        remotePath.replace("//", "/");
 
     QFile f(localPath);
     if (!f.open(QIODevice::ReadOnly)) {
@@ -745,12 +750,29 @@ void BaiduPanProvider::upload(const QString &localPath, const QString &remoteDir
             preReply->deleteLater();
             return;
         }
-        QJsonObject o = QJsonDocument::fromJson(preReply->readAll()).object();
+        const QByteArray preRaw = preReply->readAll();
+        QJsonObject o = QJsonDocument::fromJson(preRaw).object();
         preReply->deleteLater();
         const QString uploadid = o.value("uploadid").toString();
+        const int preErrno = o.value("errno").toInt(0);
         if (uploadid.isEmpty()) {
-            emit errorOccurred(tr("Baidu Pan upload precreate failed (check the "
-                "\"netdisk\" scope and that your app allows uploads)."));
+            // Surface Baidu's actual errno so the failure is diagnosable.
+            // Common causes:
+            //   -6     : access_token invalid / missing the "netdisk" scope
+            //   2 / 31034 : parameter error or request-rate limit
+            //   111    : token expired
+            // errno == 0 but empty uploadid can also mean the file already
+            // exists identically (rapid-upload) — in that case Baidu returns
+            // return_type==2 and the file is already there, so treat it as a
+            // successful upload rather than an error.
+            if (preErrno == 0 && o.value("return_type").toInt() == 2) {
+                emit uploadFinished(localPath, remoteDir);
+                return;
+            }
+            emit errorOccurred(tr("Baidu Pan upload precreate failed (errno=%1). "
+                "Check that the access_token has the \"netdisk\" scope and that "
+                "the target folder exists and your app allows uploads.")
+                .arg(preErrno));
             return;
         }
 
