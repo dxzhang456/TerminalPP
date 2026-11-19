@@ -100,6 +100,14 @@ public:
         emit errorOccurred(tr("Rename not supported by this provider."));
     }
 
+    // Abort any in-flight download/upload this provider is currently running so
+    // a user Cancel/Remove in the Transfers panel stops the transfer right
+    // away. REST providers abort their QNetworkReply (handled by the transfer
+    // manager via the attached reply); worker-thread providers (SFTP/FTP) and
+    // blocking providers (SMB share) override this to set a cancel flag their
+    // copy loop checks. Default is a no-op (nothing extra to abort).
+    virtual void cancelTransfers() {}
+
 signals:
     void listed(const QString &path, const QVector<CloudEntry> &entries);
     void downloadProgress(qint64 received, qint64 total);

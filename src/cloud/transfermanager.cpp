@@ -161,8 +161,14 @@ void TransferManager::cancel(int id)
     t.state = TransferItem::Canceled;
     t.speedBps = 0;
     t.finished = QDateTime::currentDateTime();
+    // REST providers: abort the attached network reply. Worker-thread/blocking
+    // providers (SFTP/FTP/SMB) have no QNetworkReply, so also ask the provider
+    // to abort — this stops the transfer immediately instead of letting the
+    // background copy run to completion.
     if (t.reply)
         t.reply->abort();
+    if (t.provider)
+        t.provider->cancelTransfers();
     t.reply = nullptr;
     emit itemChanged(id);
 }
@@ -171,9 +177,13 @@ void TransferManager::remove(int id)
 {
     int i = indexOf(id);
     if (i < 0) return;
-    // Abort first if somehow still active.
-    if (m_items[i].isActive() && m_items[i].reply)
-        m_items[i].reply->abort();
+    // Abort first if somehow still active (network reply AND provider-level).
+    if (m_items[i].isActive()) {
+        if (m_items[i].reply)
+            m_items[i].reply->abort();
+        if (m_items[i].provider)
+            m_items[i].provider->cancelTransfers();
+    }
     m_items.remove(i);
     emit itemRemoved(id);
 }

@@ -318,21 +318,47 @@ void CloudBrowserTab::onContextMenu(const QPoint &pos)
 }
 
 // ---- actions ----
+// Download `e` to `localPath`, then run `after(localPath)`. The download is
+// registered in the TransferManager so it ALWAYS shows up in the Transfers
+// panel with live progress and can be canceled/removed — this covers temp
+// downloads triggered by Open / Open With / Open-default and the stream
+// fall-back (e.g. an mp4 that cannot be streamed is downloaded first), which
+// previously ran "invisibly" without a panel entry.
 void CloudBrowserTab::downloadThen(const CloudEntry &e, const QString &localPath,
                                    std::function<void(const QString &)> after)
 {
     emit statusMessage(TRc("Downloading %1…").arg(e.name));
-    // One-shot connection for this download.
-    auto *conn = new QMetaObject::Connection();
-    *conn = connect(m_provider, &CloudProvider::downloadFinished, this,
-        [this, conn, after, localPath](const QString &, const QString &lp) {
-            if (lp == localPath) {
-                disconnect(*conn);
-                delete conn;
-                emit statusMessage(TRc("Downloaded to %1").arg(lp));
-                if (after) after(lp);
-            }
+
+    TransferManager *tm = TransferManager::instance();
+    const int id = tm->begin(TransferItem::Download, m_title, e.name,
+                             e.path, localPath, m_provider, e.size);
+
+    auto *pConn = new QMetaObject::Connection();
+    auto *fConn = new QMetaObject::Connection();
+    auto *eConn = new QMetaObject::Connection();
+    auto cleanup = [pConn, fConn, eConn]() {
+        QObject::disconnect(*pConn); QObject::disconnect(*fConn);
+        QObject::disconnect(*eConn);
+        delete pConn; delete fConn; delete eConn;
+    };
+
+    *pConn = connect(m_provider, &CloudProvider::downloadProgress, this,
+        [tm, id](qint64 r, qint64 t) { tm->updateProgress(id, r, t); });
+    *fConn = connect(m_provider, &CloudProvider::downloadFinished, this,
+        [this, tm, id, cleanup, after, localPath](const QString &, const QString &lp) {
+            if (lp != localPath) return;
+            tm->markCompleted(id);
+            cleanup();
+            emit statusMessage(TRc("Downloaded to %1").arg(lp));
+            if (after) after(lp);
         });
+    *eConn = connect(m_provider, &CloudProvider::errorOccurred, this,
+        [tm, id, cleanup](const QString &msg) {
+            tm->markFailed(id, msg);
+            cleanup();
+        });
+
+    tm->markRunning(id);
     m_provider->download(e.path, localPath);
 }
 
@@ -495,7 +521,10 @@ void CloudBrowserTab::actionOpenInternal(const CloudEntry &e)
     const Kind k = classify(e.name);
     const QString local = tempDownloadPath(e.name);
     if (k == Text) {
-        downloadThen(e, local, [this](const QString &lp) { emit openTextFile(lp); });
+        const QString remotePath = e.path;
+        downloadThen(e, local, [this, remotePath](const QString &lp) {
+            emit openTextFile(lp, remotePath, m_title);
+        });
     } else if (k == Image) {
         downloadThen(e, local, [this](const QString &lp) {
             emit openImageFileCompareNone(lp);
@@ -506,7 +535,8 @@ void CloudBrowserTab::actionOpenInternal(const CloudEntry &e)
         // Unknown extension: download to temp, then sniff the bytes. Text-like
         // content opens in the internal editor (properly decoded, so Chinese
         // GBK files are not garbled); real binaries go to the OS default app.
-        downloadThen(e, local, [this](const QString &lp) {
+        const QString remotePath = e.path;
+        downloadThen(e, local, [this, remotePath](const QString &lp) {
             QFile f(lp);
             bool isText = false;
             if (f.open(QIODevice::ReadOnly)) {
@@ -514,7 +544,7 @@ void CloudBrowserTab::actionOpenInternal(const CloudEntry &e)
                 f.close();
             }
             if (isText)
-                emit openTextFile(lp);
+                emit openTextFile(lp, remotePath, m_title);
             else
                 QDesktopServices::openUrl(QUrl::fromLocalFile(lp));
         });
@@ -525,7 +555,10 @@ void CloudBrowserTab::actionOpenInternal(const CloudEntry &e)
 void CloudBrowserTab::actionOpenAsText(const CloudEntry &e)
 {
     const QString local = tempDownloadPath(e.name);
-    downloadThen(e, local, [this](const QString &lp) { emit openTextFile(lp); });
+    const QString remotePath = e.path;
+    downloadThen(e, local, [this, remotePath](const QString &lp) {
+        emit openTextFile(lp, remotePath, m_title);
+    });
 }
 
 void CloudBrowserTab::actionOpenWith(const CloudEntry &e)

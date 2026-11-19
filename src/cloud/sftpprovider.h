@@ -36,6 +36,8 @@ public:
     void makeDir(const QString &remoteDir, const QString &name) override;
     void remove(const QString &remotePath) override;
     void rename(const QString &remotePath, const QString &newName) override;
+    // Signal the worker to abort an in-flight download/upload immediately.
+    void cancelTransfers() override;
 
 private slots:
     void onWorkerListed(const QString &path, const QVector<CloudEntry> &entries);

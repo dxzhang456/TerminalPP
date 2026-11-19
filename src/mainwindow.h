@@ -21,6 +21,7 @@ class SessionManager;
 class CloudBrowserTab;
 class TransferPanel;
 class QShortcut;
+class CloudProvider;
 
 // The application main window. Hosts a central tab widget that can contain:
 //   * Editor tabs (ndd / Notepad-- replica)
@@ -36,6 +37,11 @@ public:
 
     // Open a file into a new editor tab (used by command line + File menu).
     EditorTab *openFile(const QString &path);
+    // Open a local (downloaded) file that originated from a cloud drive /
+    // shared folder / SFTP / FTP connection, remembering where it came from so
+    // Save can offer to push changes back to that remote location.
+    EditorTab *openRemoteFile(const QString &localPath, CloudProvider *provider,
+                              const QString &remotePath, const QString &driveLabel);
 
     // Remove the first tab if it is still the untouched default empty document
     // (used after opening command-line files so no blank tab lingers).
@@ -80,6 +86,9 @@ private slots:
 
     // --- Language / encoding / EOL ---
     void setLanguage(int lang);
+    // Tick the Language-menu entry that matches the active editor's current
+    // (possibly auto-detected) syntax language.
+    void syncLanguageMenu();
     void setEncoding(const QString &enc);
     void setEol(int eol);
 
@@ -143,6 +152,10 @@ private:
     void rebuildRecentMenu();
     QStringList recentFiles() const;
     bool maybeSaveTab(EditorTab *tab);
+    // After a successful local save of a tab opened from a cloud drive /
+    // shared folder / SFTP / FTP, ask the user whether to also push the
+    // change back to the remote origin, and do so if confirmed.
+    void maybeSaveBackToRemote(EditorTab *tab);
 
     // Rebuild the Terminal > Sessions submenu from saved sessions.
     void rebuildSessionsMenu();

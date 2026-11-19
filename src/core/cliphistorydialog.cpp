@@ -30,12 +30,17 @@ ClipHistoryDialog::ClipHistoryDialog(QWidget *parent)
     auto *buttons = new QHBoxLayout();
     auto *pasteBtn = new QPushButton(
         I18n::instance()->tr(QStringLiteral("&Paste")), this);
+    // "Copy" copies the selected entry to the system clipboard WITHOUT closing
+    // the dialog, so the user can pick an old entry and paste it elsewhere.
+    auto *copyBtn = new QPushButton(
+        I18n::instance()->tr(QStringLiteral("&Copy")), this);
     auto *clearBtn = new QPushButton(
         I18n::instance()->tr(QStringLiteral("Clear")), this);
     auto *cancelBtn = new QPushButton(
         I18n::instance()->tr(QStringLiteral("Cancel")), this);
     buttons->addWidget(clearBtn);
     buttons->addStretch(1);
+    buttons->addWidget(copyBtn);
     buttons->addWidget(pasteBtn);
     buttons->addWidget(cancelBtn);
     layout->addLayout(buttons);
@@ -46,6 +51,8 @@ ClipHistoryDialog::ClipHistoryDialog(QWidget *parent)
             this, &ClipHistoryDialog::acceptCurrent);
     connect(pasteBtn, &QPushButton::clicked,
             this, &ClipHistoryDialog::acceptCurrent);
+    connect(copyBtn, &QPushButton::clicked,
+            this, &ClipHistoryDialog::copyCurrent);
     connect(clearBtn, &QPushButton::clicked,
             this, &ClipHistoryDialog::clearHistory);
     connect(cancelBtn, &QPushButton::clicked,
@@ -93,6 +100,20 @@ void ClipHistoryDialog::acceptCurrent()
     if (QClipboard *cb = QApplication::clipboard())
         cb->setText(m_selected);
     accept();
+}
+
+void ClipHistoryDialog::copyCurrent()
+{
+    QListWidgetItem *item = m_list ? m_list->currentItem() : nullptr;
+    if (!item)
+        return;
+    const QString text = item->data(Qt::UserRole).toString();
+    if (text.isEmpty())
+        return;
+    // Copy to the system clipboard but keep the dialog open so the user can
+    // continue browsing / picking other entries.
+    if (QClipboard *cb = QApplication::clipboard())
+        cb->setText(text);
 }
 
 void ClipHistoryDialog::clearHistory()

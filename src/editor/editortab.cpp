@@ -1,5 +1,6 @@
 #include "editortab.h"
 #include "codeeditor.h"
+#include "cloud/cloudprovider.h"   // complete type needed for QPointer<CloudProvider>
 
 #include <QVBoxLayout>
 #include <QFile>
@@ -218,6 +219,34 @@ void EditorTab::detectLanguageFromPath()
 {
     const QString suffix = QFileInfo(m_filePath).suffix();
     m_highlighter->setLanguage(SyntaxHighlighter::languageForExtension(suffix));
+}
+
+// --- Remote origin tracking -------------------------------------------------
+// Implemented here (not inline in the header) so QPointer<CloudProvider> sees
+// the complete CloudProvider type — its internal static_cast needs it.
+void EditorTab::setRemoteOrigin(CloudProvider *provider, const QString &remotePath,
+                                const QString &driveLabel)
+{
+    m_remoteProvider = provider;
+    m_remotePath = remotePath;
+    m_remoteDriveLabel = driveLabel;
+}
+
+void EditorTab::clearRemoteOrigin()
+{
+    m_remoteProvider.clear();
+    m_remotePath.clear();
+    m_remoteDriveLabel.clear();
+}
+
+bool EditorTab::hasRemoteOrigin() const
+{
+    return !m_remoteProvider.isNull() && !m_remotePath.isEmpty();
+}
+
+CloudProvider *EditorTab::remoteProvider() const
+{
+    return m_remoteProvider;
 }
 
 void EditorTab::applyTheme(const EditorTheme &theme)

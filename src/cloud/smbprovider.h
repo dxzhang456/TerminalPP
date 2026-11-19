@@ -50,10 +50,15 @@ public:
     void makeDir(const QString &remoteDir, const QString &name) override;
     void remove(const QString &remotePath) override;
     void rename(const QString &remotePath, const QString &newName) override;
+    // Abort an in-flight copy loop (download/upload). The SMB copy runs on the
+    // GUI thread in 1 MiB chunks; the loop pumps events between chunks and
+    // checks this flag so Cancel/Remove stops it promptly.
+    void cancelTransfers() override { m_cancel = true; }
 
 private:
     QString absPath(const QString &relPath) const;
     QString m_base, m_user, m_pass;
+    bool m_cancel = false;   // set by cancelTransfers(); polled by copy loops
 };
 
 #endif // SMBPROVIDER_H

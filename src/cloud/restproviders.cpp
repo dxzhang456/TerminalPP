@@ -23,6 +23,34 @@ RestCloudBase::RestCloudBase(QObject *parent)
     m_net = new QNetworkAccessManager(this);
 }
 
+void RestCloudBase::trackReply(QNetworkReply *reply)
+{
+    if (reply)
+        m_activeReplies.append(reply);
+}
+
+void RestCloudBase::untrackReply(QNetworkReply *reply)
+{
+    m_activeReplies.removeAll(reply);
+    // Also drop any replies that have already been destroyed (QPointer == null).
+    for (int i = m_activeReplies.size() - 1; i >= 0; --i)
+        if (m_activeReplies[i].isNull())
+            m_activeReplies.removeAt(i);
+}
+
+void RestCloudBase::cancelTransfers()
+{
+    // Abort every in-flight download/upload. abort() triggers each reply's
+    // finished handler with an OperationCanceledError, which closes its file
+    // and cleans up; the transfer manager has already marked the item Canceled.
+    const auto replies = m_activeReplies;   // copy: abort() may mutate the list
+    for (const QPointer<QNetworkReply> &r : replies) {
+        if (!r.isNull() && r->isRunning())
+            r->abort();
+    }
+    m_activeReplies.clear();
+}
+
 void RestCloudBase::downloadUrl(const QString &url, const QString &remotePath,
                                 const QString &localPath,
                                 const QList<QPair<QByteArray, QByteArray>> &headers)
@@ -37,9 +65,11 @@ void RestCloudBase::downloadUrl(const QString &url, const QString &remotePath,
         req.setRawHeader("Authorization", ("Bearer " + m_token).toUtf8());
 
     QNetworkReply *reply = m_net->get(req);
+    trackReply(reply);
     auto *file = new QFile(localPath, reply);
     if (!file->open(QIODevice::WriteOnly)) {
         emit errorOccurred(tr("Cannot write local file: %1").arg(localPath));
+        untrackReply(reply);
         reply->deleteLater();
         return;
     }
@@ -53,10 +83,18 @@ void RestCloudBase::downloadUrl(const QString &url, const QString &remotePath,
         file->write(reply->readAll());
         file->flush();
         file->close();
-        if (reply->error() != QNetworkReply::NoError)
-            emit errorOccurred(reply->errorString());
-        else
+        untrackReply(reply);
+        if (reply->error() != QNetworkReply::NoError) {
+            // A user Cancel aborts the reply (OperationCanceledError); remove
+            // the partially-written local file and stay silent — the transfer
+            // manager already marked the item Canceled.
+            if (reply->error() == QNetworkReply::OperationCanceledError)
+                QFile::remove(localPath);
+            else
+                emit errorOccurred(reply->errorString());
+        } else {
             emit downloadFinished(remotePath, localPath);
+        }
         reply->deleteLater();
     });
 }
@@ -83,6 +121,7 @@ void RestCloudBase::uploadPut(const QString &url, const QString &localPath,
         req.setRawHeader("Authorization", ("Bearer " + m_token).toUtf8());
 
     QNetworkReply *reply = m_net->put(req, file);
+    trackReply(reply);
     file->setParent(reply);   // the file lives as long as the reply
     connect(reply, &QNetworkReply::uploadProgress, this,
             [this, localPath](qint64 sent, qint64 total) {
@@ -90,10 +129,13 @@ void RestCloudBase::uploadPut(const QString &url, const QString &localPath,
     });
     connect(reply, &QNetworkReply::finished, this,
             [this, reply, localPath, remoteDir]() {
-        if (reply->error() != QNetworkReply::NoError)
-            emit errorOccurred(reply->errorString());
-        else
+        untrackReply(reply);
+        if (reply->error() != QNetworkReply::NoError) {
+            if (reply->error() != QNetworkReply::OperationCanceledError)
+                emit errorOccurred(reply->errorString());
+        } else {
             emit uploadFinished(localPath, remoteDir);
+        }
         reply->deleteLater();
     });
 }

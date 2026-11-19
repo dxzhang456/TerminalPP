@@ -21,6 +21,7 @@
 #include "compare/imagecomparetab.h"
 #include "cloud/cloudconnectdialog.h"
 #include "cloud/cloudbrowsertab.h"
+#include "cloud/cloudprovider.h"
 #include "cloud/transferpanel.h"
 
 #include <QTabWidget>
@@ -297,10 +298,13 @@ void MainWindow::createMenus()
     for (const auto &li : langs) {
         QAction *a = m_langSyntaxMenu->addAction(li.name);
         a->setCheckable(true);
+        a->setData(li.id);   // remember which language this action selects
         m_langGroup->addAction(a);
         int id = li.id;
         connect(a, &QAction::triggered, this, [this, id]() { setLanguage(id); });
     }
+    // Reflect the active tab's (auto-)detected language in the menu checkmark.
+    syncLanguageMenu();
 
     // ---------- Encoding ----------
     m_encMenu = menuBar()->addMenu(TR("E&ncoding"));
@@ -605,6 +609,76 @@ EditorTab *MainWindow::openFile(const QString &path)
     return tab;
 }
 
+// Open a locally-downloaded file that originated from a cloud drive / shared
+// folder / SFTP / FTP browser tab. Identical to openFile() but additionally
+// records the remote origin on the tab so saveFile()/saveFileAs() can offer
+// to push the change back to that same connection.
+EditorTab *MainWindow::openRemoteFile(const QString &localPath, CloudProvider *provider,
+                                      const QString &remotePath, const QString &driveLabel)
+{
+    EditorTab *tab = openFile(localPath);
+    if (tab)
+        tab->setRemoteOrigin(provider, remotePath, driveLabel);
+    return tab;
+}
+
+// After a successful local save of a tab that was opened from a cloud drive /
+// shared folder / SFTP / FTP connection, ask whether to also push the change
+// back to that remote location. Confirm -> upload; decline -> local-only save
+// (exactly as requested: "保存的时候本地保存了，但是要对话框问一下是否更新到
+// 网盘/ftp/sftp/window share，确定就更新到远程，如果否就是保存本地不更新到远程").
+void MainWindow::maybeSaveBackToRemote(EditorTab *tab)
+{
+    if (!tab || !tab->hasRemoteOrigin())
+        return;
+
+    CloudProvider *provider = tab->remoteProvider();
+    const QString remotePath = tab->remotePath();
+    const QString driveLabel = tab->remoteDriveLabel();
+    const QString localPath = tab->filePath();
+
+    const auto ret = QMessageBox::question(
+        this, TR("Save to Remote?"),
+        TR("\"%1\" was opened from %2.\nDo you also want to update it there?")
+            .arg(QFileInfo(localPath).fileName(), driveLabel),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (ret != QMessageBox::Yes)
+        return;   // local-only save; remote origin is kept for next time
+
+    // Upload the just-saved local file back over the same remote path. Most
+    // providers overwrite-on-conflict by default (upload() recreates the file
+    // at remoteDir + filename, and remotePath already IS that full path/dir
+    // for a plain overwrite, so pass its parent directory).
+    QString remoteDir = remotePath;
+    int slash = remoteDir.lastIndexOf('/');
+    if (slash >= 0) remoteDir = remoteDir.left(slash);
+    if (remoteDir.isEmpty()) remoteDir = "/";
+
+    auto *fConn = new QMetaObject::Connection();
+    auto *eConn = new QMetaObject::Connection();
+    auto cleanup = [fConn, eConn]() {
+        QObject::disconnect(*fConn);
+        QObject::disconnect(*eConn);
+        delete fConn; delete eConn;
+    };
+    *fConn = connect(provider, &CloudProvider::uploadFinished, this,
+        [this, cleanup, localPath, driveLabel](const QString &lp, const QString &) {
+            if (lp != localPath) return;
+            cleanup();
+            statusBar()->showMessage(TR("Updated %1 on %2").arg(
+                QFileInfo(lp).fileName(), driveLabel), 3000);
+        });
+    *eConn = connect(provider, &CloudProvider::errorOccurred, this,
+        [this, cleanup](const QString &msg) {
+            cleanup();
+            QMessageBox::warning(this, TR("Save to Remote?"),
+                TR("Failed to update the remote copy:\n%1").arg(msg));
+        });
+    statusBar()->showMessage(TR("Updating %1 on %2…").arg(
+        QFileInfo(localPath).fileName(), driveLabel), 3000);
+    provider->upload(localPath, remoteDir);
+}
+
 // --------------------------------------------------------------------------
 // Recent files (File > Open Recent), capped at 20, persisted in QSettings.
 // --------------------------------------------------------------------------
@@ -739,6 +813,7 @@ bool MainWindow::saveFile()
     }
     statusBar()->showMessage(TR("Saved %1").arg(tab->filePath()), 3000);
     updateWindowTitle();
+    maybeSaveBackToRemote(tab);
     return true;
 }
 
@@ -775,6 +850,7 @@ bool MainWindow::saveFileAs()
     statusBar()->showMessage(TR("Saved %1").arg(tab->filePath()), 3000);
     updateWindowTitle();
     updateStatusBar();
+    maybeSaveBackToRemote(tab);
     return true;
 }
 
@@ -1052,7 +1128,36 @@ void MainWindow::setLanguage(int lang)
     if (!t)
         return;
     t->highlighter()->setLanguage(static_cast<SyntaxHighlighter::Language>(lang));
+    syncLanguageMenu();
     updateStatusBar();
+}
+
+// Tick the Language-menu entry matching the active editor's current (possibly
+// auto-detected from the file extension) syntax language. Opening a.py checks
+// "Python", a.cpp checks "C/C++", etc. For non-editor tabs nothing is checked.
+void MainWindow::syncLanguageMenu()
+{
+    if (!m_langGroup)
+        return;
+    EditorTab *t = currentEditorTab();
+    const int current = t ? static_cast<int>(t->highlighter()->language()) : -1;
+    const QList<QAction *> actions = m_langGroup->actions();
+    for (QAction *a : actions) {
+        const bool match = (a->data().toInt() == current);
+        a->blockSignals(true);   // avoid re-triggering setLanguage()
+        a->setChecked(match);
+        a->blockSignals(false);
+    }
+    // When no editor tab is active, clear any checkmark.
+    if (current < 0 && m_langGroup->checkedAction()) {
+        QAction *checked = m_langGroup->checkedAction();
+        checked->blockSignals(true);
+        // QActionGroup is exclusive; temporarily allow unchecking all.
+        m_langGroup->setExclusive(false);
+        checked->setChecked(false);
+        m_langGroup->setExclusive(true);
+        checked->blockSignals(false);
+    }
 }
 
 void MainWindow::setEncoding(const QString &enc)
@@ -1478,9 +1583,12 @@ CloudBrowserTab *MainWindow::openCloudTab(const CloudDriveConfig &cfg)
     connect(tab, &CloudBrowserTab::statusMessage, this, [this](const QString &m) {
         statusBar()->showMessage(m, 4000);
     });
-    // A text file downloaded from the cloud opens in an internal editor tab.
-    connect(tab, &CloudBrowserTab::openTextFile, this, [this](const QString &lp) {
-        openFile(lp);
+    // A text file downloaded from the cloud opens in an internal editor tab,
+    // remembering its remote origin so Save can offer to push it back.
+    connect(tab, &CloudBrowserTab::openTextFile, this,
+            [this, tab](const QString &lp, const QString &remotePath,
+                       const QString &driveLabel) {
+        openRemoteFile(lp, tab->provider(), remotePath, driveLabel);
     });
     // An image file downloaded from the cloud opens in a picture view (compared
     // against itself so the single-image viewer with zoom/pan is reused).
@@ -1776,6 +1884,9 @@ void MainWindow::updateStatusBar()
     m_langLabel->setText(SyntaxHighlighter::languageName(t->highlighter()->language()));
     m_encLabel->setText(t->encoding());
     m_eolLabel->setText(t->eolName());
+
+    // Keep the Language menu's checkmark on the active tab's detected language.
+    syncLanguageMenu();
 
     // Reflect the active editor's column (block) edit state.
     if (m_colLabel)

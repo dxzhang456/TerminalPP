@@ -20,6 +20,7 @@ public:
 private slots:
     void refresh();
     void acceptCurrent();
+    void copyCurrent();    // copy the selected entry to the clipboard only
     void clearHistory();
 
 private:

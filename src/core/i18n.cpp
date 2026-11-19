@@ -445,6 +445,27 @@ void I18n::loadTable()
     add("Delete \"%1\"?",    "确定删除 \"%1\"？","確定刪除 \"%1\"？","¿Eliminar \"%1\"?","Supprimer \"%1\" ?","\"%1\" löschen?","Удалить \"%1\"?","\"%1\" を削除しますか？","\"%1\" 을(를) 삭제할까요?");
     add("Deleted \"%1\".",   "已删除 \"%1\"。","已刪除 \"%1\"。","Se eliminó \"%1\".","\"%1\" supprimé.","\"%1\" gelöscht.","Удалено \"%1\".","\"%1\" を削除しました。","\"%1\" 삭제됨.");
     add("Delete failed: %1", "删除失败：%1","刪除失敗：%1","Error al eliminar: %1","Échec de la suppression : %1","Löschen fehlgeschlagen: %1","Ошибка удаления: %1","削除に失敗しました：%1","삭제 실패: %1");
+    add("Save to Remote?",   "保存到远程？","儲存到遠端？","¿Guardar en remoto?","Enregistrer à distance ?","Auf Remote speichern?","Сохранить на удалённый сервер?","リモートに保存しますか？","원격에 저장할까요?");
+    add("\"%1\" was opened from %2.\nDo you also want to update it there?",
+        "\"%1\" 是从 %2 打开的。\n是否同时更新到那里？",
+        "\"%1\" 是從 %2 開啟的。\n是否同時更新到那裡？",
+        "\"%1\" se abrió desde %2.\n¿Desea también actualizarlo allí?",
+        "\"%1\" a été ouvert depuis %2.\nVoulez-vous aussi le mettre à jour là-bas ?",
+        "\"%1\" wurde von %2 geöffnet.\nMöchten Sie es dort auch aktualisieren?",
+        "\"%1\" был открыт из %2.\nХотите также обновить его там?",
+        "\"%1\" は %2 から開かれました。\nそこも更新しますか？",
+        "\"%1\" 은(는) %2 에서 열렸습니다.\n그곳도 업데이트할까요?");
+    add("Updated %1 on %2",  "已更新 %1 到 %2","已更新 %1 到 %2","Se actualizó %1 en %2","%1 mis à jour sur %2","%1 auf %2 aktualisiert","Обновлено %1 на %2","%1 を %2 で更新しました","%1 을(를) %2 에 업데이트함");
+    add("Updating %1 on %2…","正在更新 %1 到 %2…","正在更新 %1 到 %2…","Actualizando %1 en %2…","Mise à jour de %1 sur %2…","%1 wird auf %2 aktualisiert…","Обновление %1 на %2…","%1 を %2 で更新中…","%1 을(를) %2 에 업데이트 중…");
+    add("Failed to update the remote copy:\n%1",
+        "更新远程副本失败：\n%1",
+        "更新遠端副本失敗：\n%1",
+        "No se pudo actualizar la copia remota:\n%1",
+        "Échec de la mise à jour de la copie distante :\n%1",
+        "Aktualisierung der Remote-Kopie fehlgeschlagen:\n%1",
+        "Не удалось обновить удалённую копию:\n%1",
+        "リモートコピーの更新に失敗しました：\n%1",
+        "원격 복사본 업데이트 실패:\n%1");
     add("Renamed \"%1\" to \"%2\".",
         "已将 \"%1\" 重命名为 \"%2\"。",
         "已將 \"%1\" 重新命名為 \"%2\"。",
@@ -626,6 +647,61 @@ void I18n::loadTable()
     add("Ln %1, Col %2",     "行 %1, 列 %2","行 %1, 欄 %2","Ln %1, Col %2","Lg %1, Col %2","Z %1, Sp %2","Стр %1, Стлб %2","行 %1, 列 %2","행 %1, 열 %2");
     add("new",               "新建",      "新增",      "nuevo",        "nouveau",       "neu",           "новый",           "新規",          "새 파일");
     add("untitled",          "未命名",    "未命名",    "sin título",   "sans titre",    "unbenannt",     "без имени",       "無題",          "제목 없음");
+
+    // ---- Editor/save/session messages (status bar + message boxes) ----
+    add("Open",              "打开",      "開啟",      "Abrir",        "Ouvrir",        "Öffnen",        "Открыть",         "開く",          "열기");
+    add("Save",              "保存",      "儲存",      "Guardar",      "Enregistrer",   "Speichern",     "Сохранить",       "保存",          "저장");
+    add("Cannot open file:\n%1",
+        "无法打开文件：\n%1","無法開啟檔案：\n%1","No se puede abrir el archivo:\n%1",
+        "Impossible d'ouvrir le fichier :\n%1","Datei kann nicht geöffnet werden:\n%1",
+        "Не удалось открыть файл:\n%1","ファイルを開けません：\n%1","파일을 열 수 없습니다:\n%1");
+    add("Cannot write file.",
+        "无法写入文件。","無法寫入檔案。","No se puede escribir el archivo.",
+        "Impossible d'écrire le fichier.","Datei kann nicht geschrieben werden.",
+        "Не удалось записать файл.","ファイルを書き込めません。","파일을 쓸 수 없습니다.");
+    add("Saved %1",          "已保存 %1", "已儲存 %1", "Guardado %1",  "Enregistré %1", "%1 gespeichert","Сохранено %1",    "%1 を保存しました","%1 저장됨");
+    add("Terminal++",        "Terminal++","Terminal++","Terminal++",  "Terminal++",    "Terminal++",    "Terminal++",      "Terminal++",    "Terminal++");
+    add("The document \"%1\" has unsaved changes.\nDo you want to save?",
+        "文档 \"%1\" 有未保存的更改。\n是否要保存？",
+        "文件 \"%1\" 有未儲存的變更。\n是否要儲存？",
+        "El documento \"%1\" tiene cambios sin guardar.\n¿Desea guardar?",
+        "Le document \"%1\" a des modifications non enregistrées.\nVoulez-vous enregistrer ?",
+        "Das Dokument \"%1\" hat ungespeicherte Änderungen.\nMöchten Sie speichern?",
+        "Документ \"%1\" содержит несохранённые изменения.\nСохранить?",
+        "ドキュメント \"%1\" に未保存の変更があります。\n保存しますか？",
+        "문서 \"%1\" 에 저장되지 않은 변경 사항이 있습니다.\n저장할까요?");
+    add("Host is required.", "必须填写主机。","必須填寫主機。","El host es obligatorio.","L'hôte est requis.","Host ist erforderlich.","Требуется указать хост.","ホストは必須です。","호스트는 필수입니다.");
+    add("Serial",            "串口",      "序列",      "Serie",        "Série",         "Seriell",       "Serial",          "シリアル",      "시리얼");
+    add("No serial port selected.","未选择串口。","未選擇序列埠。","No se seleccionó ningún puerto serie.","Aucun port série sélectionné.","Kein serieller Port ausgewählt.","Последовательный порт не выбран.","シリアルポートが選択されていません。","시리얼 포트가 선택되지 않았습니다.");
+    add("Delete Session",    "删除会话",  "刪除工作階段","Eliminar sesión","Supprimer la session","Sitzung löschen","Удалить сеанс","セッションを削除","세션 삭제");
+    add("Delete SSH session \"%1\"?",
+        "确定删除 SSH 会话 \"%1\"？","確定刪除 SSH 工作階段 \"%1\"？","¿Eliminar la sesión SSH \"%1\"?",
+        "Supprimer la session SSH \"%1\" ?","SSH-Sitzung \"%1\" löschen?","Удалить SSH-сеанс \"%1\"?",
+        "SSH セッション \"%1\" を削除しますか？","SSH 세션 \"%1\" 을(를) 삭제할까요?");
+    add("Delete serial session \"%1\"?",
+        "确定删除串口会话 \"%1\"？","確定刪除序列工作階段 \"%1\"？","¿Eliminar la sesión serie \"%1\"?",
+        "Supprimer la session série \"%1\" ?","Seriell-Sitzung \"%1\" löschen?","Удалить Serial-сеанс \"%1\"?",
+        "シリアルセッション \"%1\" を削除しますか？","시리얼 세션 \"%1\" 을(를) 삭제할까요?");
+    add(" [closed]",         " [已关闭]", " [已關閉]", " [cerrado]",   " [fermé]",      " [geschlossen]"," [закрыто]",      " [切断]",       " [닫힘]");
+    add("Theme: %1",         "主题：%1",  "佈景主題：%1","Tema: %1",    "Thème : %1",    "Design: %1",    "Тема: %1",        "テーマ: %1",    "테마: %1");
+    add("Auto-save enabled (every %1s)",
+        "已启用自动保存（每 %1 秒）","已啟用自動儲存（每 %1 秒）","Autoguardado activado (cada %1s)",
+        "Enregistrement auto activé (toutes les %1s)","Autospeichern aktiviert (alle %1s)",
+        "Автосохранение включено (каждые %1с)","自動保存を有効化（%1 秒ごと）","자동 저장 켜짐(%1초마다)");
+    add("Auto-save disabled","已禁用自动保存","已停用自動儲存","Autoguardado desactivado","Enregistrement auto désactivé","Autospeichern deaktiviert","Автосохранение выключено","自動保存を無効化","자동 저장 꺼짐");
+    add("Auto-saved %1 file(s)","已自动保存 %1 个文件","已自動儲存 %1 個檔案","Autoguardado %1 archivo(s)","%1 fichier(s) enregistré(s) auto","%1 Datei(en) automatisch gespeichert","Автосохранено файлов: %1","%1 件を自動保存しました","%1개 파일 자동 저장됨");
+    add("Column (block) edit mode — type/Delete/Ctrl+C/Ctrl+V across lines, Esc to exit",
+        "列（块）编辑模式 — 可跨行 输入/删除/Ctrl+C/Ctrl+V，按 Esc 退出",
+        "欄（區塊）編輯模式 — 可跨行 輸入/刪除/Ctrl+C/Ctrl+V，按 Esc 離開",
+        "Modo de edición de columna (bloque) — escribir/Supr/Ctrl+C/Ctrl+V entre líneas, Esc para salir",
+        "Mode d'édition colonne (bloc) — saisir/Suppr/Ctrl+C/Ctrl+V sur plusieurs lignes, Échap pour quitter",
+        "Spalten-/Blockbearbeitungsmodus — Tippen/Entf/Strg+C/Strg+V über Zeilen, Esc zum Beenden",
+        "Режим редактирования столбца (блока) — ввод/Delete/Ctrl+C/Ctrl+V по строкам, Esc для выхода",
+        "列（ブロック）編集モード — 複数行で 入力/Delete/Ctrl+C/Ctrl+V、Esc で終了",
+        "열(블록) 편집 모드 — 여러 줄에서 입력/Delete/Ctrl+C/Ctrl+V, Esc로 종료");
+    add("Cloud",             "云盘",      "雲端",      "Nube",         "Cloud",         "Cloud",         "Облако",          "クラウド",      "클라우드");
+    add("&Copy",             "复制(&C)",  "複製(&C)",  "&Copiar",      "&Copier",       "&Kopieren",     "&Копировать",     "コピー(&C)",    "복사(&C)");
+    add("&Paste",            "粘贴(&P)",  "貼上(&P)",  "&Pegar",       "C&oller",       "&Einfügen",     "&Вставить",       "貼り付け(&P)",  "붙여넣기(&P)");
 
     // ---- Dialogs / messages ----
     add("Open Files",        "打开文件",  "開啟檔案",  "Abrir archivos","Ouvrir des fichiers","Dateien öffnen","Открыть файлы","ファイルを開く","파일 열기");

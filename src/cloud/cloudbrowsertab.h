@@ -29,11 +29,17 @@ public:
 
     void applyTheme(const EditorTheme &theme);
     QString title() const { return m_title; }
+    // Exposes the provider so the host (MainWindow) can wire a "save back to
+    // remote" action on text files opened from this tab. Not owned by caller.
+    CloudProvider *provider() const { return m_provider; }
 
 signals:
     void statusMessage(const QString &msg);
     // Ask the host (MainWindow) to open a downloaded local file internally.
-    void openTextFile(const QString &localPath);
+    // `remotePath` + `driveLabel` let the host remember where the file came
+    // from, so Save can offer to push changes back to this same connection.
+    void openTextFile(const QString &localPath, const QString &remotePath,
+                      const QString &driveLabel);
     void openImageFileCompareNone(const QString &localPath); // open image viewer
 
 public slots:

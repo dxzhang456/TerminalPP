@@ -8,6 +8,8 @@
 #include <QRegularExpression>
 #include <QStringList>
 
+#include <atomic>
+
 // ===========================================================================
 //  FtpWorker — owns the control-channel QTcpSocket; lives on its own thread.
 //  Uses simple blocking reads (waitForReadyRead/waitForConnected) since this
@@ -22,6 +24,10 @@ public:
         : m_host(host), m_port(port), m_user(user), m_pass(pass) {}
 
     ~FtpWorker() override { closeAll(); }
+
+    // Set from the provider (GUI) thread when the user cancels; the blocking
+    // download/upload loops poll it and bail out. Atomic => lock-free & safe.
+    void requestCancel() { m_cancel.store(true); }
 
 public slots:
     void doList(const QString &path)
@@ -82,6 +88,7 @@ public slots:
 
     void doDownload(const QString &remotePath, const QString &localPath)
     {
+        m_cancel.store(false);              // fresh operation
         if (!ensureConnected()) return;
         QTcpSocket *data = openPassiveData();
         if (!data) { emit error(tr("Cannot open FTP data connection.")); return; }
@@ -107,6 +114,12 @@ public slots:
         }
         qint64 done = 0;
         while (data->state() != QAbstractSocket::UnconnectedState || data->bytesAvailable() > 0) {
+            if (m_cancel.load()) {          // user canceled -> stop immediately
+                dst.close();
+                data->abort(); delete data;
+                dst.remove();               // drop the partial file
+                return;                     // silent: manager already marked it
+            }
             if (!data->waitForReadyRead(5000)) {
                 if (data->state() == QAbstractSocket::UnconnectedState) break;
                 continue;
@@ -125,6 +138,7 @@ public slots:
 
     void doUpload(const QString &localPath, const QString &remoteDir)
     {
+        m_cancel.store(false);              // fresh operation
         if (!ensureConnected()) return;
         QFile src(localPath);
         if (!src.open(QIODevice::ReadOnly)) {
@@ -150,6 +164,11 @@ public slots:
         const qint64 total = src.size();
         qint64 done = 0;
         while (!src.atEnd()) {
+            if (m_cancel.load()) {          // user canceled -> stop immediately
+                src.close();
+                data->abort(); delete data;
+                return;
+            }
             QByteArray chunk = src.read(65536);
             data->write(chunk);
             data->waitForBytesWritten(5000);
@@ -329,6 +348,7 @@ private:
     QString m_host, m_user, m_pass;
     int m_port;
     QTcpSocket *m_ctrl = nullptr;
+    std::atomic_bool m_cancel { false };   // set by requestCancel() to abort I/O
 };
 
 // ===========================================================================
@@ -409,6 +429,14 @@ void FtpProvider::rename(const QString &remotePath, const QString &newName)
     ensureWorker();
     QMetaObject::invokeMethod(m_worker, "doRename", Qt::QueuedConnection,
                               Q_ARG(QString, remotePath), Q_ARG(QString, newName));
+}
+
+void FtpProvider::cancelTransfers()
+{
+    // The worker runs a blocking read/write loop; setting the atomic cancel
+    // flag (thread-safe) makes that loop bail out on its next iteration.
+    if (m_worker)
+        m_worker->requestCancel();
 }
 
 void FtpProvider::onWorkerListed(const QString &path, const QVector<CloudEntry> &entries)

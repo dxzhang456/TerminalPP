@@ -6,6 +6,8 @@
 #include <QDateTime>
 #include <QDir>
 
+#include <atomic>
+
 #include <libssh2.h>
 #include <libssh2_sftp.h>
 
@@ -41,6 +43,11 @@ public:
         : m_host(host), m_port(port), m_user(user), m_pass(pass), m_keyPath(keyPath) {}
 
     ~SftpWorker() override { closeAll(); }
+
+    // Set from the provider (GUI) thread when the user cancels; the blocking
+    // download/upload loops below poll it and bail out. std::atomic makes the
+    // cross-thread write safe without a lock.
+    void requestCancel() { m_cancel.store(true); }
 
 public slots:
     void doList(const QString &path)
@@ -79,6 +86,7 @@ public slots:
 
     void doDownload(const QString &remotePath, const QString &localPath)
     {
+        m_cancel.store(false);           // fresh operation
         if (!ensureConnected()) return;
         LIBSSH2_SFTP_HANDLE *fh = libssh2_sftp_open(
             m_sftp, remotePath.toUtf8().constData(), LIBSSH2_FXF_READ, 0);
@@ -101,6 +109,12 @@ public slots:
         qint64 done = 0;
         ssize_t n;
         while ((n = libssh2_sftp_read(fh, buf, sizeof(buf))) > 0) {
+            if (m_cancel.load()) {        // user canceled -> stop immediately
+                dst.close();
+                libssh2_sftp_close(fh);
+                dst.remove();             // drop the partial file
+                return;                   // silent: manager already marked it
+            }
             dst.write(buf, n);
             done += n;
             emit downloadProgress(done, total);
@@ -116,6 +130,7 @@ public slots:
 
     void doUpload(const QString &localPath, const QString &remoteDir)
     {
+        m_cancel.store(false);           // fresh operation
         if (!ensureConnected()) return;
         QFile src(localPath);
         if (!src.open(QIODevice::ReadOnly)) {
@@ -140,6 +155,11 @@ public slots:
         const qint64 total = src.size();
         qint64 done = 0;
         while (!src.atEnd()) {
+            if (m_cancel.load()) {        // user canceled -> stop immediately
+                libssh2_sftp_close(fh);
+                src.close();
+                return;
+            }
             QByteArray chunk = src.read(65536);
             const char *p = chunk.constData();
             qint64 remaining = chunk.size();
@@ -342,6 +362,7 @@ private:
     LIBSSH2_SESSION *m_session = nullptr;
     LIBSSH2_SFTP *m_sftp = nullptr;
     qintptr m_socket = -1;
+    std::atomic_bool m_cancel { false };   // set by requestCancel() to abort I/O
 };
 
 // ===========================================================================
@@ -426,6 +447,15 @@ void SftpProvider::rename(const QString &remotePath, const QString &newName)
     ensureWorker();
     QMetaObject::invokeMethod(m_worker, "doRename", Qt::QueuedConnection,
                               Q_ARG(QString, remotePath), Q_ARG(QString, newName));
+}
+
+void SftpProvider::cancelTransfers()
+{
+    // The worker runs a blocking read/write loop; setting the atomic cancel
+    // flag (thread-safe) makes that loop bail out on its next iteration. Safe
+    // to call even if no worker exists yet.
+    if (m_worker)
+        m_worker->requestCancel();
 }
 
 void SftpProvider::onWorkerListed(const QString &path, const QVector<CloudEntry> &entries)

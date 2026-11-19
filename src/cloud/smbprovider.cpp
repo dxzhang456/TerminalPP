@@ -6,6 +6,7 @@
 #include <QDateTime>
 #include <QTimer>
 #include <QUrl>
+#include <QCoreApplication>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -94,6 +95,7 @@ void SmbShareProvider::download(const QString &remotePath, const QString &localP
 {
     ensureConnected(m_base, m_user, m_pass);
     const QString full = absPath(remotePath);
+    m_cancel = false;   // fresh operation
     QTimer::singleShot(0, this, [this, remotePath, localPath, full]() {
         QFile src(full);
         if (!src.open(QIODevice::ReadOnly)) {
@@ -110,6 +112,16 @@ void SmbShareProvider::download(const QString &remotePath, const QString &localP
         qint64 done = 0;
         const qint64 chunk = 1 << 20; // 1 MiB chunks for progress reporting
         while (!src.atEnd()) {
+            // Pump the event loop so a Cancel/Remove click can flip m_cancel
+            // between chunks (the copy otherwise runs on the GUI thread).
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+            if (m_cancel) {                // user canceled -> stop immediately
+                src.close();
+                dst.close();
+                dst.remove();              // drop the partial file
+                m_cancel = false;          // reset for the next transfer
+                return;                    // silent: manager already marked it
+            }
             QByteArray buf = src.read(chunk);
             dst.write(buf);
             done += buf.size();
@@ -140,6 +152,7 @@ void SmbShareProvider::upload(const QString &localPath, const QString &remoteDir
     rel += name;
     const QString full = absPath(rel);
 
+    m_cancel = false;   // fresh operation
     QTimer::singleShot(0, this, [this, localPath, remoteDir, full]() {
         QFile src(localPath);
         if (!src.open(QIODevice::ReadOnly)) {
@@ -156,6 +169,14 @@ void SmbShareProvider::upload(const QString &localPath, const QString &remoteDir
         qint64 done = 0;
         const qint64 chunk = 1 << 20;
         while (!src.atEnd()) {
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+            if (m_cancel) {                // user canceled -> stop immediately
+                src.close();
+                dst.close();
+                dst.remove();              // drop the partial remote file
+                m_cancel = false;          // reset for the next transfer
+                return;
+            }
             QByteArray buf = src.read(chunk);
             dst.write(buf);
             done += buf.size();

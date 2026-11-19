@@ -4,9 +4,12 @@
 #include "cloudprovider.h"
 #include <QString>
 #include <QHash>
+#include <QList>
+#include <QPointer>
 #include <functional>
 
 class QNetworkAccessManager;
+class QNetworkReply;
 
 // ---------------------------------------------------------------------------
 // Token-based REST cloud providers. Each subclass speaks its service's HTTP
@@ -25,9 +28,20 @@ public:
     void setAccessToken(const QString &token) { m_token = token; }
     QString accessToken() const { return m_token; }
 
+    // Abort every in-flight download/upload reply this provider started so a
+    // user Cancel/Remove stops the transfer immediately.
+    void cancelTransfers() override;
+
 protected:
     QNetworkAccessManager *m_net = nullptr;
     QString m_token;
+    // Replies currently in flight (download/upload); used by cancelTransfers().
+    // QPointer entries auto-null when a reply is deleted, so stale ones are
+    // skipped safely.
+    QList<QPointer<QNetworkReply>> m_activeReplies;
+    // Remember + forget an in-flight reply.
+    void trackReply(QNetworkReply *reply);
+    void untrackReply(QNetworkReply *reply);
 
     // Download a resolved absolute URL to a local path, wiring progress/finish.
     // Follows HTTP redirects (needed for Baidu dlink 302) and lets callers add
