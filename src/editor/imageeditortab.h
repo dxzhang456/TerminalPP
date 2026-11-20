@@ -57,6 +57,9 @@ public:
 
     void applyTheme(const EditorTheme &theme);
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 signals:
     void statusMessage(const QString &msg);
     void modificationChanged(bool modified);
@@ -155,6 +158,7 @@ private:
     int      m_dpi = 96;
 
     QComboBox *m_filterCombo = nullptr;   // preset-filter chooser
+    bool      m_firstShowFit = false;     // whether auto-fit on initial display has triggered
 };
 
 #endif // IMAGEEDITORTAB_H

@@ -3,6 +3,7 @@
 
 #include <QScrollArea>
 #include <QLabel>
+#include <QTimer>
 #include <QComboBox>
 #include <QSpinBox>
 #include <QSlider>
@@ -97,15 +98,17 @@ public:
     void zoomFitTo(const QSize &viewport)
     {
         if (m_image.isNull()) return;
-        if (viewport.width() <= 0 || viewport.height() <= 0) return;
-        const double zx = double(viewport.width())  / m_image.width();
-        const double zy = double(viewport.height()) / m_image.height();
-        // Scale the image to fit the viewport in BOTH directions. Small images
-        // are upscaled so they are comfortably visible (never below ~1x unless
-        // the viewport is tiny), large images are downscaled to fit.
+        // Viewport needs to have positive dimensions; subtract a small margin
+        // (16px) for scrollbars/borders so the whole image fits cleanly.
+        const int vw = viewport.width() - 16;
+        const int vh = viewport.height() - 16;
+        if (vw <= 0 || vh <= 0) return;
+
+        const double zx = double(vw) / m_image.width();
+        const double zy = double(vh) / m_image.height();
+        // Scale the image to fit the viewport in BOTH dimensions regardless of
+        // whether the image is large or small (large is shrunk, small is scaled up).
         double z = qMin(zx, zy);
-        // Leave a small margin so the image doesn't touch the edges.
-        z *= 0.98;
         setZoom(z);
     }
 
@@ -609,10 +612,30 @@ bool ImageEditorTab::loadFile(const QString &path)
     m_undo.clear();
     m_redo.clear();
     setImage(img, false);
-    // Auto-fit oversized images into the viewport on open.
-    zoomFit();
+    // Defer zoomFit until the tab has been added and its viewport geometry
+    // has settled, so whatever the image size (small or huge) it always adapts
+    // to the window size cleanly on open.
+    m_firstShowFit = false;
+    QTimer::singleShot(0, this, [this]() {
+        zoomFit();
+        m_firstShowFit = true;
+    });
     updateTitleState();
     return true;
+}
+
+void ImageEditorTab::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    // If the window is resized before or right at open, keep the fit
+    if (!m_firstShowFit) {
+        QTimer::singleShot(0, this, [this]() {
+            if (!m_firstShowFit) {
+                zoomFit();
+                m_firstShowFit = true;
+            }
+        });
+    }
 }
 
 void ImageEditorTab::setImage(const QImage &img, bool markModified)
