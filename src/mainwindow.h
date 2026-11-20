@@ -104,10 +104,6 @@ private slots:
     void connectSelectedSession();
     void reconnectCurrent();
 
-    // --- Terminal: local shells ---
-    void newCmdTerminal();           // open a local cmd.exe terminal tab
-    void newPowerShellTerminal();    // open a local PowerShell terminal tab
-
     // --- Terminal: Serial ---
     void newSerialSession();
 
@@ -157,8 +153,6 @@ private:
     void openHexEditor(const QString &path);
     // Open any image in the full image-editor tab (edit + filters + export).
     void openImageEditor(const QString &path);
-    // Open a local shell terminal (0 = cmd, 1 = PowerShell).
-    void openLocalShell(int shell);
 
     // Recent-files list (most-recent first, capped at 20). Persisted in
     // QSettings and rebuilt into the File > Open Recent submenu.

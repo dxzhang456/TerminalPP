@@ -10,6 +10,7 @@
 #include <QToolBar>
 #include <QAction>
 #include <QLabel>
+#include <QSpinBox>
 #include <QMenu>
 #include <QHeaderView>
 #include <QProgressBar>
@@ -70,14 +71,40 @@ TransferPanel::TransferPanel(QWidget *parent) : QWidget(parent)
     tb->addAction(TRc("Open Folder"), this, [this]() {
         if (auto *it = m_tree->currentItem()) {
             if (TransferItem *t = TransferManager::instance()->find(idForItem(it))) {
-                const QString dir = QFileInfo(t->localPath).absolutePath();
-                QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
+                if (!t->localPath.isEmpty()) {
+                    const QString dir = QFileInfo(t->localPath).absolutePath();
+                    QDesktopServices::openUrl(QUrl::fromLocalFile(dir));
+                }
             }
         }
     });
     tb->addSeparator();
     tb->addAction(TRc("Clear Finished"), this,
                   []() { TransferManager::instance()->clearFinished(); });
+    tb->addSeparator();
+
+    m_maxTasksLabel = new QLabel(TRc("Max Tasks:"), this);
+    m_maxTasksLabel->setContentsMargins(6, 0, 4, 0);
+    tb->addWidget(m_maxTasksLabel);
+
+    m_maxTasksSpin = new QSpinBox(this);
+    m_maxTasksSpin->setRange(1, 1000);
+    m_maxTasksSpin->setValue(TransferManager::instance()->maxTasks());
+    m_maxTasksSpin->setToolTip(TRc("Maximum concurrent transfer tasks (1 - 1000)"));
+    m_maxTasksSpin->setFixedWidth(65);
+    connect(m_maxTasksSpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int val) {
+        TransferManager::instance()->setMaxTasks(val);
+    });
+    connect(TransferManager::instance(), &TransferManager::maxTasksChanged,
+            this, [this](int val) {
+        if (m_maxTasksSpin && m_maxTasksSpin->value() != val) {
+            m_maxTasksSpin->blockSignals(true);
+            m_maxTasksSpin->setValue(val);
+            m_maxTasksSpin->blockSignals(false);
+        }
+    });
+    tb->addWidget(m_maxTasksSpin);
+
     outer->addWidget(tb);
 
     m_tree = new QTreeWidget(this);
@@ -217,10 +244,12 @@ void TransferPanel::onContextMenu(const QPoint &pos)
     if (t->direction == TransferItem::Download && t->state == TransferItem::Completed) {
         menu.addAction(TRc("Open"), this, [this, t]() { emit openLocalFile(t->localPath); });
     }
-    menu.addAction(TRc("Open Folder"), this, [t]() {
-        QDesktopServices::openUrl(
-            QUrl::fromLocalFile(QFileInfo(t->localPath).absolutePath()));
-    });
+    if (!t->localPath.isEmpty()) {
+        menu.addAction(TRc("Open Folder"), this, [t]() {
+            QDesktopServices::openUrl(
+                QUrl::fromLocalFile(QFileInfo(t->localPath).absolutePath()));
+        });
+    }
     menu.addSeparator();
     // Copy submenu: file name, local path, or remote path to the clipboard.
     QMenu *copyMenu = menu.addMenu(TRc("Copy"));

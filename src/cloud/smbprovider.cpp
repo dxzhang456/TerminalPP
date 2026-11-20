@@ -159,6 +159,10 @@ void SmbShareProvider::upload(const QString &localPath, const QString &remoteDir
             emit errorOccurred(tr("Cannot read local file: %1").arg(localPath));
             return;
         }
+        // Ensure remote file is cleanly overwritten if it already exists
+        if (QFile::exists(full)) {
+            QFile::remove(full);
+        }
         QFile dst(full);
         if (!dst.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             emit errorOccurred(tr("Cannot write to shared folder: %1").arg(full));

@@ -152,6 +152,10 @@ public slots:
 
         sendCmd("TYPE I");
         readReply();
+        // Delete remote file first if it exists, to ensure a clean overwrite across all FTP server implementations
+        sendCmd("DELE " + rel);
+        readReply(); // Ignore reply (e.g. 550 if file doesn't exist)
+
         QTcpSocket *data = openPassiveData();
         if (!data) { emit error(tr("Cannot open FTP data connection.")); src.close(); return; }
         sendCmd("STOR " + rel);

@@ -142,6 +142,9 @@ public slots:
         if (!rel.endsWith('/')) rel += '/';
         rel += name;
 
+        // If remote file exists, unlink first to guarantee a clean overwrite across all SFTP server permissions
+        libssh2_sftp_unlink(m_sftp, rel.toUtf8().constData());
+
         LIBSSH2_SFTP_HANDLE *fh = libssh2_sftp_open(
             m_sftp, rel.toUtf8().constData(),
             LIBSSH2_FXF_WRITE | LIBSSH2_FXF_CREAT | LIBSSH2_FXF_TRUNC,

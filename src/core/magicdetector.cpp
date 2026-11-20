@@ -37,14 +37,27 @@ public:
         if (!ensureMimeCookie())
             return QString();
 
+        // 1. Try magic_file with toLocal8Bit() and toUtf8()
         QByteArray nativePath = QDir::toNativeSeparators(filePath).toLocal8Bit();
         const char *res = magic_file(m_mimeMagic, nativePath.constData());
         if (!res) {
-            // Try with UTF-8 if local 8-bit failed
             QByteArray utf8Path = filePath.toUtf8();
             res = magic_file(m_mimeMagic, utf8Path.constData());
         }
-        return res ? QString::fromLatin1(res) : QString();
+        if (res)
+            return QString::fromLatin1(res);
+
+        // 2. Fallback to magic_buffer using QFile to avoid Windows Unicode filename path issues in libmagic
+        QFile file(filePath);
+        if (file.open(QIODevice::ReadOnly)) {
+            QByteArray buf = file.read(65536);
+            if (!buf.isEmpty()) {
+                const char *bufRes = magic_buffer(m_mimeMagic, buf.constData(), buf.size());
+                if (bufRes)
+                    return QString::fromLatin1(bufRes);
+            }
+        }
+        return QString();
     }
 
     QString getDescription(const QString &filePath)
@@ -53,13 +66,27 @@ public:
         if (!ensureDescCookie())
             return QString();
 
+        // 1. Try magic_file with toLocal8Bit() and toUtf8()
         QByteArray nativePath = QDir::toNativeSeparators(filePath).toLocal8Bit();
         const char *res = magic_file(m_descMagic, nativePath.constData());
         if (!res) {
             QByteArray utf8Path = filePath.toUtf8();
             res = magic_file(m_descMagic, utf8Path.constData());
         }
-        return res ? QString::fromUtf8(res) : QString();
+        if (res)
+            return QString::fromUtf8(res);
+
+        // 2. Fallback to magic_buffer using QFile
+        QFile file(filePath);
+        if (file.open(QIODevice::ReadOnly)) {
+            QByteArray buf = file.read(65536);
+            if (!buf.isEmpty()) {
+                const char *bufRes = magic_buffer(m_descMagic, buf.constData(), buf.size());
+                if (bufRes)
+                    return QString::fromUtf8(bufRes);
+            }
+        }
+        return QString();
     }
 
 private:
@@ -136,8 +163,31 @@ private:
     magic_t m_descMagic = nullptr;
 };
 
-// Fallback: heuristic byte inspection to distinguish text from binary if
-// libmagic returns application/octet-stream or fails.
+    // Well-known text / script / document extensions that are always text unless
+    // containing binary NUL bytes.
+    bool hasKnownTextExtension(const QString &filePath)
+    {
+        const QString ext = QFileInfo(filePath).suffix().toLower();
+        static const QStringList textExts = {
+            "txt", "log", "text", "md", "markdown", "rst", "adoc", "asciidoc",
+            "csv", "tsv", "tab", "diff", "patch", "po", "pot", "srt", "vtt", "lrc",
+            "ini", "cfg", "conf", "config", "properties", "env", "toml", "yaml", "yml",
+            "json", "json5", "jsonc", "xml", "xsd", "xsl", "xslt", "plist", "reg",
+            "editorconfig", "gitignore", "gitattributes", "dockerfile", "makefile", "mk",
+            "cmake", "gradle", "pro", "pri", "qrc", "ui", "spec",
+            "c", "cc", "cpp", "cxx", "c++", "h", "hh", "hpp", "hxx", "h++", "inl", "ipp",
+            "cs", "java", "kt", "kts", "scala", "groovy", "py", "pyw", "pyi", "rb", "rake",
+            "pl", "pm", "php", "phtml", "lua", "tcl", "r", "jl", "swift", "go", "rs", "dart",
+            "js", "jsx", "mjs", "cjs", "ts", "tsx", "vue", "svelte",
+            "sh", "bash", "zsh", "fish", "ksh", "csh", "bat", "cmd", "ps1", "psm1", "psd1",
+            "sql", "ddl", "dml", "proto", "thrift", "pas", "pp", "bas", "vb", "vbs", "asm",
+            "html", "htm", "xhtml", "css", "scss", "sass", "less", "jsp", "asp", "aspx"
+        };
+        return textExts.contains(ext);
+    }
+
+    // Fallback: heuristic byte inspection to distinguish text from binary if
+    // libmagic returns application/octet-stream or fails.
 bool looksLikeTextFallback(const QString &filePath)
 {
     QFile f(filePath);
@@ -186,10 +236,16 @@ MagicDetector::FileType MagicDetector::detectType(const QString &filePath)
     if (fi.size() == 0)
         return Text; // Empty files open in the text editor
 
-    // 1. First consult libmagic for the MIME type
+    // 1. If it has a known text extension (.txt, .log, .md, .py, .cpp, etc.)
+    // and looks like text (no NUL bytes), classify as Text immediately
+    if (hasKnownTextExtension(filePath) && looksLikeTextFallback(filePath)) {
+        return Text;
+    }
+
+    // 2. First consult libmagic for the MIME type
     QString mime = detectMime(filePath).trimmed().toLower();
 
-    // 2. Classify based on MIME type
+    // 3. Classify based on MIME type
     if (mime.startsWith(QStringLiteral("image/"))) {
         // SVG can be treated either as image or text; QImageReader supports SVG
         // and user requested "如果是图片就按照图片格式打开"
@@ -222,7 +278,7 @@ MagicDetector::FileType MagicDetector::detectType(const QString &filePath)
         return Image;
     }
 
-    // 3. If libmagic returned generic "application/octet-stream" or similar,
+    // 4. If libmagic returned generic "application/octet-stream" or similar,
     // double-check with the detailed description and content heuristics
     if (mime == QStringLiteral("application/octet-stream") || mime.isEmpty()) {
         QString desc = detectDescription(filePath).toLower();
@@ -248,6 +304,11 @@ MagicDetector::FileType MagicDetector::detectType(const QString &filePath)
             return Text;
 
         return Binary;
+    }
+
+    // 5. If libmagic returned some other MIME type, check if byte content is actually text
+    if (looksLikeTextFallback(filePath)) {
+        return Text;
     }
 
     // Known binary MIME types (executables, archives, binaries, audio/video)

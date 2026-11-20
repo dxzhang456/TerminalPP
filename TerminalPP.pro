@@ -41,6 +41,7 @@ SOURCES += \
     src/core/secretstore.cpp \
     src/core/fileassoc.cpp \
     src/core/magicdetector.cpp \
+    src/core/errorlogger.cpp \
     src/compare/diffengine.cpp \
     src/compare/textcomparetab.cpp \
     src/compare/foldercomparetab.cpp \
@@ -73,8 +74,7 @@ SOURCES += \
     src/terminal/sessionmanager.cpp \
     src/terminal/serialsession.cpp \
     src/terminal/serialtab.cpp \
-    src/terminal/serialdialog.cpp \
-    src/terminal/localshelltab.cpp
+    src/terminal/serialdialog.cpp
 
 HEADERS += \
     src/mainwindow.h \
@@ -84,6 +84,7 @@ HEADERS += \
     src/core/secretstore.h \
     src/core/fileassoc.h \
     src/core/magicdetector.h \
+    src/core/errorlogger.h \
     src/compare/diffengine.h \
     src/compare/textcomparetab.h \
     src/compare/foldercomparetab.h \
@@ -117,8 +118,7 @@ HEADERS += \
     src/terminal/sessionmanager.h \
     src/terminal/serialsession.h \
     src/terminal/serialtab.h \
-    src/terminal/serialdialog.h \
-    src/terminal/localshelltab.h
+    src/terminal/serialdialog.h
 
 RESOURCES += \
     resources/resources.qrc

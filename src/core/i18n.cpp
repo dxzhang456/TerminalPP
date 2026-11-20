@@ -460,6 +460,16 @@ void I18n::loadTable()
     add("Retry",             "重试",      "重試",      "Reintentar",   "Réessayer",     "Wiederholen",   "Повторить",       "再試行",        "다시 시도");
     add("Remove",            "移除",      "移除",      "Quitar",       "Retirer",       "Entfernen",     "Убрать",          "削除",          "제거");
     add("Clear Finished",    "清除已完成","清除已完成","Borrar completados","Effacer les terminés","Abgeschlossene löschen","Очистить завершённые","完了分をクリア","완료 항목 지우기");
+    add("Max Tasks:",        "最大任务数：","最大任務數：","Tareas máx.:","Tâches max :","Max. Aufgaben:","Макс. задач:","最大タスク数:","최대 작업 수:");
+    add("Maximum concurrent transfer tasks (1 - 1000)",
+        "最大并发传输任务数（1 - 1000）",
+        "最大並發傳輸任務數（1 - 1000）",
+        "Tareas de transferencia concurrentes máximas (1 - 1000)",
+        "Tâches de transfert simultanées maximales (1 - 1000)",
+        "Maximale gleichzeitige Übertragungsaufgaben (1 - 1000)",
+        "Максимальное количество одновременных задач (1 - 1000)",
+        "最大同時転送タスク数（1 - 1000）",
+        "최대 동시 전송 작업 수 (1 - 1000)");
     add("Rename...",         "重命名...", "重新命名...","Renombrar...", "Renommer...",   "Umbenennen...", "Переименовать...","名前を変更...","이름 바꾸기...");
     add("Rename",            "重命名",    "重新命名",  "Renombrar",    "Renommer",      "Umbenennen",    "Переименовать",   "名前を変更",    "이름 바꾸기");
     add("New name:",         "新名称：",  "新名稱：",  "Nuevo nombre:","Nouveau nom :", "Neuer Name:",   "Новое имя:",      "新しい名前：",  "새 이름:");
@@ -517,6 +527,10 @@ void I18n::loadTable()
     add("Speed",             "速度",      "速度",      "Velocidad",    "Vitesse",       "Geschwindigkeit","Скорость",       "速度",          "속도");
     add("Upload",            "上传",      "上傳",      "Subir",        "Téléverser",    "Hochladen",     "Загрузка",        "アップロード",  "업로드");
     add("Download",          "下载",      "下載",      "Descargar",    "Télécharger",   "Herunterladen", "Скачивание",      "ダウンロード",  "다운로드");
+    add("Delete",            "删除",      "刪除",      "Eliminar",     "Supprimer",     "Löschen",       "Удалить",         "削除",          "삭제");
+    add("Deleting %1…",      "正在删除 %1…","正在刪除 %1…","Eliminando %1…","Suppression de %1…","Lösche %1…","Удаление %1…","%1 を削除中…","%1 삭제 중…");
+    add("Deleted %1 file(s).","已删除 %1 个文件。","已刪除 %1 個檔案。","%1 archivo(s) eliminado(s).","%1 fichier(s) supprimé(s).","%1 Datei(en) gelöscht.","Удалено файлов: %1.","%1 個のファイルを削除しました。","%1개 파일 삭제됨.");
+    add("A folder deletion is already in progress.","已有文件夹删除任务在进行中。","已有資料夾刪除任務在進行中。","Ya hay una eliminación de carpeta en curso.","Une suppression de dossier est déjà en cours.","Eine Ordnerlöschung läuft bereits.","Удаление папки уже выполняется.","フォルダの削除が既に進行中です。","폴더 삭제가 이미 진행 중입니다.");
     add("Queued",            "排队中",    "排隊中",    "En cola",      "En file",       "In Warteschlange","В очереди",     "待機中",        "대기 중");
     add("Running",           "进行中",    "進行中",    "En curso",     "En cours",      "Läuft",         "Выполняется",     "実行中",        "진행 중");
     add("Paused",            "已暂停",    "已暫停",    "Pausado",      "En pause",      "Pausiert",      "Приостановлено",  "一時停止",      "일시 중지");
@@ -734,24 +748,6 @@ void I18n::loadTable()
     add("Cloud",             "云盘",      "雲端",      "Nube",         "Cloud",         "Cloud",         "Облако",          "クラウド",      "클라우드");
     add("&Copy",             "复制(&C)",  "複製(&C)",  "&Copiar",      "&Copier",       "&Kopieren",     "&Копировать",     "コピー(&C)",    "복사(&C)");
     add("&Paste",            "粘贴(&P)",  "貼上(&P)",  "&Pegar",       "C&oller",       "&Einfügen",     "&Вставить",       "貼り付け(&P)",  "붙여넣기(&P)");
-
-    // ---- Local shell terminals (cmd / PowerShell) ----
-    add("New &CMD Terminal",  "新建CMD终端(&C)","新增CMD終端(&C)","Nueva terminal &CMD","Nouveau terminal &CMD","Neues &CMD-Terminal","Новый терминал &CMD","新規CMD端末(&C)","새 &CMD 터미널");
-    add("New &PowerShell Terminal","新建PowerShell终端(&P)","新增PowerShell終端(&P)","Nueva terminal &PowerShell","Nouveau terminal &PowerShell","Neues &PowerShell-Terminal","Новый терминал &PowerShell","新規PowerShell端末(&P)","새 &PowerShell 터미널");
-    add("CMD",               "CMD",       "CMD",       "CMD",          "CMD",           "CMD",           "CMD",             "CMD",           "CMD");
-    add("PowerShell",        "PowerShell","PowerShell","PowerShell",   "PowerShell",    "PowerShell",    "PowerShell",      "PowerShell",    "PowerShell");
-    add("Failed to start the shell process.",
-        "无法启动 Shell 进程。","無法啟動 Shell 行程。","No se pudo iniciar el proceso del shell.",
-        "Impossible de démarrer le processus du shell.","Shell-Prozess konnte nicht gestartet werden.",
-        "Не удалось запустить процесс оболочки.","シェルプロセスの起動に失敗しました。","셸 프로세스를 시작하지 못했습니다.");
-    add("failed to start the shell process",
-        "无法启动 Shell 进程","無法啟動 Shell 行程","no se pudo iniciar el proceso del shell",
-        "impossible de démarrer le processus du shell","Shell-Prozess konnte nicht gestartet werden",
-        "не удалось запустить процесс оболочки","シェルプロセスの起動に失敗しました","셸 프로세스를 시작하지 못했습니다");
-    add("process exited (code %1)",
-        "进程已退出（代码 %1）","行程已結束（代碼 %1）","el proceso terminó (código %1)",
-        "le processus s'est terminé (code %1)","Prozess beendet (Code %1)",
-        "процесс завершён (код %1)","プロセスが終了しました（コード %1）","프로세스 종료됨(코드 %1)");
 
     // ---- Image editor ----
     add("image",             "图片",      "圖片",      "imagen",       "image",         "Bild",          "изображение",     "画像",          "이미지");

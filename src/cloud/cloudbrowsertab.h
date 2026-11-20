@@ -105,17 +105,15 @@ private:
     // at a time; the next file is pulled from the iterator only when the
     // previous upload finishes. This keeps memory flat regardless of how many
     // files / how deep the folder is.
-    // Up to this many files upload/download concurrently; the folder tree is
-    // still walked lazily (one directory entry / listing pulled at a time),
-    // but several files can be in flight at once for throughput.
-    static constexpr int kMaxConcurrent = 10;
+    // Folder upload/download concurrency limit is now dynamic (1 - 1000)
+    // configured via TransferManager::instance()->maxTasks().
 
     struct FolderUpload {
         QString localRoot;     // chosen local folder
         QString remoteRoot;    // its remote destination (already made)
         std::unique_ptr<QDirIterator> it;   // lazy walker
         int done = 0;
-        int inFlight = 0;      // files currently uploading (<= kMaxConcurrent)
+        int inFlight = 0;      // files currently uploading (<= maxTasks())
         bool exhausted = false;// iterator drained
         bool active = false;
     };
@@ -131,13 +129,32 @@ private:
         QQueue<CloudEntry> dirs;    // remote dirs still to list
         QQueue<QPair<QString,QString>> files;  // (remotePath, localPath) queue
         int done = 0;
-        int inFlight = 0;      // files currently downloading (<= kMaxConcurrent)
+        int inFlight = 0;      // files currently downloading (<= maxTasks())
         bool active = false;
         bool listing = false;
     };
     std::unique_ptr<FolderDownload> m_folderDn;
     void startFolderDownload(const CloudEntry &dir, const QString &localRoot);
     void pumpFolderDownload();
+
+    // Streaming sequential/concurrent folder delete (memory-light)
+    // Lazily lists directories, queues files to delete, deletes up to maxTasks()
+    // files concurrently, tracking each file deletion in the TransferManager.
+    // Finally removes the emptied directories in reverse order.
+    struct FolderDelete {
+        QString remoteRoot;    // root folder being deleted
+        QQueue<CloudEntry> dirsToList;  // remote dirs still to list
+        QVector<QString> dirsToDelete;  // post-order list of dirs to rmdir
+        QQueue<QString> filesToDelete; // files queued for deletion
+        int done = 0;
+        int inFlight = 0;      // file deletes currently in flight (<= maxTasks())
+        bool active = false;
+        bool listing = false;
+    };
+    std::unique_ptr<FolderDelete> m_folderDel;
+    void startFolderDelete(const CloudEntry &dir);
+    void pumpFolderDelete();
+    void trackedDelete(const QString &remotePath, bool isDir, const QString &name = QString());
 
     CloudProvider *m_provider = nullptr;
     QString m_title;

@@ -7,6 +7,7 @@
 class QTreeWidget;
 class QTreeWidgetItem;
 class QLabel;
+class QSpinBox;
 
 // A dockable view over the TransferManager. Shows every upload/download with a
 // direction icon, name, drive, size, progress bar, speed, ETA and state. The
@@ -36,6 +37,8 @@ private:
 
     QTreeWidget *m_tree = nullptr;
     QLabel *m_summary = nullptr;
+    QSpinBox *m_maxTasksSpin = nullptr;
+    QLabel *m_maxTasksLabel = nullptr;
     QHash<int, QTreeWidgetItem *> m_rows;   // transfer id -> row
 };
 

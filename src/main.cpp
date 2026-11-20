@@ -6,10 +6,21 @@
 #include "mainwindow.h"
 #include "core/i18n.h"
 #include "core/cliphistory.h"
+#include "core/errorlogger.h"
 #include "cloud/cloudprovider.h"
 
 int main(int argc, char *argv[])
 {
+    // Install the unhandled-exception / termination handlers immediately so
+    // even a crash during QApplication construction is captured. NOTE: the
+    // Qt message handler itself is safe to install this early (it does not
+    // touch QCoreApplication), and ErrorLogger::logFilePath() specifically
+    // guards against calling QCoreApplication::applicationDirPath() before
+    // an application instance exists (doing so would otherwise emit a Qt
+    // warning that re-enters our own handler and deadlocks the process
+    // before the window ever appears).
+    ErrorLogger::initialize();
+
     // --- Startup optimizations (must run BEFORE QApplication is constructed) ---
     // Keep Qt from scanning extra plugin paths at launch — we ship exactly the
     // plugins we need right next to the executable, so skipping the system /
@@ -23,6 +34,14 @@ int main(int argc, char *argv[])
 #endif
 
     QApplication app(argc, argv);
+
+    // Now that QCoreApplication exists, applicationDirPath() is safe to call,
+    // so re-anchor the log file exactly next to the executable (this matters
+    // when the current working directory at launch differs from the exe's
+    // own folder, e.g. launched via a shortcut with a custom "Start in" path).
+    ErrorLogger::logError(QStringLiteral("Startup"),
+                          QStringLiteral("Application started. Log file: %1")
+                              .arg(ErrorLogger::logFilePath()));
 
     // Needed so QVector<CloudEntry> can be queued across threads (used by
     // SftpProvider's worker-thread model for list() results).

@@ -92,6 +92,18 @@ CloudBrowserTab::CloudBrowserTab(CloudProvider *provider, const QString &title,
                 .arg(humanSize(r, false), humanSize(t, false)));
     });
 
+    // When the user changes maxTasks on the transfer panel, immediately pump
+    // in-flight folder transfers so newly allowed task slots are filled at once.
+    connect(TransferManager::instance(), &TransferManager::maxTasksChanged,
+            this, [this](int) {
+        if (m_folderUp && m_folderUp->active)
+            pumpFolderUpload();
+        if (m_folderDn && m_folderDn->active)
+            pumpFolderDownload();
+        if (m_folderDel && m_folderDel->active)
+            pumpFolderDelete();
+    });
+
     navigateTo(m_provider->rootPath());
 }
 
@@ -231,7 +243,12 @@ void CloudBrowserTab::goUp()
 
 void CloudBrowserTab::onListed(const QString &path, const QVector<CloudEntry> &entries)
 {
-    Q_UNUSED(path);
+    // Ignore internal background directory listings (such as FolderDownload or
+    // FolderDelete expanding child subtrees) so the browser view never moves
+    // or displays the contents of folders being recursively deleted/downloaded.
+    if (!path.isEmpty() && !m_currentPath.isEmpty() && path != m_currentPath)
+        return;
+
     m_entries = entries;
     m_tree->clear();
 
@@ -506,12 +523,14 @@ void CloudBrowserTab::pumpFolderUpload()
     if (!m_folderUp || !m_folderUp->active)
         return;
 
-    // Keep up to kMaxConcurrent uploads in flight. The tree is still walked
+    const int maxConcurrent = TransferManager::instance()->maxTasks();
+
+    // Keep up to maxConcurrent uploads in flight. The tree is still walked
     // lazily: each loop iteration pulls at most one more entry from the
     // iterator, starts a file upload (or creates a sub-folder) and loops until
     // either the iterator is drained or the concurrency limit is reached. When
     // an upload finishes it calls pumpFolderUpload() again to refill the slot.
-    while (m_folderUp->inFlight < kMaxConcurrent && m_folderUp->it->hasNext()) {
+    while (m_folderUp->inFlight < maxConcurrent && m_folderUp->it->hasNext()) {
         const QString path = m_folderUp->it->next();
         const QFileInfo fi = m_folderUp->it->fileInfo();
         if (fi.isDir()) {
@@ -606,8 +625,10 @@ void CloudBrowserTab::pumpFolderDownload()
     if (!m_folderDn || !m_folderDn->active)
         return;
 
-    // 1) Start downloads from the queued files, up to kMaxConcurrent at once.
-    while (m_folderDn->inFlight < kMaxConcurrent && !m_folderDn->files.isEmpty()) {
+    const int maxConcurrent = TransferManager::instance()->maxTasks();
+
+    // 1) Start downloads from the queued files, up to maxConcurrent at once.
+    while (m_folderDn->inFlight < maxConcurrent && !m_folderDn->files.isEmpty()) {
         const auto pair = m_folderDn->files.dequeue();
         const QString remotePath = pair.first;
         const QString localPath = pair.second;
@@ -875,6 +896,23 @@ void CloudBrowserTab::actionDelete(const CloudEntry &e)
                               QMessageBox::No) != QMessageBox::Yes)
         return;
 
+    if (e.isDir) {
+        startFolderDelete(e);
+    } else {
+        trackedDelete(e.path, false, e.name);
+    }
+}
+
+// Track a single delete operation in TransferManager and TransferPanel.
+void CloudBrowserTab::trackedDelete(const QString &remotePath, bool isDir, const QString &name)
+{
+    const QString displayName = name.isEmpty() ? QFileInfo(remotePath).fileName() : name;
+    emit statusMessage(TRc("Deleting %1…").arg(displayName));
+
+    TransferManager *tm = TransferManager::instance();
+    const int id = tm->begin(TransferItem::Delete, m_title, displayName,
+                             remotePath, QString(), m_provider, 0);
+
     auto *okConn = new QMetaObject::Connection();
     auto *errConn = new QMetaObject::Connection();
     auto cleanup = [okConn, errConn]() {
@@ -883,17 +921,177 @@ void CloudBrowserTab::actionDelete(const CloudEntry &e)
         delete okConn; delete errConn;
     };
     *okConn = connect(m_provider, &CloudProvider::operationFinished, this,
-        [this, e, cleanup]() {
+        [this, tm, id, displayName, cleanup]() {
+            tm->markCompleted(id);
             cleanup();
-            emit statusMessage(TRc("Deleted \"%1\".").arg(e.name));
+            emit statusMessage(TRc("Deleted \"%1\".").arg(displayName));
             refresh();
         });
     *errConn = connect(m_provider, &CloudProvider::errorOccurred, this,
-        [this, cleanup](const QString &msg) {
+        [this, tm, id, cleanup](const QString &msg) {
+            tm->markFailed(id, msg);
             cleanup();
             emit statusMessage(TRc("Delete failed: %1").arg(msg));
         });
-    m_provider->remove(e.path);
+
+    tm->markRunning(id);
+    m_provider->remove(remotePath);
+}
+
+// ---- streaming, lazy folder delete (memory-light) ----
+// Lists remote directories on demand, deleting files concurrently up to
+// maxTasks() and recording each in TransferManager/TransferPanel. Emptied
+// subdirectories and the root folder are removed bottom-up in dirsToDelete.
+void CloudBrowserTab::startFolderDelete(const CloudEntry &dir)
+{
+    if (m_folderDel && m_folderDel->active) {
+        emit statusMessage(TRc("A folder deletion is already in progress."));
+        return;
+    }
+    m_folderDel = std::make_unique<FolderDelete>();
+    m_folderDel->remoteRoot = dir.path;
+    m_folderDel->active = true;
+    m_folderDel->dirsToDelete.push_back(dir.path); // will be rmdir'd at the very end
+    CloudEntry root = dir;
+    m_folderDel->dirsToList.enqueue(root);
+    emit statusMessage(TRc("Deleting %1…").arg(dir.name));
+    pumpFolderDelete();
+}
+
+void CloudBrowserTab::pumpFolderDelete()
+{
+    if (!m_folderDel || !m_folderDel->active)
+        return;
+
+    const int maxConcurrent = TransferManager::instance()->maxTasks();
+
+    // 1) Delete queued files up to maxConcurrent at once
+    while (m_folderDel->inFlight < maxConcurrent && !m_folderDel->filesToDelete.isEmpty()) {
+        const QString remoteFilePath = m_folderDel->filesToDelete.dequeue();
+        const QString fileName = QFileInfo(remoteFilePath).fileName();
+        emit statusMessage(TRc("Deleting %1…").arg(fileName));
+
+        TransferManager *tm = TransferManager::instance();
+        const int id = tm->begin(TransferItem::Delete, m_title, fileName,
+                                 remoteFilePath, QString(), m_provider, 0);
+
+        auto *okConn = new QMetaObject::Connection();
+        auto *errConn = new QMetaObject::Connection();
+        auto cleanup = [okConn, errConn]() {
+            QObject::disconnect(*okConn);
+            QObject::disconnect(*errConn);
+            delete okConn; delete errConn;
+        };
+
+        *okConn = connect(m_provider, &CloudProvider::operationFinished, this,
+            [this, tm, id, cleanup]() {
+                tm->markCompleted(id);
+                cleanup();
+                if (m_folderDel) { --m_folderDel->inFlight; ++m_folderDel->done; }
+                pumpFolderDelete();
+            });
+        *errConn = connect(m_provider, &CloudProvider::errorOccurred, this,
+            [this, tm, id, cleanup](const QString &msg) {
+                tm->markFailed(id, msg);
+                cleanup();
+                if (m_folderDel) --m_folderDel->inFlight;
+                pumpFolderDelete();
+            });
+
+        ++m_folderDel->inFlight;
+        tm->markRunning(id);
+        m_provider->remove(remoteFilePath);
+    }
+
+    // If files are still queued but concurrency slot is full, wait for completion
+    if (!m_folderDel->filesToDelete.isEmpty())
+        return;
+
+    // 2) Expand next directory lazily if more dirs remain to list
+    if (!m_folderDel->dirsToList.isEmpty() && !m_folderDel->listing) {
+        const CloudEntry d = m_folderDel->dirsToList.dequeue();
+        m_folderDel->listing = true;
+
+        auto *lConn = new QMetaObject::Connection();
+        auto *eConn = new QMetaObject::Connection();
+        auto cleanup = [lConn, eConn]() {
+            QObject::disconnect(*lConn);
+            QObject::disconnect(*eConn);
+            delete lConn; delete eConn;
+        };
+
+        *lConn = connect(m_provider, &CloudProvider::listed, this,
+            [this, cleanup](const QString &, const QVector<CloudEntry> &entries) {
+                cleanup();
+                m_folderDel->listing = false;
+                for (const CloudEntry &e : entries) {
+                    if (e.isDir) {
+                        m_folderDel->dirsToList.enqueue(e);
+                        // Record for later bottom-up rmdir
+                        m_folderDel->dirsToDelete.push_back(e.path);
+                    } else {
+                        m_folderDel->filesToDelete.enqueue(e.path);
+                    }
+                }
+                pumpFolderDelete();
+            });
+        *eConn = connect(m_provider, &CloudProvider::errorOccurred, this,
+            [this, cleanup](const QString &msg) {
+                cleanup();
+                m_folderDel->listing = false;
+                emit statusMessage(TRc("Error: %1").arg(msg));
+                pumpFolderDelete();
+            });
+
+        m_provider->list(d.path);
+        return;
+    }
+
+    // 3) If listing or files are in flight, wait
+    if (m_folderDel->listing || m_folderDel->inFlight > 0)
+        return;
+
+    // 4) All files have been deleted. Now remove directories bottom-up
+    if (!m_folderDel->dirsToDelete.isEmpty()) {
+        const QString dirPath = m_folderDel->dirsToDelete.takeLast();
+        const QString dirName = QFileInfo(dirPath).fileName();
+
+        TransferManager *tm = TransferManager::instance();
+        const int id = tm->begin(TransferItem::Delete, m_title, dirName,
+                                 dirPath, QString(), m_provider, 0);
+
+        auto *okConn = new QMetaObject::Connection();
+        auto *errConn = new QMetaObject::Connection();
+        auto cleanup = [okConn, errConn]() {
+            QObject::disconnect(*okConn);
+            QObject::disconnect(*errConn);
+            delete okConn; delete errConn;
+        };
+
+        *okConn = connect(m_provider, &CloudProvider::operationFinished, this,
+            [this, tm, id, cleanup]() {
+                tm->markCompleted(id);
+                cleanup();
+                pumpFolderDelete(); // proceed to next parent dir
+            });
+        *errConn = connect(m_provider, &CloudProvider::errorOccurred, this,
+            [this, tm, id, cleanup](const QString &msg) {
+                tm->markFailed(id, msg);
+                cleanup();
+                pumpFolderDelete();
+            });
+
+        tm->markRunning(id);
+        m_provider->remove(dirPath);
+        return;
+    }
+
+    // 5) Finished: all files deleted and all directories removed
+    const int totalDeleted = m_folderDel->done;
+    m_folderDel->active = false;
+    m_folderDel.reset();
+    emit statusMessage(TRc("Deleted %1 file(s).").arg(totalDeleted));
+    refresh();
 }
 
 // Rename a file or folder. Prompts for the new name (pre-filled with the

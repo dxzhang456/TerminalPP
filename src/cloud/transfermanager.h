@@ -15,7 +15,7 @@ class QNetworkReply;
 // state) lives here so the UI is a pure view over this model.
 struct TransferItem
 {
-    enum Direction { Download, Upload };
+    enum Direction { Download, Upload, Delete };
     enum State { Queued, Running, Paused, Completed, Failed, Canceled };
 
     int       id = 0;
@@ -89,10 +89,15 @@ public:
     void retry(int id);           // re-issue a failed/canceled transfer
     void clearFinished();         // remove all completed/failed/canceled entries
 
+    // Maximum concurrent folder transfer tasks (1 - 1000).
+    int maxTasks() const { return m_maxTasks; }
+    void setMaxTasks(int maxTasks);
+
 signals:
     void itemAdded(int id);
     void itemChanged(int id);
     void itemRemoved(int id);
+    void maxTasksChanged(int maxTasks);
 
 private:
     explicit TransferManager(QObject *parent = nullptr);
@@ -100,6 +105,7 @@ private:
 
     QVector<TransferItem> m_items;
     int m_nextId = 1;
+    int m_maxTasks = 10;
 };
 
 #endif // TRANSFERMANAGER_H

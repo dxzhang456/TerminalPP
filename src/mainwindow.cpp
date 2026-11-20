@@ -8,7 +8,6 @@
 #include "editor/imageeditortab.h"
 #include "terminal/sshtab.h"
 #include "terminal/serialtab.h"
-#include "terminal/localshelltab.h"
 #include "terminal/sessiondialog.h"
 #include "terminal/serialdialog.h"
 #include "terminal/sessionmanager.h"
@@ -330,9 +329,6 @@ void MainWindow::createMenus()
 
     // ---------- Terminal ----------
     m_termMenu = menuBar()->addMenu(TR("&Terminal"));
-    m_termMenu->addAction(TR("New &CMD Terminal"), this, &MainWindow::newCmdTerminal);
-    m_termMenu->addAction(TR("New &PowerShell Terminal"), this, &MainWindow::newPowerShellTerminal);
-    m_termMenu->addSeparator();
     m_termMenu->addAction(TR("New &SSH Session..."), QKeySequence("Ctrl+N"), this, &MainWindow::newSshSession)
         ->setShortcutContext(Qt::ApplicationShortcut);
     m_termMenu->addAction(TR("New Serial / &UART Session..."), this, &MainWindow::newSerialSession);
@@ -1020,8 +1016,6 @@ bool MainWindow::closeTabAt(int index)
         s->disconnectSession();
     } else if (SerialTab *s = qobject_cast<SerialTab *>(w)) {
         s->closePort();
-    } else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w)) {
-        s->stop();
     }
 
     m_tabs->removeTab(index);
@@ -1175,7 +1169,6 @@ void MainWindow::zoomIn()
     if (EditorTab *t = qobject_cast<EditorTab *>(w)) t->editor()->zoomIn(1);
     else if (SshTab *s = qobject_cast<SshTab *>(w)) zoomTerminalFont(s->terminal(), +1);
     else if (SerialTab *s = qobject_cast<SerialTab *>(w)) zoomTerminalFont(s->terminal(), +1);
-    else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w)) zoomTerminalFont(s->terminal(), +1);
     else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) i->zoomIn();
     else if (ImageEditorTab *i = qobject_cast<ImageEditorTab *>(w)) i->zoomIn();
 }
@@ -1186,7 +1179,6 @@ void MainWindow::zoomOut()
     if (EditorTab *t = qobject_cast<EditorTab *>(w)) t->editor()->zoomOut(1);
     else if (SshTab *s = qobject_cast<SshTab *>(w)) zoomTerminalFont(s->terminal(), -1);
     else if (SerialTab *s = qobject_cast<SerialTab *>(w)) zoomTerminalFont(s->terminal(), -1);
-    else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w)) zoomTerminalFont(s->terminal(), -1);
     else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) i->zoomOut();
     else if (ImageEditorTab *i = qobject_cast<ImageEditorTab *>(w)) i->zoomOut();
 }
@@ -1202,9 +1194,6 @@ void MainWindow::zoomReset()
         QFont f("Consolas", 11); f.setStyleHint(QFont::Monospace);
         s->terminal()->setTerminalFont(f);
     } else if (SerialTab *s = qobject_cast<SerialTab *>(w)) {
-        QFont f("Consolas", 11); f.setStyleHint(QFont::Monospace);
-        s->terminal()->setTerminalFont(f);
-    } else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w)) {
         QFont f("Consolas", 11); f.setStyleHint(QFont::Monospace);
         s->terminal()->setTerminalFont(f);
     } else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) {
@@ -1232,8 +1221,6 @@ void MainWindow::applyThemeByName(const QString &name)
         else if (SshTab *s = qobject_cast<SshTab *>(w))
             s->applyTheme(theme);
         else if (SerialTab *s = qobject_cast<SerialTab *>(w))
-            s->applyTheme(theme);
-        else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w))
             s->applyTheme(theme);
     }
 
@@ -1352,33 +1339,6 @@ static void convertSerialBack(const SerialConfig &c, SerialSessionConfig &out)
                (c.flow == QSerialPort::SoftwareControl) ? "XON-XOFF" : "None";
     out.lineEnding = c.lineEnding;
     out.localEcho = c.localEcho;
-}
-
-// ------------------------------------------------------------------
-// Local shell terminals (cmd.exe / powershell.exe)
-// ------------------------------------------------------------------
-void MainWindow::newCmdTerminal()        { openLocalShell(0); }
-void MainWindow::newPowerShellTerminal() { openLocalShell(1); }
-
-// shell: 0 = cmd, 1 = PowerShell.
-void MainWindow::openLocalShell(int shell)
-{
-    auto *tab = new LocalShellTab(
-        shell == 1 ? LocalShellTab::PowerShell : LocalShellTab::Cmd, this);
-    tab->applyTheme(m_themeManager.current());
-    const QString title = (shell == 1) ? TR("PowerShell") : TR("CMD");
-    int idx = m_tabs->addTab(tab, title);
-    m_tabs->setCurrentIndex(idx);
-
-    connect(tab, &LocalShellTab::connectionClosed, this, [this, tab]() {
-        int i = m_tabs->indexOf(tab);
-        if (i >= 0)
-            m_tabs->setTabText(i, m_tabs->tabText(i) + TR(" [closed]"));
-    });
-
-    if (!tab->start())
-        statusBar()->showMessage(TR("Failed to start the shell process."), 4000);
-    tab->terminal()->setFocus();
 }
 
 void MainWindow::newSshSession()
@@ -2115,8 +2075,6 @@ void MainWindow::onCurrentTabChanged(int)
         s->terminal()->setFocus();
     else if (SerialTab *s = qobject_cast<SerialTab *>(w))
         s->terminal()->setFocus();
-    else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w))
-        s->terminal()->setFocus();
 
     // The Transfers panel is only relevant to cloud-drive browsing, so only
     // show its dock while a cloud tab is active; hide it for every other tab
@@ -2202,8 +2160,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
             s->disconnectSession();
         else if (SerialTab *s = qobject_cast<SerialTab *>(m_tabs->widget(i)))
             s->closePort();
-        else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(m_tabs->widget(i)))
-            s->stop();
     }
 
     event->accept();

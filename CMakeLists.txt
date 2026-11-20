@@ -47,7 +47,7 @@ set(PROJECT_SOURCES
     src/mainwindow.cpp
     src/mainwindow.h
 
-    # --- Core (i18n, clipboard history, preferences, secret storage) ---
+    # --- Core (i18n, clipboard history, preferences, secret storage, logging) ---
     src/core/i18n.cpp
     src/core/i18n.h
     src/core/cliphistory.cpp
@@ -60,6 +60,8 @@ set(PROJECT_SOURCES
     src/core/fileassoc.h
     src/core/magicdetector.cpp
     src/core/magicdetector.h
+    src/core/errorlogger.cpp
+    src/core/errorlogger.h
 
     # --- Compare (Beyond Compare-style) ---
     src/compare/diffengine.cpp
@@ -139,10 +141,6 @@ set(PROJECT_SOURCES
     src/terminal/serialtab.h
     src/terminal/serialdialog.cpp
     src/terminal/serialdialog.h
-
-    # --- Local shell terminal (cmd / PowerShell via QProcess) ---
-    src/terminal/localshelltab.cpp
-    src/terminal/localshelltab.h
 )
 
 # Windows application icon (compiled from resources/app.rc -> icon.ico).

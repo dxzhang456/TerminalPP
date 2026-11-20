@@ -92,7 +92,6 @@ MOC_HEADERS=(
   "$SRC/terminal/sshsession.h"     "$SRC/terminal/sshtab.h"
   "$SRC/terminal/sessiondialog.h"  "$SRC/terminal/serialsession.h"
   "$SRC/terminal/serialtab.h"      "$SRC/terminal/serialdialog.h"
-  "$SRC/terminal/localshelltab.h"
 )
 echo "[1/4] moc"
 MOC_CPP=()

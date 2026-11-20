@@ -3,6 +3,7 @@
 #include "core/i18n.h"
 
 #include <QNetworkReply>
+#include <QSettings>
 
 static QString TRc(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
 
@@ -21,7 +22,9 @@ QString TransferItem::stateText() const
 
 QString TransferItem::directionText() const
 {
-    return direction == Upload ? TRc("Upload") : TRc("Download");
+    if (direction == Upload) return TRc("Upload");
+    if (direction == Delete) return TRc("Delete");
+    return TRc("Download");
 }
 
 // ---------------------------------------------------------------------------
@@ -31,7 +34,22 @@ TransferManager *TransferManager::instance()
     return &inst;
 }
 
-TransferManager::TransferManager(QObject *parent) : QObject(parent) {}
+TransferManager::TransferManager(QObject *parent) : QObject(parent)
+{
+    QSettings s;
+    m_maxTasks = qBound(1, s.value(QStringLiteral("transfers/maxTasks"), 10).toInt(), 1000);
+}
+
+void TransferManager::setMaxTasks(int maxTasks)
+{
+    const int val = qBound(1, maxTasks, 1000);
+    if (m_maxTasks == val)
+        return;
+    m_maxTasks = val;
+    QSettings s;
+    s.setValue(QStringLiteral("transfers/maxTasks"), m_maxTasks);
+    emit maxTasksChanged(m_maxTasks);
+}
 
 int TransferManager::indexOf(int id) const
 {
@@ -206,8 +224,10 @@ void TransferManager::retry(int id)
     remove(id);
     if (dir == TransferItem::Download)
         p->download(remote, local);
-    else
+    else if (dir == TransferItem::Upload)
         p->upload(local, remote);
+    else if (dir == TransferItem::Delete)
+        p->remove(remote);
 }
 
 void TransferManager::clearFinished()
