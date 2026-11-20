@@ -3,8 +3,12 @@
 
 #include <QWidget>
 #include <QVector>
+#include <QQueue>
+#include <memory>
 #include "cloudprovider.h"
 #include "editor/thememanager.h"
+
+class QDirIterator;
 
 class QTreeWidget;
 class QTreeWidgetItem;
@@ -26,6 +30,9 @@ public:
     // Takes ownership of `provider`.
     explicit CloudBrowserTab(CloudProvider *provider, const QString &title,
                              QWidget *parent = nullptr);
+    // Declared (and defined in the .cpp) so the std::unique_ptr<QDirIterator>
+    // member is destroyed where QDirIterator is a complete type.
+    ~CloudBrowserTab() override;
 
     void applyTheme(const EditorTheme &theme);
     QString title() const { return m_title; }
@@ -38,9 +45,13 @@ signals:
     // Ask the host (MainWindow) to open a downloaded local file internally.
     // `remotePath` + `driveLabel` let the host remember where the file came
     // from, so Save can offer to push changes back to this same connection.
+    // MainWindow will use libmagic to determine whether to open in EditorTab,
+    // ImageEditorTab, or HexEditorTab.
+    void openDownloadedFile(const QString &localPath, const QString &remotePath,
+                            const QString &driveLabel);
+    // Kept for backward compatibility
     void openTextFile(const QString &localPath, const QString &remotePath,
                       const QString &driveLabel);
-    void openImageFileCompareNone(const QString &localPath); // open image viewer
 
 public slots:
     void refresh();
@@ -87,6 +98,46 @@ private:
     void trackedUpload(const QString &localPath, const QString &remoteDir);
     // Recursively upload a local directory tree, creating remote sub-folders.
     void uploadDirectory(const QString &localDir, const QString &remoteParent);
+
+    // --- Streaming, sequential folder upload (memory-light) -----------------
+    // Instead of enumerating the whole tree and queuing every file at once,
+    // the tree is walked lazily with a QDirIterator and ONE file is uploaded
+    // at a time; the next file is pulled from the iterator only when the
+    // previous upload finishes. This keeps memory flat regardless of how many
+    // files / how deep the folder is.
+    // Up to this many files upload/download concurrently; the folder tree is
+    // still walked lazily (one directory entry / listing pulled at a time),
+    // but several files can be in flight at once for throughput.
+    static constexpr int kMaxConcurrent = 10;
+
+    struct FolderUpload {
+        QString localRoot;     // chosen local folder
+        QString remoteRoot;    // its remote destination (already made)
+        std::unique_ptr<QDirIterator> it;   // lazy walker
+        int done = 0;
+        int inFlight = 0;      // files currently uploading (<= kMaxConcurrent)
+        bool exhausted = false;// iterator drained
+        bool active = false;
+    };
+    std::unique_ptr<FolderUpload> m_folderUp;
+    void startFolderUpload(const QString &localRoot, const QString &remoteRoot);
+    void pumpFolderUpload();            // upload the next streamed file
+    // Map a local absolute path under localRoot to its remote parent dir.
+    QString remoteParentFor(const QString &localAbsPath) const;
+    // Streaming sequential folder download (symmetric to the upload above).
+    struct FolderDownload {
+        QString remoteRoot;    // chosen remote folder
+        QString localRoot;     // local destination
+        QQueue<CloudEntry> dirs;    // remote dirs still to list
+        QQueue<QPair<QString,QString>> files;  // (remotePath, localPath) queue
+        int done = 0;
+        int inFlight = 0;      // files currently downloading (<= kMaxConcurrent)
+        bool active = false;
+        bool listing = false;
+    };
+    std::unique_ptr<FolderDownload> m_folderDn;
+    void startFolderDownload(const CloudEntry &dir, const QString &localRoot);
+    void pumpFolderDownload();
 
     CloudProvider *m_provider = nullptr;
     QString m_title;

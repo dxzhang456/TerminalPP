@@ -20,9 +20,31 @@ I18n::I18n(QObject *parent) : QObject(parent)
 {
 }
 
+// Lightweight bootstrap — only installs the language code / display-name
+// metadata and reads the persisted preference. The (large) translation table
+// itself is loaded lazily the first time a non-English translation is actually
+// requested, so launching in English (the default for first-run users) stays
+// as fast as possible.
 void I18n::initialize()
 {
-    loadTable();
+    // Language codes and their self-localized display names (needed for the
+    // UI Language menu, which is built up front).
+    m_codes = {
+        QStringLiteral("en"), QStringLiteral("zh_CN"), QStringLiteral("zh_TW"),
+        QStringLiteral("es"), QStringLiteral("fr"),    QStringLiteral("de"),
+        QStringLiteral("ru"), QStringLiteral("ja"),    QStringLiteral("ko"),
+    };
+    m_displayNames = {
+        {QStringLiteral("en"),    QStringLiteral("English")},
+        {QStringLiteral("zh_CN"), QStringLiteral("简体中文")},
+        {QStringLiteral("zh_TW"), QStringLiteral("繁體中文")},
+        {QStringLiteral("es"),    QStringLiteral("Español")},
+        {QStringLiteral("fr"),    QStringLiteral("Français")},
+        {QStringLiteral("de"),    QStringLiteral("Deutsch")},
+        {QStringLiteral("ru"),    QStringLiteral("Русский")},
+        {QStringLiteral("ja"),    QStringLiteral("日本語")},
+        {QStringLiteral("ko"),    QStringLiteral("한국어")},
+    };
 
     // Restore the persisted language, defaulting to English on first launch.
     QSettings s;
@@ -30,6 +52,12 @@ void I18n::initialize()
     if (saved.isEmpty() || !m_codes.contains(saved))
         saved = QStringLiteral("en");
     m_current = saved;
+
+    // Only pay the cost of building the full translation table when the user
+    // has actually chosen a non-English language. English launches skip this
+    // entirely for a faster startup.
+    if (m_current != QStringLiteral("en"))
+        ensureTableLoaded();
 }
 
 QStringList I18n::languageCodes() const
@@ -49,6 +77,10 @@ void I18n::setLanguage(const QString &code)
     m_current = code;
     QSettings s;
     s.setValue(QStringLiteral("ui/language"), code);
+    // Make sure the translation table is populated before any widget
+    // re-translates itself on the languageChanged() signal.
+    if (m_current != QStringLiteral("en"))
+        ensureTableLoaded();
     emit languageChanged(code);
 }
 
@@ -62,25 +94,19 @@ QString I18n::tr(const QString &source) const
     return it->value(source, source);
 }
 
+void I18n::ensureTableLoaded()
+{
+    if (m_tableLoaded)
+        return;
+    m_tableLoaded = true;
+    loadTable();
+}
+
 void I18n::loadTable()
 {
-    // Language codes and their self-localized display names.
-    m_codes = {
-        QStringLiteral("en"), QStringLiteral("zh_CN"), QStringLiteral("zh_TW"),
-        QStringLiteral("es"), QStringLiteral("fr"),    QStringLiteral("de"),
-        QStringLiteral("ru"), QStringLiteral("ja"),    QStringLiteral("ko"),
-    };
-    m_displayNames = {
-        {QStringLiteral("en"),    QStringLiteral("English")},
-        {QStringLiteral("zh_CN"), QStringLiteral("简体中文")},
-        {QStringLiteral("zh_TW"), QStringLiteral("繁體中文")},
-        {QStringLiteral("es"),    QStringLiteral("Español")},
-        {QStringLiteral("fr"),    QStringLiteral("Français")},
-        {QStringLiteral("de"),    QStringLiteral("Deutsch")},
-        {QStringLiteral("ru"),    QStringLiteral("Русский")},
-        {QStringLiteral("ja"),    QStringLiteral("日本語")},
-        {QStringLiteral("ko"),    QStringLiteral("한국어")},
-    };
+    // NOTE: m_codes / m_displayNames are already populated in initialize() so
+    // the UI Language menu can be built without paying for the full table.
+    // Here we only populate the (source -> translated) rows.
 
     // Helper to register a row of translations for one English source string.
     auto add = [this](const char *en,
@@ -426,6 +452,10 @@ void I18n::loadTable()
     add("Select Folder to Upload","选择要上传的文件夹","選擇要上傳的資料夾","Seleccionar carpeta para subir","Sélectionner le dossier à téléverser","Hochzuladenden Ordner wählen","Выберите папку для загрузки","アップロードするフォルダを選択","업로드할 폴더 선택");
     add("Uploading %1 file(s)…","正在上传 %1 个文件…","正在上傳 %1 個檔案…","Subiendo %1 archivo(s)…","Téléversement de %1 fichier(s)…","%1 Datei(en) werden hochgeladen…","Загрузка %1 файла(ов)…","%1 件のファイルをアップロード中…","%1개 파일 업로드 중…");
     add("Uploading folder %1…","正在上传文件夹 %1…","正在上傳資料夾 %1…","Subiendo la carpeta %1…","Téléversement du dossier %1…","Ordner %1 wird hochgeladen…","Загрузка папки %1…","フォルダ %1 をアップロード中…","폴더 %1 업로드 중…");
+    add("Uploaded %1 file(s).","已上传 %1 个文件。","已上傳 %1 個檔案。","Se subieron %1 archivo(s).","%1 fichier(s) téléversé(s).","%1 Datei(en) hochgeladen.","Загружено файлов: %1.","%1 件をアップロードしました。","%1개 파일 업로드됨.");
+    add("Downloaded %1 file(s).","已下载 %1 个文件。","已下載 %1 個檔案。","Se descargaron %1 archivo(s).","%1 fichier(s) téléchargé(s).","%1 Datei(en) heruntergeladen.","Скачано файлов: %1.","%1 件をダウンロードしました。","%1개 파일 다운로드됨.");
+    add("A folder upload is already in progress.","已有文件夹上传正在进行中。","已有資料夾上傳正在進行中。","Ya hay una subida de carpeta en curso.","Un téléversement de dossier est déjà en cours.","Ein Ordner-Upload läuft bereits.","Загрузка папки уже выполняется.","フォルダのアップロードが既に進行中です。","폴더 업로드가 이미 진행 중입니다.");
+    add("A folder download is already in progress.","已有文件夹下载正在进行中。","已有資料夾下載正在進行中。","Ya hay una descarga de carpeta en curso.","Un téléchargement de dossier est déjà en cours.","Ein Ordner-Download läuft bereits.","Скачивание папки уже выполняется.","フォルダのダウンロードが既に進行中です。","폴더 다운로드가 이미 진행 중입니다.");
     add("Cancel",            "取消",      "取消",      "Cancelar",     "Annuler",       "Abbrechen",     "Отмена",          "キャンセル",    "취소");
     add("Retry",             "重试",      "重試",      "Reintentar",   "Réessayer",     "Wiederholen",   "Повторить",       "再試行",        "다시 시도");
     add("Remove",            "移除",      "移除",      "Quitar",       "Retirer",       "Entfernen",     "Убрать",          "削除",          "제거");
@@ -704,6 +734,136 @@ void I18n::loadTable()
     add("Cloud",             "云盘",      "雲端",      "Nube",         "Cloud",         "Cloud",         "Облако",          "クラウド",      "클라우드");
     add("&Copy",             "复制(&C)",  "複製(&C)",  "&Copiar",      "&Copier",       "&Kopieren",     "&Копировать",     "コピー(&C)",    "복사(&C)");
     add("&Paste",            "粘贴(&P)",  "貼上(&P)",  "&Pegar",       "C&oller",       "&Einfügen",     "&Вставить",       "貼り付け(&P)",  "붙여넣기(&P)");
+
+    // ---- Local shell terminals (cmd / PowerShell) ----
+    add("New &CMD Terminal",  "新建CMD终端(&C)","新增CMD終端(&C)","Nueva terminal &CMD","Nouveau terminal &CMD","Neues &CMD-Terminal","Новый терминал &CMD","新規CMD端末(&C)","새 &CMD 터미널");
+    add("New &PowerShell Terminal","新建PowerShell终端(&P)","新增PowerShell終端(&P)","Nueva terminal &PowerShell","Nouveau terminal &PowerShell","Neues &PowerShell-Terminal","Новый терминал &PowerShell","新規PowerShell端末(&P)","새 &PowerShell 터미널");
+    add("CMD",               "CMD",       "CMD",       "CMD",          "CMD",           "CMD",           "CMD",             "CMD",           "CMD");
+    add("PowerShell",        "PowerShell","PowerShell","PowerShell",   "PowerShell",    "PowerShell",    "PowerShell",      "PowerShell",    "PowerShell");
+    add("Failed to start the shell process.",
+        "无法启动 Shell 进程。","無法啟動 Shell 行程。","No se pudo iniciar el proceso del shell.",
+        "Impossible de démarrer le processus du shell.","Shell-Prozess konnte nicht gestartet werden.",
+        "Не удалось запустить процесс оболочки.","シェルプロセスの起動に失敗しました。","셸 프로세스를 시작하지 못했습니다.");
+    add("failed to start the shell process",
+        "无法启动 Shell 进程","無法啟動 Shell 行程","no se pudo iniciar el proceso del shell",
+        "impossible de démarrer le processus du shell","Shell-Prozess konnte nicht gestartet werden",
+        "не удалось запустить процесс оболочки","シェルプロセスの起動に失敗しました","셸 프로세스를 시작하지 못했습니다");
+    add("process exited (code %1)",
+        "进程已退出（代码 %1）","行程已結束（代碼 %1）","el proceso terminó (código %1)",
+        "le processus s'est terminé (code %1)","Prozess beendet (Code %1)",
+        "процесс завершён (код %1)","プロセスが終了しました（コード %1）","프로세스 종료됨(코드 %1)");
+
+    // ---- Image editor ----
+    add("image",             "图片",      "圖片",      "imagen",       "image",         "Bild",          "изображение",     "画像",          "이미지");
+    add("Image: %1",         "图片：%1",  "圖片：%1",  "Imagen: %1",   "Image : %1",    "Bild: %1",      "Изображение: %1", "画像: %1",      "이미지: %1");
+    add("Open as &Image...", "以图片打开(&I)...","以圖片開啟(&I)...","Abrir como &imagen...","Ouvrir comme &image...","Als &Bild öffnen...","Открыть как &изображение...","画像として開く(&I)...","이미지로 열기(&I)...");
+    add("Open as Image",     "以图片打开","以圖片開啟","Abrir como imagen","Ouvrir comme image","Als Bild öffnen","Открыть как изображение","画像として開く","이미지로 열기");
+    add("Tools",             "工具",      "工具",      "Herramientas", "Outils",        "Werkzeuge",     "Инструменты",     "ツール",        "도구");
+    add("Style",             "样式",      "樣式",      "Estilo",       "Style",         "Stil",          "Стиль",           "スタイル",      "스타일");
+    add("Adjustments",       "调整",      "調整",      "Ajustes",      "Réglages",      "Anpassungen",   "Настройки",       "調整",          "조정");
+    add("Filters",           "滤镜",      "濾鏡",      "Filtros",      "Filtres",       "Filter",        "Фильтры",         "フィルター",    "필터");
+    add("Brush",             "画笔",      "畫筆",      "Pincel",       "Pinceau",       "Pinsel",        "Кисть",           "ブラシ",        "브러시");
+    add("Eraser",            "橡皮擦",    "橡皮擦",    "Borrador",     "Gomme",         "Radierer",      "Ластик",          "消しゴム",      "지우개");
+    add("Line",              "直线",      "直線",      "Línea",        "Ligne",         "Linie",         "Линия",           "直線",          "선");
+    add("Rect",              "矩形",      "矩形",      "Rectángulo",   "Rectangle",     "Rechteck",      "Прямоугольник",   "矩形",          "사각형");
+    add("Ellipse",           "椭圆",      "橢圓",      "Elipse",       "Ellipse",       "Ellipse",       "Эллипс",          "楕円",          "타원");
+    add("Arrow",             "箭头",      "箭頭",      "Flecha",       "Flèche",        "Pfeil",         "Стрелка",         "矢印",          "화살표");
+    add("Text",              "文字",      "文字",      "Texto",        "Texte",         "Text",          "Текст",           "テキスト",      "텍스트");
+    add("Crop",              "裁剪",      "裁剪",      "Recortar",     "Rogner",        "Zuschneiden",   "Обрезать",        "切り抜き",      "자르기");
+    add("Mosaic",            "马赛克",    "馬賽克",    "Mosaico",      "Mosaïque",      "Mosaik",        "Мозаика",         "モザイク",      "모자이크");
+    add("Magic Wand",        "魔棒",      "魔術棒",    "Varita mágica","Baguette magique","Zauberstab",  "Волшебная палочка","マジックワンド","요술봉");
+    add("Brush Color...",    "画笔颜色...","畫筆顏色...","Color de pincel...","Couleur du pinceau...","Pinselfarbe...","Цвет кисти...","ブラシの色...","브러시 색...");
+    add("Text Color...",     "文字颜色...","文字顏色...","Color del texto...","Couleur du texte...","Textfarbe...","Цвет текста...","文字色...","텍스트 색...");
+    add("Brush Color",       "画笔颜色",  "畫筆顏色",  "Color de pincel","Couleur du pinceau","Pinselfarbe","Цвет кисти","ブラシの色","브러시 색");
+    add("Text Color",        "文字颜色",  "文字顏色",  "Color del texto","Couleur du texte","Textfarbe","Цвет текста","文字色","텍스트 색");
+    add("Brush Width:",      "画笔宽度：","畫筆寬度：","Grosor del pincel:","Épaisseur du pinceau :","Pinselbreite:","Ширина кисти:","ブラシの太さ：","브러시 굵기:");
+    add("Text Size:",        "文字大小：","文字大小：","Tamaño del texto:","Taille du texte :","Textgröße:","Размер текста:","文字サイズ：","텍스트 크기:");
+    add("Mosaic Block:",     "马赛克块：","馬賽克區塊：","Bloque de mosaico:","Bloc mosaïque :","Mosaikblock:","Блок мозаики:","モザイクブロック：","모자이크 블록:");
+    add("Wand Tolerance:",   "魔棒容差：","魔術棒容差：","Tolerancia de varita:","Tolérance baguette :","Zauberstab-Toleranz:","Допуск палочки:","ワンド許容値：","요술봉 허용치:");
+    add("Brightness",        "亮度",      "亮度",      "Brillo",       "Luminosité",    "Helligkeit",    "Яркость",         "明るさ",        "밝기");
+    add("Contrast",          "对比度",    "對比度",    "Contraste",    "Contraste",     "Kontrast",      "Контраст",        "コントラスト",  "대비");
+    add("Saturation",        "饱和度",    "飽和度",    "Saturación",   "Saturation",    "Sättigung",     "Насыщенность",    "彩度",          "채도");
+    add("Temperature",       "色温",      "色溫",      "Temperatura",  "Température",    "Temperatur",    "Температура",      "色温度",        "색온도");
+    add("Exposure",          "曝光",      "曝光",      "Exposición",   "Exposition",    "Belichtung",    "Экспозиция",      "露出",          "노출");
+    add("Shadows",           "阴影",      "陰影",      "Sombras",      "Ombres",        "Schatten",      "Тени",            "シャドウ",      "그림자");
+    add("Highlights",        "高光",      "高光",      "Luces",        "Hautes lumières","Lichter",      "Света",           "ハイライト",    "하이라이트");
+    add("Sharpen",           "锐化",      "銳化",      "Nitidez",      "Netteté",       "Schärfen",      "Резкость",        "シャープ",      "선명화");
+    add("Apply",             "应用",      "套用",      "Aplicar",      "Appliquer",     "Anwenden",      "Применить",       "適用",          "적용");
+    add("Reset",             "重置",      "重設",      "Restablecer",  "Réinitialiser", "Zurücksetzen",  "Сбросить",        "リセット",      "초기화");
+    add("Adjustments applied.","已应用调整。","已套用調整。","Ajustes aplicados.","Réglages appliqués.","Anpassungen angewendet.","Настройки применены.","調整を適用しました。","조정이 적용되었습니다.");
+    add("Undo",              "撤销",      "復原",      "Deshacer",     "Annuler",       "Rückgängig",    "Отменить",        "元に戻す",      "실행 취소");
+    add("Redo",              "重做",      "重做",      "Rehacer",      "Rétablir",      "Wiederholen",   "Повторить",       "やり直し",      "다시 실행");
+    add("Rotate Left",       "向左旋转",  "向左旋轉",  "Girar a la izq.","Pivoter à gauche","Links drehen","Повернуть влево","左に回転","왼쪽 회전");
+    add("Rotate Right",      "向右旋转",  "向右旋轉",  "Girar a la der.","Pivoter à droite","Rechts drehen","Повернуть вправо","右に回転","오른쪽 회전");
+    add("Free Rotate...",    "自由旋转...","自由旋轉...","Rotación libre...","Rotation libre...","Freies Drehen...","Свободный поворот...","自由回転...","자유 회전...");
+    add("Free Rotate",       "自由旋转",  "自由旋轉",  "Rotación libre","Rotation libre","Freies Drehen","Свободный поворот","自由回転","자유 회전");
+    add("Angle (degrees):",  "角度（度）：","角度（度）：","Ángulo (grados):","Angle (degrés) :","Winkel (Grad):","Угол (градусы):","角度（度）：","각도(도):");
+    add("Straighten...",     "拉直...",   "拉直...",   "Enderezar...", "Redresser...",  "Begradigen...", "Выпрямить...",    "傾き補正...",   "수평 맞추기...");
+    add("Straighten",        "拉直",      "拉直",      "Enderezar",    "Redresser",     "Begradigen",    "Выпрямить",       "傾き補正",      "수평 맞추기");
+    add("Tilt (degrees):",   "倾斜（度）：","傾斜（度）：","Inclinación (grados):","Inclinaison (degrés) :","Neigung (Grad):","Наклон (градусы):","傾き（度）：","기울기(도):");
+    add("Flip H",            "水平翻转",  "水平翻轉",  "Voltear H",    "Miroir H",      "H spiegeln",    "Отразить Г",      "左右反転",      "좌우 반전");
+    add("Flip V",            "垂直翻转",  "垂直翻轉",  "Voltear V",    "Miroir V",      "V spiegeln",    "Отразить В",      "上下反転",      "상하 반전");
+    add("Select a crop region first (use the Crop tool).",
+        "请先用裁剪工具框选裁剪区域。","請先用裁剪工具框選裁剪區域。","Seleccione primero una región de recorte (herramienta Recortar).",
+        "Sélectionnez d'abord une zone de rognage (outil Rogner).","Wählen Sie zuerst einen Zuschneidebereich (Werkzeug Zuschneiden).",
+        "Сначала выделите область обрезки (инструмент Обрезать).","先に切り抜き領域を選択してください（切り抜きツール）。","먼저 자를 영역을 선택하세요(자르기 도구).");
+    add("Resize...",         "改尺寸...", "改尺寸...", "Redimensionar...","Redimensionner...","Größe ändern...","Изменить размер...","サイズ変更...","크기 조정...");
+    add("Resize",            "改尺寸",    "改尺寸",    "Redimensionar","Redimensionner","Größe ändern",  "Изменить размер", "サイズ変更",    "크기 조정");
+    add("Scale...",          "缩放...",   "縮放...",   "Escalar...",   "Mettre à l'échelle...","Skalieren...","Масштаб...","拡大縮小...","배율...");
+    add("Scale",             "缩放",      "縮放",      "Escalar",      "Échelle",       "Skalieren",     "Масштаб",         "拡大縮小",      "배율");
+    add("Scale (%):",        "缩放（%）：","縮放（%）：","Escala (%):",  "Échelle (%) :", "Skalierung (%):","Масштаб (%):",   "拡大縮小（%）：","배율(%):");
+    add("Width:",            "宽度：",    "寬度：",    "Ancho:",       "Largeur :",     "Breite:",       "Ширина:",         "幅：",          "너비:");
+    add("Height:",           "高度：",    "高度：",    "Alto:",        "Hauteur :",     "Höhe:",         "Высота:",         "高さ：",        "높이:");
+    add("DPI...",            "DPI...",    "DPI...",    "PPP...",       "PPP...",        "DPI...",        "DPI...",          "DPI...",        "DPI...");
+    add("DPI",               "DPI",       "DPI",       "PPP",          "PPP",           "DPI",           "DPI",             "DPI",           "DPI");
+    add("DPI:",              "DPI：",     "DPI：",     "PPP:",         "PPP :",         "DPI:",          "DPI:",            "DPI：",         "DPI:");
+    add("DPI set to %1.",    "DPI 已设为 %1。","DPI 已設為 %1。","PPP establecido en %1.","PPP réglé sur %1.","DPI auf %1 gesetzt.","DPI установлен в %1.","DPI を %1 に設定しました。","DPI를 %1(으)로 설정함.");
+    add("Expand Canvas...",  "扩画布...", "擴畫布...", "Ampliar lienzo...","Agrandir le canevas...","Leinwand erweitern...","Расширить холст...","キャンバス拡張...","캔버스 확장...");
+    add("Expand Canvas",     "扩画布",    "擴畫布",    "Ampliar lienzo","Agrandir le canevas","Leinwand erweitern","Расширить холст","キャンバス拡張","캔버스 확장");
+    add("Border (px):",      "边框（像素）：","邊框（像素）：","Borde (px):","Bordure (px) :","Rand (px):","Граница (px):","枠（px）：","테두리(px):");
+    add("Auto Cutout",       "自动抠图",  "自動去背",  "Recorte automático","Détourage auto","Auto-Freistellen","Авто-вырезание","自動切り抜き","자동 누끼");
+    add("Background removed (auto cutout).","已移除背景（自动抠图）。","已移除背景（自動去背）。","Fondo eliminado (recorte automático).","Arrière-plan supprimé (détourage auto).","Hintergrund entfernt (Auto-Freistellen).","Фон удалён (авто-вырезание).","背景を削除しました（自動切り抜き）。","배경 제거됨(자동 누끼).");
+    add("Text Watermark...", "文字水印...","文字浮水印...","Marca de agua de texto...","Filigrane texte...","Text-Wasserzeichen...","Текстовый водяной знак...","文字透かし...","텍스트 워터마크...");
+    add("Text Watermark",    "文字水印",  "文字浮水印","Marca de agua de texto","Filigrane texte","Text-Wasserzeichen","Текстовый водяной знак","文字透かし","텍스트 워터마크");
+    add("Image Watermark...","图片水印...","圖片浮水印...","Marca de agua de imagen...","Filigrane image...","Bild-Wasserzeichen...","Водяной знак (изобр.)...","画像透かし...","이미지 워터마크...");
+    add("Watermark text:",   "水印文字：","浮水印文字：","Texto de marca de agua:","Texte du filigrane :","Wasserzeichentext:","Текст водяного знака:","透かし文字：","워터마크 텍스트:");
+    add("Choose Watermark Image","选择水印图片","選擇浮水印圖片","Elegir imagen de marca de agua","Choisir l'image de filigrane","Wasserzeichenbild wählen","Выбрать изображение водяного знака","透かし画像を選択","워터마크 이미지 선택");
+    add("Export As...",      "导出为...", "匯出為...", "Exportar como...","Exporter sous...","Exportieren als...","Экспорт как...","エクスポート...","내보내기...");
+    add("Export As",         "导出为",    "匯出為",    "Exportar como","Exporter sous", "Exportieren als","Экспорт как",   "エクスポート",  "내보내기");
+    add("Exported to %1",    "已导出到 %1","已匯出到 %1","Exportado a %1","Exporté vers %1","Exportiert nach %1","Экспортировано в %1","%1 にエクスポートしました","%1 로 내보냄");
+    add("Compress & Export...","压缩并导出...","壓縮並匯出...","Comprimir y exportar...","Compresser et exporter...","Komprimieren & exportieren...","Сжать и экспортировать...","圧縮してエクスポート...","압축 후 내보내기...");
+    add("Compress & Export", "压缩并导出","壓縮並匯出","Comprimir y exportar","Compresser et exporter","Komprimieren & exportieren","Сжать и экспортировать","圧縮してエクスポート","압축 후 내보내기");
+    add("Quality (1-100):",  "质量（1-100）：","品質（1-100）：","Calidad (1-100):","Qualité (1-100) :","Qualität (1-100):","Качество (1-100):","品質（1-100）：","품질(1-100):");
+    add("Exported (quality %1) to %2","已以质量 %1 导出到 %2","已以品質 %1 匯出到 %2","Exportado (calidad %1) a %2","Exporté (qualité %1) vers %2","Exportiert (Qualität %1) nach %2","Экспортировано (качество %1) в %2","品質 %1 で %2 にエクスポート","품질 %1(으)로 %2 에 내보냄");
+    add("Filter applied: %1","已应用滤镜：%1","已套用濾鏡：%1","Filtro aplicado: %1","Filtre appliqué : %1","Filter angewendet: %1","Фильтр применён: %1","フィルター適用: %1","필터 적용: %1");
+    add("Add Text",          "添加文字",  "新增文字",  "Agregar texto","Ajouter du texte","Text hinzufügen","Добавить текст","テキスト追加","텍스트 추가");
+    add("Text:",             "文字：",    "文字：",    "Texto:",       "Texte :",       "Text:",         "Текст:",          "テキスト：",    "텍스트:");
+    add("Images (*.png *.jpg *.jpeg *.bmp *.webp)","图片 (*.png *.jpg *.jpeg *.bmp *.webp)","圖片 (*.png *.jpg *.jpeg *.bmp *.webp)","Imágenes (*.png *.jpg *.jpeg *.bmp *.webp)","Images (*.png *.jpg *.jpeg *.bmp *.webp)","Bilder (*.png *.jpg *.jpeg *.bmp *.webp)","Изображения (*.png *.jpg *.jpeg *.bmp *.webp)","画像 (*.png *.jpg *.jpeg *.bmp *.webp)","이미지 (*.png *.jpg *.jpeg *.bmp *.webp)");
+
+    // ---- File associations ----
+    add("File &Associations...","文件关联(&A)...","檔案關聯(&A)...","&Asociaciones de archivo...","&Associations de fichiers...","Datei&zuordnungen...","&Ассоциации файлов...","ファイル関連付け(&A)...","파일 연결(&A)...");
+    add("File Associations", "文件关联",  "檔案關聯",  "Asociaciones de archivo","Associations de fichiers","Dateizuordnungen","Ассоциации файлов","ファイル関連付け","파일 연결");
+    add("File associations are only supported on Windows.","文件关联仅在 Windows 上支持。","檔案關聯僅在 Windows 上支援。","Las asociaciones de archivo solo se admiten en Windows.","Les associations de fichiers ne sont prises en charge que sous Windows.","Dateizuordnungen werden nur unter Windows unterstützt.","Ассоциации файлов поддерживаются только в Windows.","ファイル関連付けは Windows のみ対応です。","파일 연결은 Windows에서만 지원됩니다.");
+    add("Choose which file groups Terminal++ should handle, then pick an action. All changes are per-user and fully reversible.",
+        "选择要让 Terminal++ 处理的文件分组，然后选择一个操作。所有更改均为当前用户级且完全可撤销。",
+        "選擇要讓 Terminal++ 處理的檔案分組，然後選擇一個動作。所有變更皆為目前使用者層級且完全可還原。",
+        "Elija qué grupos de archivos debe manejar Terminal++ y luego una acción. Todos los cambios son por usuario y totalmente reversibles.",
+        "Choisissez les groupes de fichiers que Terminal++ doit gérer, puis une action. Tous les changements sont par utilisateur et réversibles.",
+        "Wählen Sie, welche Dateigruppen Terminal++ behandeln soll, dann eine Aktion. Alle Änderungen sind benutzerbezogen und umkehrbar.",
+        "Выберите группы файлов для Terminal++, затем действие. Все изменения на уровне пользователя и обратимы.",
+        "Terminal++ が処理するファイルグループを選び、操作を選択してください。すべての変更はユーザー単位で、完全に元に戻せます。",
+        "Terminal++가 처리할 파일 그룹을 선택한 뒤 작업을 고르세요. 모든 변경은 사용자 단위이며 되돌릴 수 있습니다.");
+    add("Text files (.txt, .md, .log, .csv, .ini, .json, .xml, …)","文本文件 (.txt, .md, .log, .csv, .ini, .json, .xml, …)","文字檔 (.txt, .md, .log, .csv, .ini, .json, .xml, …)","Archivos de texto (.txt, .md, .log, .csv, .ini, .json, .xml, …)","Fichiers texte (.txt, .md, .log, .csv, .ini, .json, .xml, …)","Textdateien (.txt, .md, .log, .csv, .ini, .json, .xml, …)","Текстовые файлы (.txt, .md, .log, .csv, .ini, .json, .xml, …)","テキストファイル (.txt, .md, .log, .csv, .ini, .json, .xml, …)","텍스트 파일 (.txt, .md, .log, .csv, .ini, .json, .xml, …)");
+    add("Source code (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)","源代码 (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)","原始碼 (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)","Código fuente (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)","Code source (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)","Quellcode (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)","Исходный код (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)","ソースコード (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)","소스 코드 (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)");
+    add("Images (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)","图片 (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)","圖片 (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)","Imágenes (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)","Images (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)","Bilder (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)","Изображения (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)","画像 (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)","이미지 (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)");
+    add("Add to \"Open with\"","加入“打开方式”","加入「開啟方式」","Añadir a \"Abrir con\"","Ajouter à « Ouvrir avec »","Zu \"Öffnen mit\" hinzufügen","Добавить в «Открыть с помощью»","「プログラムから開く」に追加","\"연결 프로그램\"에 추가");
+    add("Remove from \"Open with\"","从“打开方式”移除","從「開啟方式」移除","Quitar de \"Abrir con\"","Retirer de « Ouvrir avec »","Aus \"Öffnen mit\" entfernen","Убрать из «Открыть с помощью»","「プログラムから開く」から削除","\"연결 프로그램\"에서 제거");
+    add("Set as Default Program","设为默认程序","設為預設程式","Establecer como programa predeterminado","Définir comme programme par défaut","Als Standardprogramm festlegen","Сделать программой по умолчанию","既定のプログラムに設定","기본 프로그램으로 설정");
+    add("Unset as Default Program","取消默认程序","取消預設程式","Quitar como programa predeterminado","Retirer comme programme par défaut","Als Standardprogramm entfernen","Убрать как программу по умолчанию","既定のプログラムを解除","기본 프로그램 해제");
+    add("Added Terminal++ to \"Open with\" for %1 file type(s).","已为 %1 种文件类型将 Terminal++ 加入“打开方式”。","已為 %1 種檔案類型將 Terminal++ 加入「開啟方式」。","Terminal++ añadido a \"Abrir con\" para %1 tipo(s) de archivo.","Terminal++ ajouté à « Ouvrir avec » pour %1 type(s) de fichier.","Terminal++ zu \"Öffnen mit\" für %1 Dateityp(en) hinzugefügt.","Terminal++ добавлен в «Открыть с помощью» для %1 типов файлов.","%1 種類のファイルで Terminal++ を「プログラムから開く」に追加しました。","%1개 파일 형식에 대해 Terminal++를 \"연결 프로그램\"에 추가함.");
+    add("Removed Terminal++ from \"Open with\" for %1 file type(s).","已为 %1 种文件类型将 Terminal++ 从“打开方式”移除。","已為 %1 種檔案類型將 Terminal++ 從「開啟方式」移除。","Terminal++ quitado de \"Abrir con\" para %1 tipo(s) de archivo.","Terminal++ retiré de « Ouvrir avec » pour %1 type(s) de fichier.","Terminal++ aus \"Öffnen mit\" für %1 Dateityp(en) entfernt.","Terminal++ убран из «Открыть с помощью» для %1 типов файлов.","%1 種類のファイルで Terminal++ を「プログラムから開く」から削除しました。","%1개 파일 형식에서 Terminal++를 \"연결 프로그램\"에서 제거함.");
+    add("Terminal++ set as default for %1 file type(s).","已为 %1 种文件类型将 Terminal++ 设为默认程序。","已為 %1 種檔案類型將 Terminal++ 設為預設程式。","Terminal++ establecido como predeterminado para %1 tipo(s).","Terminal++ défini par défaut pour %1 type(s).","Terminal++ als Standard für %1 Dateityp(en) festgelegt.","Terminal++ установлен по умолчанию для %1 типов.","%1 種類のファイルで Terminal++ を既定に設定しました。","%1개 파일 형식의 기본 프로그램으로 설정함.");
+    add("Terminal++ removed as default for %1 file type(s).","已为 %1 种文件类型取消 Terminal++ 的默认程序。","已為 %1 種檔案類型取消 Terminal++ 的預設程式。","Terminal++ quitado como predeterminado para %1 tipo(s).","Terminal++ retiré par défaut pour %1 type(s).","Terminal++ als Standard für %1 Dateityp(en) entfernt.","Terminal++ убран из программ по умолчанию для %1 типов.","%1 種類のファイルで Terminal++ の既定を解除しました。","%1개 파일 형식에서 Terminal++ 기본 설정을 해제함.");
 
     // ---- Dialogs / messages ----
     add("Open Files",        "打开文件",  "開啟檔案",  "Abrir archivos","Ouvrir des fichiers","Dateien öffnen","Открыть файлы","ファイルを開く","파일 열기");

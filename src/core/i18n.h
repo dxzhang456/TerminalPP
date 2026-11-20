@@ -42,13 +42,18 @@ signals:
 
 private:
     explicit I18n(QObject *parent = nullptr);
+    // Build the full English->target translation table. Called lazily by
+    // ensureTableLoaded() the first time a non-English translation is needed,
+    // so launching in English pays zero startup cost.
     void loadTable();
+    void ensureTableLoaded();
 
     QString m_current = QStringLiteral("en");
     // code -> (English source -> translated)
     QHash<QString, QHash<QString, QString>> m_table;
     QStringList m_codes;
     QHash<QString, QString> m_displayNames;
+    bool m_tableLoaded = false;
 };
 
 // Convenience macro mirroring Qt's tr() but routed through our runtime table.

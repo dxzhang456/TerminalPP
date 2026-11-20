@@ -5,8 +5,10 @@
 #include "editor/finddialog.h"
 #include "editor/gotodialog.h"
 #include "editor/hexeditortab.h"
+#include "editor/imageeditortab.h"
 #include "terminal/sshtab.h"
 #include "terminal/serialtab.h"
+#include "terminal/localshelltab.h"
 #include "terminal/sessiondialog.h"
 #include "terminal/serialdialog.h"
 #include "terminal/sessionmanager.h"
@@ -14,6 +16,8 @@
 #include "core/i18n.h"
 #include "core/cliphistory.h"
 #include "core/cliphistorydialog.h"
+#include "core/fileassoc.h"
+#include "core/magicdetector.h"
 #include "compare/comparedialog.h"
 #include "compare/textcomparetab.h"
 #include "compare/foldercomparetab.h"
@@ -46,6 +50,8 @@
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QPushButton>
+#include <QCheckBox>
+#include <QDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QListWidgetItem>
@@ -178,6 +184,7 @@ void MainWindow::createMenus()
     m_fileMenu->addAction(TR("&New"), QKeySequence::New, this, &MainWindow::newFile);
     m_fileMenu->addAction(TR("&Open..."), QKeySequence::Open, this, &MainWindow::openFileDialog);
     m_fileMenu->addAction(TR("Open as &Hex..."), this, &MainWindow::openHexEditorDialog);
+    m_fileMenu->addAction(TR("Open as &Image..."), this, &MainWindow::openImageEditorDialog);
     m_recentMenu = m_fileMenu->addMenu(TR("Open &Recent"));
     rebuildRecentMenu();
     m_fileMenu->addAction(TR("&Save"), QKeySequence::Save, this, &MainWindow::saveFile);
@@ -185,6 +192,8 @@ void MainWindow::createMenus()
     m_fileMenu->addAction(TR("Save A&ll"), QKeySequence("Ctrl+Shift+S"), this, &MainWindow::saveAll);
     m_fileMenu->addSeparator();
     m_fileMenu->addAction(TR("&Print..."), QKeySequence::Print, this, &MainWindow::printFile);
+    m_fileMenu->addSeparator();
+    m_fileMenu->addAction(TR("File &Associations..."), this, &MainWindow::manageFileAssociations);
     m_fileMenu->addSeparator();
     m_fileMenu->addAction(TR("&Close Tab"), QKeySequence("Ctrl+W"), this, &MainWindow::closeCurrentTab);
     m_fileMenu->addAction(TR("E&xit"), QKeySequence("Ctrl+Q"), this, &MainWindow::close);
@@ -321,6 +330,9 @@ void MainWindow::createMenus()
 
     // ---------- Terminal ----------
     m_termMenu = menuBar()->addMenu(TR("&Terminal"));
+    m_termMenu->addAction(TR("New &CMD Terminal"), this, &MainWindow::newCmdTerminal);
+    m_termMenu->addAction(TR("New &PowerShell Terminal"), this, &MainWindow::newPowerShellTerminal);
+    m_termMenu->addSeparator();
     m_termMenu->addAction(TR("New &SSH Session..."), QKeySequence("Ctrl+N"), this, &MainWindow::newSshSession)
         ->setShortcutContext(Qt::ApplicationShortcut);
     m_termMenu->addAction(TR("New Serial / &UART Session..."), this, &MainWindow::newSerialSession);
@@ -580,23 +592,56 @@ void MainWindow::newFile()
     updateStatusBar();
 }
 
-EditorTab *MainWindow::openFile(const QString &path)
+QWidget *MainWindow::openFile(const QString &path)
 {
     if (path.isEmpty())
         return nullptr;
 
-    // If already open, focus it.
+    // If already open, focus it (works across EditorTab, ImageEditorTab, HexEditorTab).
     for (int i = 0; i < m_tabs->count(); ++i) {
-        EditorTab *t = qobject_cast<EditorTab *>(m_tabs->widget(i));
-        if (t && t->filePath() == path) {
-            m_tabs->setCurrentIndex(i);
-            return t;
+        QWidget *w = m_tabs->widget(i);
+        if (EditorTab *t = qobject_cast<EditorTab *>(w)) {
+            if (t->filePath() == path) {
+                m_tabs->setCurrentIndex(i);
+                return t;
+            }
+        } else if (ImageEditorTab *img = qobject_cast<ImageEditorTab *>(w)) {
+            if (img->filePath() == path) {
+                m_tabs->setCurrentIndex(i);
+                return img;
+            }
+        } else if (HexEditorTab *hex = qobject_cast<HexEditorTab *>(w)) {
+            if (hex->filePath() == path) {
+                m_tabs->setCurrentIndex(i);
+                return hex;
+            }
         }
     }
 
+    // Use libmagic to determine the file type:
+    //   - Image  -> open in ImageEditorTab
+    //   - Text   -> open in EditorTab
+    //   - Binary -> open in HexEditorTab
+    const MagicDetector::FileType type = MagicDetector::detectType(path);
+
+    if (type == MagicDetector::Image) {
+        openImageEditor(path);
+        addRecentFile(path);
+        return m_tabs->currentWidget();
+    }
+    if (type == MagicDetector::Binary) {
+        openHexEditor(path);
+        addRecentFile(path);
+        return m_tabs->currentWidget();
+    }
+
+    // Default: plain text / source code -> EditorTab
     EditorTab *tab = addEditorTab();
     if (!tab->loadFile(path)) {
         QMessageBox::warning(this, TR("Open"), TR("Cannot open file:\n%1").arg(path));
+        int idx = m_tabs->indexOf(tab);
+        if (idx >= 0) m_tabs->removeTab(idx);
+        tab->deleteLater();
         return nullptr;
     }
     tab->applyTheme(m_themeManager.current());
@@ -610,16 +655,16 @@ EditorTab *MainWindow::openFile(const QString &path)
 }
 
 // Open a locally-downloaded file that originated from a cloud drive / shared
-// folder / SFTP / FTP browser tab. Identical to openFile() but additionally
-// records the remote origin on the tab so saveFile()/saveFileAs() can offer
-// to push the change back to that same connection.
-EditorTab *MainWindow::openRemoteFile(const QString &localPath, CloudProvider *provider,
-                                      const QString &remotePath, const QString &driveLabel)
+// folder / SFTP / FTP browser tab. Uses openFile() (which uses libmagic to
+// route to ImageEditorTab, EditorTab, or HexEditorTab), and if the resulting
+// tab is a text EditorTab, records the remote origin so Save can push back.
+QWidget *MainWindow::openRemoteFile(const QString &localPath, CloudProvider *provider,
+                                    const QString &remotePath, const QString &driveLabel)
 {
-    EditorTab *tab = openFile(localPath);
-    if (tab)
+    QWidget *w = openFile(localPath);
+    if (EditorTab *tab = qobject_cast<EditorTab *>(w))
         tab->setRemoteOrigin(provider, remotePath, driveLabel);
-    return tab;
+    return w;
 }
 
 // After a successful local save of a tab that was opened from a cloud drive /
@@ -777,6 +822,41 @@ void MainWindow::openHexEditor(const QString &path)
     m_tabs->setCurrentIndex(idx);
 }
 
+void MainWindow::openImageEditorDialog()
+{
+    const QString f = QFileDialog::getOpenFileName(this, TR("Open as Image"),
+        QString(),
+        TR("Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.ico *.svg);;All Files (*)"));
+    if (!f.isEmpty())
+        openImageEditor(f);
+}
+
+// Open a file in the full image-editor tab (view + edit + filters + export).
+// Oversized images auto-fit to the viewport on open.
+void MainWindow::openImageEditor(const QString &path)
+{
+    auto *tab = new ImageEditorTab(this);
+    tab->applyTheme(m_themeManager.current());
+    if (!tab->loadFile(path)) {
+        delete tab;
+        QMessageBox::warning(this, TR("Open"), TR("Cannot open file:\n%1").arg(path));
+        return;
+    }
+    connect(tab, &ImageEditorTab::statusMessage, this, [this](const QString &m) {
+        statusBar()->showMessage(m, 4000);
+    });
+    connect(tab, &ImageEditorTab::modificationChanged, this, [this, tab](bool mod) {
+        int i = m_tabs->indexOf(tab);
+        if (i >= 0) {
+            QString t = TR("Image: %1").arg(QFileInfo(tab->filePath()).fileName());
+            m_tabs->setTabText(i, mod ? t + " *" : t);
+        }
+    });
+    int idx = m_tabs->addTab(tab, TR("Image: %1").arg(QFileInfo(path).fileName()));
+    m_tabs->setTabToolTip(idx, path);
+    m_tabs->setCurrentIndex(idx);
+}
+
 void MainWindow::closeInitialEmptyTab()
 {
     // The first tab is the auto-created empty document. If it is still an
@@ -799,6 +879,13 @@ bool MainWindow::saveFile()
             statusBar()->showMessage(TR("Saved %1").arg(hex->filePath()), 3000);
             return true;
         }
+        QMessageBox::warning(this, TR("Save"), TR("Cannot write file."));
+        return false;
+    }
+    // Image-editor tab: save the edited image back to disk.
+    if (auto *img = qobject_cast<ImageEditorTab *>(m_tabs->currentWidget())) {
+        if (img->save())
+            return true;
         QMessageBox::warning(this, TR("Save"), TR("Cannot write file."));
         return false;
     }
@@ -831,6 +918,22 @@ bool MainWindow::saveFileAs()
         }
         int i = m_tabs->indexOf(hex);
         m_tabs->setTabText(i, TR("Hex: %1").arg(QFileInfo(path).fileName()));
+        m_tabs->setTabToolTip(i, path);
+        return true;
+    }
+    // Image-editor tab: choose a new path (format from extension) and save.
+    if (auto *img = qobject_cast<ImageEditorTab *>(m_tabs->currentWidget())) {
+        QString path = QFileDialog::getSaveFileName(this, TR("Save As"),
+            img->filePath(),
+            "PNG (*.png);;JPEG (*.jpg *.jpeg);;WebP (*.webp);;BMP (*.bmp)");
+        if (path.isEmpty())
+            return false;
+        if (!img->saveAs(path)) {
+            QMessageBox::warning(this, TR("Save"), TR("Cannot write file."));
+            return false;
+        }
+        int i = m_tabs->indexOf(img);
+        m_tabs->setTabText(i, TR("Image: %1").arg(QFileInfo(path).fileName()));
         m_tabs->setTabToolTip(i, path);
         return true;
     }
@@ -904,10 +1007,21 @@ bool MainWindow::closeTabAt(int index)
             if (ret == QMessageBox::Cancel) return false;
             if (ret == QMessageBox::Save) hex->save();
         }
+    } else if (auto *img = qobject_cast<ImageEditorTab *>(w)) {
+        if (img->isModified()) {
+            auto ret = QMessageBox::warning(this, TR("Terminal++"),
+                TR("The document \"%1\" has unsaved changes.\nDo you want to save?")
+                    .arg(QFileInfo(img->filePath()).fileName()),
+                QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+            if (ret == QMessageBox::Cancel) return false;
+            if (ret == QMessageBox::Save) img->save();
+        }
     } else if (SshTab *s = qobject_cast<SshTab *>(w)) {
         s->disconnectSession();
     } else if (SerialTab *s = qobject_cast<SerialTab *>(w)) {
         s->closePort();
+    } else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w)) {
+        s->stop();
     }
 
     m_tabs->removeTab(index);
@@ -1061,7 +1175,9 @@ void MainWindow::zoomIn()
     if (EditorTab *t = qobject_cast<EditorTab *>(w)) t->editor()->zoomIn(1);
     else if (SshTab *s = qobject_cast<SshTab *>(w)) zoomTerminalFont(s->terminal(), +1);
     else if (SerialTab *s = qobject_cast<SerialTab *>(w)) zoomTerminalFont(s->terminal(), +1);
+    else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w)) zoomTerminalFont(s->terminal(), +1);
     else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) i->zoomIn();
+    else if (ImageEditorTab *i = qobject_cast<ImageEditorTab *>(w)) i->zoomIn();
 }
 
 void MainWindow::zoomOut()
@@ -1070,7 +1186,9 @@ void MainWindow::zoomOut()
     if (EditorTab *t = qobject_cast<EditorTab *>(w)) t->editor()->zoomOut(1);
     else if (SshTab *s = qobject_cast<SshTab *>(w)) zoomTerminalFont(s->terminal(), -1);
     else if (SerialTab *s = qobject_cast<SerialTab *>(w)) zoomTerminalFont(s->terminal(), -1);
+    else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w)) zoomTerminalFont(s->terminal(), -1);
     else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) i->zoomOut();
+    else if (ImageEditorTab *i = qobject_cast<ImageEditorTab *>(w)) i->zoomOut();
 }
 
 void MainWindow::zoomReset()
@@ -1086,8 +1204,13 @@ void MainWindow::zoomReset()
     } else if (SerialTab *s = qobject_cast<SerialTab *>(w)) {
         QFont f("Consolas", 11); f.setStyleHint(QFont::Monospace);
         s->terminal()->setTerminalFont(f);
+    } else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w)) {
+        QFont f("Consolas", 11); f.setStyleHint(QFont::Monospace);
+        s->terminal()->setTerminalFont(f);
     } else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) {
         i->zoomFit();
+    } else if (ImageEditorTab *i = qobject_cast<ImageEditorTab *>(w)) {
+        i->zoomReset();
     }
 }
 
@@ -1109,6 +1232,8 @@ void MainWindow::applyThemeByName(const QString &name)
         else if (SshTab *s = qobject_cast<SshTab *>(w))
             s->applyTheme(theme);
         else if (SerialTab *s = qobject_cast<SerialTab *>(w))
+            s->applyTheme(theme);
+        else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w))
             s->applyTheme(theme);
     }
 
@@ -1227,6 +1352,33 @@ static void convertSerialBack(const SerialConfig &c, SerialSessionConfig &out)
                (c.flow == QSerialPort::SoftwareControl) ? "XON-XOFF" : "None";
     out.lineEnding = c.lineEnding;
     out.localEcho = c.localEcho;
+}
+
+// ------------------------------------------------------------------
+// Local shell terminals (cmd.exe / powershell.exe)
+// ------------------------------------------------------------------
+void MainWindow::newCmdTerminal()        { openLocalShell(0); }
+void MainWindow::newPowerShellTerminal() { openLocalShell(1); }
+
+// shell: 0 = cmd, 1 = PowerShell.
+void MainWindow::openLocalShell(int shell)
+{
+    auto *tab = new LocalShellTab(
+        shell == 1 ? LocalShellTab::PowerShell : LocalShellTab::Cmd, this);
+    tab->applyTheme(m_themeManager.current());
+    const QString title = (shell == 1) ? TR("PowerShell") : TR("CMD");
+    int idx = m_tabs->addTab(tab, title);
+    m_tabs->setCurrentIndex(idx);
+
+    connect(tab, &LocalShellTab::connectionClosed, this, [this, tab]() {
+        int i = m_tabs->indexOf(tab);
+        if (i >= 0)
+            m_tabs->setTabText(i, m_tabs->tabText(i) + TR(" [closed]"));
+    });
+
+    if (!tab->start())
+        statusBar()->showMessage(TR("Failed to start the shell process."), 4000);
+    tab->terminal()->setFocus();
 }
 
 void MainWindow::newSshSession()
@@ -1583,17 +1735,22 @@ CloudBrowserTab *MainWindow::openCloudTab(const CloudDriveConfig &cfg)
     connect(tab, &CloudBrowserTab::statusMessage, this, [this](const QString &m) {
         statusBar()->showMessage(m, 4000);
     });
-    // A text file downloaded from the cloud opens in an internal editor tab,
-    // remembering its remote origin so Save can offer to push it back.
+    // All downloaded files from cloud / share / sftp / ftp are opened via
+    // openRemoteFile(), which uses libmagic to automatically route to:
+    //   - ImageEditorTab for images (editing + viewing, auto fit-to-view)
+    //   - EditorTab for text/source-code (with save-back-to-remote prompt)
+    //   - HexEditorTab for binary
+    // NOTE: Picture comparison is NEVER used for single image opening here.
+    connect(tab, &CloudBrowserTab::openDownloadedFile, this,
+            [this, tab](const QString &lp, const QString &remotePath,
+                       const QString &driveLabel) {
+        openRemoteFile(lp, tab->provider(), remotePath, driveLabel);
+    });
     connect(tab, &CloudBrowserTab::openTextFile, this,
             [this, tab](const QString &lp, const QString &remotePath,
                        const QString &driveLabel) {
         openRemoteFile(lp, tab->provider(), remotePath, driveLabel);
     });
-    // An image file downloaded from the cloud opens in a picture view (compared
-    // against itself so the single-image viewer with zoom/pan is reused).
-    connect(tab, &CloudBrowserTab::openImageFileCompareNone, this,
-            [this](const QString &lp) { openImageCompare(lp, lp); });
 
     int idx = m_tabs->addTab(tab, TR("☁ %1").arg(label));
     m_tabs->setCurrentIndex(idx);
@@ -1846,6 +2003,107 @@ void MainWindow::about()
     QMessageBox::about(this, TR("About Terminal++"), body);
 }
 
+// ------------------------------------------------------------------
+// File associations (Windows): register/unregister Terminal++ as the default
+// program and/or add it to the Explorer "Open with" menu for text, source-code
+// and supported-image extensions. Fully reversible; per-user (no admin).
+// ------------------------------------------------------------------
+void MainWindow::manageFileAssociations()
+{
+    if (!FileAssociations::isSupported()) {
+        QMessageBox::information(this, TR("File Associations"),
+            TR("File associations are only supported on Windows."));
+        return;
+    }
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(TR("File Associations"));
+    dlg.resize(460, 260);
+    auto *v = new QVBoxLayout(&dlg);
+
+    v->addWidget(new QLabel(
+        TR("Choose which file groups Terminal++ should handle, then pick an "
+           "action. All changes are per-user and fully reversible."), &dlg));
+
+    // Group checkboxes.
+    auto *cbText = new QCheckBox(
+        TR("Text files (.txt, .md, .log, .csv, .ini, .json, .xml, …)"), &dlg);
+    auto *cbCode = new QCheckBox(
+        TR("Source code (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)"), &dlg);
+    auto *cbImage = new QCheckBox(
+        TR("Images (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)"), &dlg);
+    cbText->setChecked(true);
+    cbCode->setChecked(true);
+    cbImage->setChecked(true);
+    v->addWidget(cbText);
+    v->addWidget(cbCode);
+    v->addWidget(cbImage);
+
+    auto gatherExts = [cbText, cbCode, cbImage]() {
+        QStringList exts;
+        if (cbText->isChecked())  exts += FileAssociations::textExtensions();
+        if (cbCode->isChecked())  exts += FileAssociations::sourceCodeExtensions();
+        if (cbImage->isChecked()) exts += FileAssociations::imageExtensions();
+        exts.removeDuplicates();
+        return exts;
+    };
+
+    // Action buttons.
+    auto *addOpenWith = new QPushButton(TR("Add to \"Open with\""), &dlg);
+    auto *removeOpenWith = new QPushButton(TR("Remove from \"Open with\""), &dlg);
+    auto *setDefault = new QPushButton(TR("Set as Default Program"), &dlg);
+    auto *unsetDefault = new QPushButton(TR("Unset as Default Program"), &dlg);
+
+    connect(addOpenWith, &QPushButton::clicked, &dlg, [this, gatherExts]() {
+        const QStringList e = gatherExts();
+        if (e.isEmpty()) return;
+        FileAssociations::addToOpenWith(e);
+        statusBar()->showMessage(
+            TR("Added Terminal++ to \"Open with\" for %1 file type(s).")
+                .arg(e.size()), 4000);
+    });
+    connect(removeOpenWith, &QPushButton::clicked, &dlg, [this, gatherExts]() {
+        const QStringList e = gatherExts();
+        if (e.isEmpty()) return;
+        FileAssociations::removeFromOpenWith(e);
+        statusBar()->showMessage(
+            TR("Removed Terminal++ from \"Open with\" for %1 file type(s).")
+                .arg(e.size()), 4000);
+    });
+    connect(setDefault, &QPushButton::clicked, &dlg, [this, gatherExts]() {
+        const QStringList e = gatherExts();
+        if (e.isEmpty()) return;
+        FileAssociations::setAsDefault(e);
+        statusBar()->showMessage(
+            TR("Terminal++ set as default for %1 file type(s).").arg(e.size()),
+            4000);
+    });
+    connect(unsetDefault, &QPushButton::clicked, &dlg, [this, gatherExts]() {
+        const QStringList e = gatherExts();
+        if (e.isEmpty()) return;
+        FileAssociations::unsetAsDefault(e);
+        statusBar()->showMessage(
+            TR("Terminal++ removed as default for %1 file type(s).").arg(e.size()),
+            4000);
+    });
+
+    auto *row1 = new QHBoxLayout();
+    row1->addWidget(addOpenWith);
+    row1->addWidget(removeOpenWith);
+    v->addLayout(row1);
+    auto *row2 = new QHBoxLayout();
+    row2->addWidget(setDefault);
+    row2->addWidget(unsetDefault);
+    v->addLayout(row2);
+
+    auto *closeBtn = new QPushButton(TR("Close"), &dlg);
+    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    v->addStretch(1);
+    v->addWidget(closeBtn);
+
+    dlg.exec();
+}
+
 void MainWindow::onCurrentTabChanged(int)
 {
     updateWindowTitle();
@@ -1856,6 +2114,8 @@ void MainWindow::onCurrentTabChanged(int)
     if (SshTab *s = qobject_cast<SshTab *>(w))
         s->terminal()->setFocus();
     else if (SerialTab *s = qobject_cast<SerialTab *>(w))
+        s->terminal()->setFocus();
+    else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(w))
         s->terminal()->setFocus();
 
     // The Transfers panel is only relevant to cloud-drive browsing, so only
@@ -1942,6 +2202,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
             s->disconnectSession();
         else if (SerialTab *s = qobject_cast<SerialTab *>(m_tabs->widget(i)))
             s->closePort();
+        else if (LocalShellTab *s = qobject_cast<LocalShellTab *>(m_tabs->widget(i)))
+            s->stop();
     }
 
     event->accept();

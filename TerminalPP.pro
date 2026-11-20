@@ -29,7 +29,7 @@ win32 {
         INCLUDEPATH += $$LIBSSH2_DIR/include
         LIBS += -L$$LIBSSH2_DIR/lib
     }
-    LIBS += -lssh2 -lws2_32 -lcrypt32 -lmpr
+    LIBS += -lssh2 -lmagic -lws2_32 -lcrypt32 -lmpr
 }
 
 SOURCES += \
@@ -39,6 +39,8 @@ SOURCES += \
     src/core/cliphistory.cpp \
     src/core/cliphistorydialog.cpp \
     src/core/secretstore.cpp \
+    src/core/fileassoc.cpp \
+    src/core/magicdetector.cpp \
     src/compare/diffengine.cpp \
     src/compare/textcomparetab.cpp \
     src/compare/foldercomparetab.cpp \
@@ -61,6 +63,7 @@ SOURCES += \
     src/editor/gotodialog.cpp \
     src/editor/editortab.cpp \
     src/editor/hexeditortab.cpp \
+    src/editor/imageeditortab.cpp \
     src/editor/thememanager.cpp \
     src/terminal/terminalwidget.cpp \
     src/terminal/ansiparser.cpp \
@@ -70,7 +73,8 @@ SOURCES += \
     src/terminal/sessionmanager.cpp \
     src/terminal/serialsession.cpp \
     src/terminal/serialtab.cpp \
-    src/terminal/serialdialog.cpp
+    src/terminal/serialdialog.cpp \
+    src/terminal/localshelltab.cpp
 
 HEADERS += \
     src/mainwindow.h \
@@ -78,6 +82,8 @@ HEADERS += \
     src/core/cliphistory.h \
     src/core/cliphistorydialog.h \
     src/core/secretstore.h \
+    src/core/fileassoc.h \
+    src/core/magicdetector.h \
     src/compare/diffengine.h \
     src/compare/textcomparetab.h \
     src/compare/foldercomparetab.h \
@@ -101,6 +107,7 @@ HEADERS += \
     src/editor/gotodialog.h \
     src/editor/editortab.h \
     src/editor/hexeditortab.h \
+    src/editor/imageeditortab.h \
     src/editor/thememanager.h \
     src/terminal/terminalwidget.h \
     src/terminal/ansiparser.h \
@@ -110,7 +117,8 @@ HEADERS += \
     src/terminal/sessionmanager.h \
     src/terminal/serialsession.h \
     src/terminal/serialtab.h \
-    src/terminal/serialdialog.h
+    src/terminal/serialdialog.h \
+    src/terminal/localshelltab.h
 
 RESOURCES += \
     resources/resources.qrc

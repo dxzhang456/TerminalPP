@@ -53,9 +53,14 @@ public:
     {
         if (m_img.isNull())
             return;
+        if (viewport.width() <= 0 || viewport.height() <= 0)
+            return;
         double zx = double(viewport.width())  / m_img.width();
         double zy = double(viewport.height()) / m_img.height();
-        applyZoom(qMax(0.01, qMin(zx, zy)));
+        // Fit BOTH directions: small images are upscaled so they are
+        // comfortably visible; large images are downscaled to fit the viewport.
+        double z = qMin(zx, zy) * 0.98;   // tiny margin
+        applyZoom(qBound(0.01, z, 32.0));
     }
 
     double zoom() const { return m_zoom; }

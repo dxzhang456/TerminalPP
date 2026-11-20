@@ -56,6 +56,10 @@ set(PROJECT_SOURCES
     src/core/cliphistorydialog.h
     src/core/secretstore.cpp
     src/core/secretstore.h
+    src/core/fileassoc.cpp
+    src/core/fileassoc.h
+    src/core/magicdetector.cpp
+    src/core/magicdetector.h
 
     # --- Compare (Beyond Compare-style) ---
     src/compare/diffengine.cpp
@@ -107,6 +111,8 @@ set(PROJECT_SOURCES
     src/editor/editortab.h
     src/editor/hexeditortab.cpp
     src/editor/hexeditortab.h
+    src/editor/imageeditortab.cpp
+    src/editor/imageeditortab.h
     src/editor/thememanager.cpp
     src/editor/thememanager.h
 
@@ -133,6 +139,10 @@ set(PROJECT_SOURCES
     src/terminal/serialtab.h
     src/terminal/serialdialog.cpp
     src/terminal/serialdialog.h
+
+    # --- Local shell terminal (cmd / PowerShell via QProcess) ---
+    src/terminal/localshelltab.cpp
+    src/terminal/localshelltab.h
 )
 
 # Windows application icon (compiled from resources/app.rc -> icon.ico).
@@ -177,9 +187,11 @@ else()
 endif()
 
 # Winsock + DPAPI (CryptProtectData) + Mpr (WNetAddConnection2 for the SMB
-# shared-folder provider) on Windows.
+# shared-folder provider) + libmagic on Windows.
 if (WIN32)
-    target_link_libraries(TerminalPP PRIVATE ws2_32 crypt32 mpr)
+    target_link_libraries(TerminalPP PRIVATE ws2_32 crypt32 mpr magic)
+else()
+    target_link_libraries(TerminalPP PRIVATE magic)
 endif()
 
 # Installation / deployment

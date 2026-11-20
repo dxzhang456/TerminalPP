@@ -21,6 +21,8 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QDir>
+#include <QDirIterator>
+#include <QQueue>
 #include <QFile>
 #include <QFileInfo>
 #include <QLocale>
@@ -92,6 +94,10 @@ CloudBrowserTab::CloudBrowserTab(CloudProvider *provider, const QString &title,
 
     navigateTo(m_provider->rootPath());
 }
+
+// Out-of-line so the std::unique_ptr<QDirIterator> (and FolderUpload/Download)
+// members are destroyed here, where QDirIterator is a complete type.
+CloudBrowserTab::~CloudBrowserTab() = default;
 
 // ---- classification by extension ----
 CloudBrowserTab::Kind CloudBrowserTab::classify(const QString &name)
@@ -280,7 +286,15 @@ void CloudBrowserTab::onContextMenu(const QPoint &pos)
             m_history.push_back(m_currentPath);
             navigateTo(e.path);
         });
-        menu.addAction(TRc("Download Folder..."), this, [this, e]() { actionDownload(e); });
+        menu.addAction(TRc("Download Folder..."), this, [this, e]() {
+            // Streaming recursive folder download (memory-light): pick a local
+            // destination directory, then walk the remote tree one listing at a
+            // time and download one file at a time.
+            const QString local = QFileDialog::getExistingDirectory(
+                this, TRc("Select Folder to Upload"));
+            if (!local.isEmpty())
+                startFolderDownload(e, local + "/" + e.name);
+        });
         menu.addSeparator();
         menu.addAction(TRc("Rename..."), this, [this, e]() { actionRename(e); });
         menu.addAction(TRc("Delete"), this, [this, e]() { actionDelete(e); });
@@ -424,13 +438,13 @@ void CloudBrowserTab::uploadFolder()
         this, TRc("Select Folder to Upload"));
     if (dir.isEmpty())
         return;
-    // Recreate the chosen folder itself under the current remote directory,
-    // then recurse into it.
+    if (m_folderUp && m_folderUp->active) {
+        emit statusMessage(TRc("A folder upload is already in progress."));
+        return;
+    }
+    // Recreate the chosen folder itself under the current remote directory.
     const QString folderName = QFileInfo(dir).fileName();
     emit statusMessage(TRc("Uploading folder %1…").arg(folderName));
-    // Create the top folder first; once created, upload its contents. We give
-    // the server a moment by issuing makeDir then recursing (most providers
-    // accept uploads into a path even before an explicit refresh).
     m_provider->makeDir(m_currentPath, folderName);
     QString childRemote = m_currentPath;
     if (!childRemote.endsWith('/')) childRemote += '/';
@@ -439,31 +453,260 @@ void CloudBrowserTab::uploadFolder()
     // which some providers (e.g. Baidu xpan) reject as an invalid path.
     while (childRemote.contains("//"))
         childRemote.replace("//", "/");
-    uploadDirectory(dir, childRemote);
+    startFolderUpload(dir, childRemote);
 }
 
-// Recursively walk a local directory: create each sub-folder remotely and
-// upload every file. Google Drive is id-based so nested folder creation there
-// needs the new folder id (not handled by this simple path-based walk); for
-// path-based providers (OneDrive/Dropbox/Baidu/WebDAV) this works directly.
+// Kept for API compatibility: a one-shot recursive upload is no longer used
+// (replaced by the streaming startFolderUpload/pumpFolderUpload below), but
+// the declaration remains, so provide a thin wrapper that starts a streaming
+// upload rooted at the given local/remote pair.
 void CloudBrowserTab::uploadDirectory(const QString &localDir, const QString &remoteParent)
 {
-    QDir dir(localDir);
-    const QFileInfoList entries = dir.entryInfoList(
-        QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QFileInfo &fi : entries) {
-        if (fi.isDir()) {
-            QString childRemote = remoteParent;
-            if (!childRemote.endsWith('/')) childRemote += '/';
-            childRemote += fi.fileName();
-            while (childRemote.contains("//"))
-                childRemote.replace("//", "/");
-            m_provider->makeDir(remoteParent, fi.fileName());
-            uploadDirectory(fi.absoluteFilePath(), childRemote);
-        } else {
-            trackedUpload(fi.absoluteFilePath(), remoteParent);
-        }
+    startFolderUpload(localDir, remoteParent);
+}
+
+// ---- streaming, sequential folder upload (memory-light) ----
+// Walks the local tree lazily with a QDirIterator and uploads ONE file at a
+// time. The whole file list is never materialised in memory; each next file
+// is pulled from the iterator only after the previous upload finishes.
+void CloudBrowserTab::startFolderUpload(const QString &localRoot,
+                                        const QString &remoteRoot)
+{
+    m_folderUp = std::make_unique<FolderUpload>();
+    m_folderUp->localRoot = QDir(localRoot).absolutePath();
+    m_folderUp->remoteRoot = remoteRoot;
+    m_folderUp->it = std::make_unique<QDirIterator>(
+        localRoot,
+        QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot,
+        QDirIterator::Subdirectories);
+    m_folderUp->active = true;
+    pumpFolderUpload();
+}
+
+// Map a local absolute path (a file inside localRoot) to the remote directory
+// it should be uploaded into, preserving the sub-folder structure.
+QString CloudBrowserTab::remoteParentFor(const QString &localAbsPath) const
+{
+    if (!m_folderUp)
+        return m_currentPath;
+    const QString root = m_folderUp->localRoot;
+    QString rel = QDir(root).relativeFilePath(QFileInfo(localAbsPath).absolutePath());
+    QString remote = m_folderUp->remoteRoot;
+    if (rel != "." && !rel.isEmpty()) {
+        if (!remote.endsWith('/')) remote += '/';
+        remote += rel;
     }
+    while (remote.contains("//"))
+        remote.replace("//", "/");
+    return remote;
+}
+
+void CloudBrowserTab::pumpFolderUpload()
+{
+    if (!m_folderUp || !m_folderUp->active)
+        return;
+
+    // Keep up to kMaxConcurrent uploads in flight. The tree is still walked
+    // lazily: each loop iteration pulls at most one more entry from the
+    // iterator, starts a file upload (or creates a sub-folder) and loops until
+    // either the iterator is drained or the concurrency limit is reached. When
+    // an upload finishes it calls pumpFolderUpload() again to refill the slot.
+    while (m_folderUp->inFlight < kMaxConcurrent && m_folderUp->it->hasNext()) {
+        const QString path = m_folderUp->it->next();
+        const QFileInfo fi = m_folderUp->it->fileInfo();
+        if (fi.isDir()) {
+            // Ensure the remote sub-folder exists (fire-and-forget; providers
+            // tolerate "already exists"). remoteParentFor() maps this dir's
+            // local path to the remote dir that should CONTAIN it.
+            const QString remoteDirParent = remoteParentFor(path);
+            m_provider->makeDir(remoteDirParent, fi.fileName());
+            continue;   // directories don't consume a concurrency slot
+        }
+        // A file: register + start one upload; several may run concurrently.
+        const QString remoteDir = remoteParentFor(path);
+        const QString localPath = path;
+        emit statusMessage(TRc("Uploading %1…").arg(fi.fileName()));
+
+        TransferManager *tm = TransferManager::instance();
+        const int id = tm->begin(TransferItem::Upload, m_title, fi.fileName(),
+                                 remoteDir, localPath, m_provider, fi.size());
+
+        auto *pConn = new QMetaObject::Connection();
+        auto *fConn = new QMetaObject::Connection();
+        auto *eConn = new QMetaObject::Connection();
+        auto cleanup = [pConn, fConn, eConn]() {
+            QObject::disconnect(*pConn); QObject::disconnect(*fConn);
+            QObject::disconnect(*eConn);
+            delete pConn; delete fConn; delete eConn;
+        };
+        *pConn = connect(m_provider, &CloudProvider::uploadProgress, this,
+            [tm, id, localPath](const QString &lp, qint64 s, qint64 t) {
+                if (lp == localPath) tm->updateProgress(id, s, t);
+            });
+        *fConn = connect(m_provider, &CloudProvider::uploadFinished, this,
+            [this, tm, id, localPath, cleanup](const QString &lp, const QString &) {
+                if (lp != localPath) return;
+                tm->markCompleted(id);
+                cleanup();
+                if (m_folderUp) { --m_folderUp->inFlight; ++m_folderUp->done; }
+                pumpFolderUpload();   // refill the freed slot (streamed)
+            });
+        *eConn = connect(m_provider, &CloudProvider::errorOccurred, this,
+            [this, tm, id, localPath, cleanup](const QString &msg) {
+                // Only react to an error for THIS file (progress/finished are
+                // matched by localPath; errorOccurred has no path, so guard
+                // against double-decrement by disconnecting on first hit).
+                Q_UNUSED(localPath);
+                tm->markFailed(id, msg);
+                cleanup();
+                if (m_folderUp) --m_folderUp->inFlight;
+                pumpFolderUpload();
+            });
+
+        ++m_folderUp->inFlight;
+        tm->markRunning(id);
+        m_provider->upload(localPath, remoteDir);
+    }
+
+    if (!m_folderUp->it->hasNext())
+        m_folderUp->exhausted = true;
+
+    // Finished only when the iterator is drained AND no uploads remain.
+    if (m_folderUp->exhausted && m_folderUp->inFlight == 0) {
+        const int n = m_folderUp->done;
+        m_folderUp->active = false;
+        m_folderUp.reset();
+        emit statusMessage(TRc("Uploaded %1 file(s).").arg(n));
+        refresh();
+    }
+}
+
+// ---- streaming, sequential folder download (memory-light) ----
+// Lists the remote tree one directory at a time and downloads one file at a
+// time. The full file list is never held in memory at once — directories are
+// expanded lazily as earlier ones finish.
+void CloudBrowserTab::startFolderDownload(const CloudEntry &dir, const QString &localRoot)
+{
+    if (m_folderDn && m_folderDn->active) {
+        emit statusMessage(TRc("A folder download is already in progress."));
+        return;
+    }
+    QDir().mkpath(localRoot);
+    m_folderDn = std::make_unique<FolderDownload>();
+    m_folderDn->remoteRoot = dir.path;
+    m_folderDn->localRoot = QDir(localRoot).absolutePath();
+    m_folderDn->active = true;
+    CloudEntry root = dir;        // seed the dir queue with the chosen folder
+    m_folderDn->dirs.enqueue(root);
+    pumpFolderDownload();
+}
+
+void CloudBrowserTab::pumpFolderDownload()
+{
+    if (!m_folderDn || !m_folderDn->active)
+        return;
+
+    // 1) Start downloads from the queued files, up to kMaxConcurrent at once.
+    while (m_folderDn->inFlight < kMaxConcurrent && !m_folderDn->files.isEmpty()) {
+        const auto pair = m_folderDn->files.dequeue();
+        const QString remotePath = pair.first;
+        const QString localPath = pair.second;
+        QDir().mkpath(QFileInfo(localPath).absolutePath());
+        emit statusMessage(TRc("Downloading %1…").arg(QFileInfo(localPath).fileName()));
+
+        TransferManager *tm = TransferManager::instance();
+        const int id = tm->begin(TransferItem::Download, m_title,
+                                 QFileInfo(localPath).fileName(),
+                                 remotePath, localPath, m_provider, 0);
+        auto *pConn = new QMetaObject::Connection();
+        auto *fConn = new QMetaObject::Connection();
+        auto *eConn = new QMetaObject::Connection();
+        auto cleanup = [pConn, fConn, eConn]() {
+            QObject::disconnect(*pConn); QObject::disconnect(*fConn);
+            QObject::disconnect(*eConn);
+            delete pConn; delete fConn; delete eConn;
+        };
+        *pConn = connect(m_provider, &CloudProvider::downloadProgress, this,
+            [tm, id](qint64 r, qint64 t) { tm->updateProgress(id, r, t); });
+        *fConn = connect(m_provider, &CloudProvider::downloadFinished, this,
+            [this, tm, id, localPath, cleanup](const QString &, const QString &lp) {
+                if (lp != localPath) return;
+                tm->markCompleted(id);
+                cleanup();
+                if (m_folderDn) { --m_folderDn->inFlight; ++m_folderDn->done; }
+                pumpFolderDownload();
+            });
+        *eConn = connect(m_provider, &CloudProvider::errorOccurred, this,
+            [this, tm, id, cleanup](const QString &msg) {
+                tm->markFailed(id, msg);
+                cleanup();
+                if (m_folderDn) --m_folderDn->inFlight;
+                pumpFolderDownload();
+            });
+        ++m_folderDn->inFlight;
+        tm->markRunning(id);
+        m_provider->download(remotePath, localPath);
+    }
+
+    // If files are still queued but the concurrency limit is reached, wait for
+    // an in-flight download to finish (its handler re-pumps).
+    if (!m_folderDn->files.isEmpty())
+        return;
+
+    // 2) Files queue empty: expand the next remote directory (lazy listing).
+    //    (Only one listing at a time; it refills the files queue on return.)
+    if (!m_folderDn->dirs.isEmpty() && !m_folderDn->listing) {
+        const CloudEntry d = m_folderDn->dirs.dequeue();
+        m_folderDn->listing = true;
+
+        auto *lConn = new QMetaObject::Connection();
+        auto *eConn = new QMetaObject::Connection();
+        auto cleanup = [lConn, eConn]() {
+            QObject::disconnect(*lConn); QObject::disconnect(*eConn);
+            delete lConn; delete eConn;
+        };
+        // Map this remote dir to its local counterpart.
+        const QString relRemote = d.path.mid(m_folderDn->remoteRoot.length());
+        QString localDir = m_folderDn->localRoot + relRemote;
+        while (localDir.contains("//")) localDir.replace("//", "/");
+        QDir().mkpath(localDir);
+
+        *lConn = connect(m_provider, &CloudProvider::listed, this,
+            [this, cleanup, localDir](const QString &, const QVector<CloudEntry> &entries) {
+                cleanup();
+                m_folderDn->listing = false;
+                for (const CloudEntry &e : entries) {
+                    if (e.isDir) {
+                        m_folderDn->dirs.enqueue(e);   // expand later (lazy)
+                    } else {
+                        QString lp = localDir;
+                        if (!lp.endsWith('/')) lp += '/';
+                        lp += e.name;
+                        m_folderDn->files.enqueue({ e.path, lp });
+                    }
+                }
+                pumpFolderDownload();
+            });
+        *eConn = connect(m_provider, &CloudProvider::errorOccurred, this,
+            [this, cleanup](const QString &msg) {
+                cleanup();
+                m_folderDn->listing = false;
+                emit statusMessage(TRc("Error: %1").arg(msg));
+                pumpFolderDownload();
+            });
+        m_provider->list(d.path);
+        return;
+    }
+
+    // 3) Finished only when nothing is listing, no dirs remain to expand, no
+    // files are queued, and no downloads are still in flight.
+    if (m_folderDn->listing || m_folderDn->inFlight > 0
+        || !m_folderDn->files.isEmpty() || !m_folderDn->dirs.isEmpty())
+        return;
+    const int n = m_folderDn->done;
+    m_folderDn->active = false;
+    m_folderDn.reset();
+    emit statusMessage(TRc("Downloaded %1 file(s).").arg(n));
 }
 
 // Register an upload in the TransferManager and wire the provider signals.
@@ -525,36 +768,15 @@ void CloudBrowserTab::makeFolder()
 void CloudBrowserTab::actionOpenInternal(const CloudEntry &e)
 {
     const Kind k = classify(e.name);
-    const QString local = tempDownloadPath(e.name);
-    if (k == Text) {
-        const QString remotePath = e.path;
-        downloadThen(e, local, [this, remotePath](const QString &lp) {
-            emit openTextFile(lp, remotePath, m_title);
-        });
-    } else if (k == Image) {
-        downloadThen(e, local, [this](const QString &lp) {
-            emit openImageFileCompareNone(lp);
-        });
-    } else if (k == Video || k == Audio) {
+    if (k == Video || k == Audio) {
         actionStream(e);
-    } else {
-        // Unknown extension: download to temp, then sniff the bytes. Text-like
-        // content opens in the internal editor (properly decoded, so Chinese
-        // GBK files are not garbled); real binaries go to the OS default app.
-        const QString remotePath = e.path;
-        downloadThen(e, local, [this, remotePath](const QString &lp) {
-            QFile f(lp);
-            bool isText = false;
-            if (f.open(QIODevice::ReadOnly)) {
-                isText = looksLikeText(f.read(8192));
-                f.close();
-            }
-            if (isText)
-                emit openTextFile(lp, remotePath, m_title);
-            else
-                QDesktopServices::openUrl(QUrl::fromLocalFile(lp));
-        });
+        return;
     }
+    const QString local = tempDownloadPath(e.name);
+    const QString remotePath = e.path;
+    downloadThen(e, local, [this, remotePath](const QString &lp) {
+        emit openDownloadedFile(lp, remotePath, m_title);
+    });
 }
 
 // Force-open a file in the internal editor regardless of its extension.
@@ -563,7 +785,7 @@ void CloudBrowserTab::actionOpenAsText(const CloudEntry &e)
     const QString local = tempDownloadPath(e.name);
     const QString remotePath = e.path;
     downloadThen(e, local, [this, remotePath](const QString &lp) {
-        emit openTextFile(lp, remotePath, m_title);
+        emit openDownloadedFile(lp, remotePath, m_title);
     });
 }
 

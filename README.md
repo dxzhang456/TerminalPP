@@ -1,344 +1,159 @@
 # Terminal++
 
-**Terminal++** 是一款用 **Qt 6** 开发的一体化终端与编辑器工具，在同一个带标签页的窗口里集成了三大功能模块：
+**Languages / 语言 / 语种:**
+[English](#english) · [简体中文](#简体中文) · [繁體中文](#繁體中文) · [Español](#español) · [Français](#français) · [Deutsch](#deutsch) · [Русский](#русский) · [日本語](#日本語) · [한국어](#한국어)
 
-- **代码编辑器** — 多标签代码/文本编辑
-- **SSH 终端** — 远程 SSH 会话（内置 tmux 支持）
-- **串口 / UART 终端** — 本地串口调试控制台
-
-三个模块共用同一套 VT100/ANSI 终端渲染引擎，可在一个窗口内自由混排标签页。
+> The full project documentation (install, build, shortcut reference, source-code tour, design notes) is kept in **[README.zh-CN.md](README.zh-CN.md)**. The sections below are concise multi-language summaries. The application UI itself is fully translated into all 9 languages — switch at any time via the **UI Language** menu.
 
 ---
 
-## 一、功能清单
+## English
 
-### 1. 代码编辑器
-- 多标签编辑（可移动、可关闭，未保存自动提示）
-- 行号栏 + 当前行高亮
-- 多语言语法高亮：C/C++、C#、Java、Python、JavaScript、JSON、XML、HTML、SQL、Shell、INI
-- 查找 / 替换 / 全部替换 / 计数：支持大小写、全词、正则、循环查找
-- 跳转到行（Ctrl+G）
-- 撤销 / 重做 / 剪切 / 复制 / 粘贴 / 全选
-- 缩进控制：Tab→空格、块缩进 / 反缩进（Shift+Tab）、回车自动缩进
-- 编码支持：UTF-8 / UTF-16LE / UTF-16BE / ISO-8859-1 / GB18030，自动 BOM 识别
-- 行尾转换：Windows (CRLF) / Unix (LF) / Mac (CR)，打开时自动检测
-- 内置多套配色主题：Default / Monokai / Deep Black / Blue light / Twilight / Choco
-- 字体缩放（Ctrl+滚轮 / Ctrl +/- / Ctrl+0；Ctrl++/Ctrl+-/Ctrl+0 均以独立 QShortcut 注册，SSH/串口标签页同样可用 Ctrl +/- 调整终端字体大小）
-- 自动换行开关、行号显示开关
-- 打印（Ctrl+P）
-- 命令行传参直接打开文件
-- 状态栏显示行列号、语言、编码、行尾
-- **列编辑 / 块编辑**（Alt+拖动鼠标框选矩形区域，输入/删除/复制/粘贴同时作用于所有选中行，Esc 退出；状态栏显示 COLUMN 指示）
-- **剪贴板历史**（Ctrl+Shift+V 打开历史列表，自动记录最近 50 条，双击回填并粘贴，持久化保存）
-- **自动保存**（View 菜单开关，默认 30 秒静默保存所有已命名且已修改的标签，设置持久化）
-- **十六进制查看/编辑/保存**（File → Open as Hex...，偏移+十六进制+ASCII 三栏，鼠标/方向键定位，直接在 Hex 或 ASCII 列输入改写字节，Ctrl+S 保存回磁盘）
-- **File → Open Recent**：最近打开过的 20 个文件，持久化，含"清除最近文件"
-- **标签栏右键菜单**：关闭当前 / 关闭其他 / 关闭向左 / 关闭向右；标签栏空白区域双击可新建文件标签页
-- **启动即为空窗口**：不再自动打开或保留一个空白标签页，关闭最后一个标签页后窗口即为空
-- **文本解码强化**：自动识别 BOM、校验"看似合法"的 UTF-8 是否实际是误判的 GBK（避免云盘下载的中文 txt 在 Terminal++ 和系统记事本中都显示乱码），必要时回退系统 ANSI 代码页
-- **多语言界面**：English / 简体中文 / 繁體中文 / Español / Français / Deutsch / Русский / 日本語 / 한국어，首次启动默认英文，可在 "UI Language" 菜单切换，选择后立即生效并持久化，下次启动沿用
+**Terminal++** is an all-in-one **Qt 6** application that combines, inside a single tabbed window:
 
-### 2. SSH 终端
-- 多 SSH 会话，每个会话一个标签页
-- 左侧会话侧边栏（Ctrl+B 显隐），双击连接
-- 会话配置持久化到 `sessions.json`
-- 密码 / 私钥认证、自定义端口、额外连接参数
-- tmux 自动挂载：`tmux new-session -A -s <name>`，断线不丢工作
-- VT100 / xterm-256color 全 ANSI 转义渲染、256 色 + 真彩色
-- 中文输入法：候选框跟随光标位置（IME `ImCursorRectangle`）
-- 复制（Ctrl+Shift+C / 鼠标选取）、粘贴（Ctrl+Shift+V / 中键）
-- 滚动回看缓冲（scrollback 5000 行）
-- 标签标题随远端 OSC 标题自动更新
-- 重连（Ctrl+Shift+R）
-- **原生 SSH 实现**：基于 libssh2 自建客户端（独立工作线程 + socket + 握手 + 认证 + PTY/shell 通道），不依赖任何外部 ssh / plink 程序，完全自包含。
+- **Code editor** — multi-tab editor with syntax highlighting, themes, find/replace, encodings, column/block edit, clipboard history, auto-save, a built-in hex viewer/editor, and a tab-bar context menu.
+- **SSH terminal** — native libssh2 SSH sessions with tmux support and VT100/256-color rendering; passwords encrypted with Windows DPAPI.
+- **Serial / UART terminal** — configurable serial console sharing the same ANSI engine.
+- **File Compare** — side-by-side text, folder, hex, and picture comparison (including recursive folder diff with copy/sync).
+- **Cloud Drives** — Baidu Pan and WebDAV browsing, Windows/Samba shared folders, SFTP and FTP; upload/download (files and folders), rename, delete, and streaming playback, with a Transfers panel showing live progress and history.
+- **Images (view, edit, compare)** — in all image viewers (editor, compare, cloud browser), images are **auto-scaled to the visible range on open**: pictures that are too large are shrunk to fit, pictures that are too small are enlarged. You can still zoom in / out / fit / 1:1 from the toolbar.
+- **Multi-language UI (9 languages)** — English / 简体中文 / 繁體中文 / Español / Français / Deutsch / Русский / 日本語 / 한국어. First launch defaults to English; switch via the **UI Language** menu. Choice is persisted.
+- **Fast startup** — the translation table is loaded lazily (English launches skip it entirely), non-critical work (clipboard listener, etc.) is deferred until after the main window is painted.
 
-### 3. 串口 / UART 终端
-- 串口选择（自动枚举可用串口 + 刷新）
-- 波特率：300 ~ 921600（可手填）
-- 数据位 5/6/7/8、校验 None/Even/Odd/Mark/Space、停止位 1/1.5/2
-- 流控：None / RTS-CTS / XON-XOFF
-- 回车发送：CR / LF / CRLF / None
-- 本地回显（Local echo）
-- 与 SSH 共用同一 ANSI 终端渲染，支持彩色日志
-- 设备拔出自动检测
-
-### 4. 文件比较
-顶层 **Compare** 菜单（New Comparison = Ctrl+Shift+K；或直接选择某种比较类型，对话框会自动预选对应类型）：
-- **文本比较**：左右双栏对齐视图——插入/删除行留空、按类型着色（修改/新增/删除/相同）、字符级内联高亮、同步滚动、上一处/下一处差异导航（◀ Prev / Next ▶）、整块互拷（Copy → / ← Copy）、交换、重载、保存左/右、忽略大小写/忽略空白开关、差异统计。基于 Myers O(ND) 差异算法。
-- **文件夹比较**：**递归**对比两个目录的所有子文件夹，6 列（名称/大小/修改时间/状态/大小/修改时间），状态分类 Same / Left newer / Right newer / Left only / Right only / Different（MD5+大小判等）、状态列按主题着色、名称 glob 过滤（`*.cpp;*.h`）、仅显示差异开关、**文件与整个文件夹递归互拷**（Copy → / ← Copy）、刷新。双击差异文件对按类型智能分流：文本→文本比较、图片→图片比较、其它→十六进制比较。
-- **十六进制比较**：左右 hex dump（偏移 | 16 字节 | ASCII），差异字节高亮、同步滚动、字节差异统计。
-- **图片比较**：左右同步平移/缩放（放大/缩小/适应/1:1）、逐像素差异叠加模式、尺寸与差异像素百分比统计。
-
-### 5. 连接（云盘 / 共享文件夹 / SFTP / FTP）
-顶层 **Connect** 菜单提供三个独立入口，均用同一个浏览器标签页界面（与右键操作、上传/下载、传输面板完全一致）：
-
-- **Connect Cloud Drive...**：**百度网盘** 与通用 **WebDAV**（坚果云/Nutstore、自建服务器等）。认证：百度用 OAuth2 访问令牌，WebDAV 用 URL + 账号密码。
-- **Connect Shared Folder...**：**Windows / Samba 共享文件夹**，填入 UNC 路径（如 `\\server\share` 或 `//server/share`）。Windows 对 SMB 协议版本（SMB1/CIFS、SMB2、SMB3）的协商完全透明，应用层无需选择版本即可兼容任意服务器支持的 SMB 方言；若需认证会用 `WNetAddConnection2` 以提供的用户名密码临时建立连接。
-- **Connect SFTP/FTP...**：**SFTP**（基于项目已内置的原生 libssh2，与 SSH 终端共用同一套库，无需外部 sftp.exe，支持密码或私钥文件认证）与 **FTP**（纯 `QTcpSocket` 实现 RFC 959 控制通道 + PASV 被动模式数据通道，Qt6 已移除 QFtp，故自实现，不依赖外部 ftp.exe）。
-
-每种连接的浏览器标签页功能完全一致：
-- **浏览**：树状列出文件夹与文件（名称/大小/修改时间），双击进入子文件夹，支持后退/上级/刷新。
-- **上传**：工具栏「Upload Files...」多选文件上传到当前目录；「Upload Folder...」整个本地文件夹**递归**上传（自动在远端建同名子目录）；「New Folder...」新建远端文件夹。百度网盘走官方 xpan 三步流程（precreate → superfile2 → create）。
-- **右键菜单**：
-  - **文本文件** → 内部编辑器打开（含编码自动识别，避免中文乱码，各类源代码均可编辑）。
-  - **图片** → 内部图片查看器（过大图片自动缩小适配可视范围，支持放大/缩小）。
-  - **视频/音频** → 「Stream（边下边播）」；共享文件夹/SFTP/FTP 的本地/原生路径可直接播放，百度网盘等需特殊请求头的场景通过本机 `StreamProxy` 中转；无法流式时自动回退为先下载再播放。
-  - **其它类型文件** → 「Open With...」选择外部程序打开，或「Open（系统默认程序）」；未知扩展名的文件会先下载后按字节内容嗅探是否为文本。
-  - **Download...** / **Download Folder...** → 下载到指定本地路径（会在 Transfers 面板中跟踪进度）。
-  - **Rename...** → 重命名文件或文件夹。
-  - **Delete** → 删除前弹出确认框（文件夹会提示"及其全部内容"），确认后递归删除并刷新。
-- **传输面板（Transfers）**：仅当当前标签页是浏览页时自动显示的可停靠面板，列出所有上传/下载任务（类型/名称/连接名/大小/进度条/速度/状态），右键菜单支持取消、重试、移除、打开、打开所在文件夹、复制名称/本地路径/远端路径、清除已完成。
-- **已保存连接统一管理**：无论哪种类型，连接后都会按 `后端名-用户命名` 的格式（如 `BaiduPan-dx`、`SharedFolder-nas`、`SFTP-server1`）列在 **Connect** 菜单的三个入口下方，每条均可 **打开 / 重新连接 / 编辑... / 删除**（编辑会按原后端类型自动重新打开匹配的对话框）。
-- 所有连接标签页同样跟随统一主题，界面全程多语言。
-
-### 6. 共用框架
-- 统一标签页：编辑器 / SSH / 串口 / 各类比较 / 云盘可任意混排
-- 统一菜单栏、工具栏、状态栏
-- 关闭时统一提示保存、统一断开所有连接
-- 跨平台：Windows 与 Linux（及 macOS）均可编译运行
-- **全程多语言**：所有菜单、子菜单、对话框、About、比较工具栏均支持 English / 简体中文 / 繁體中文 / Español / Français / Deutsch / Русский / 日本語 / 한국어，切换即时生效并持久化
-- **统一主题**：编辑器、SSH、串口、比较标签页及整个窗口（含菜单/状态栏）跟随同一主题，内置 VS Code Dark+/Light+/High Contrast、GitHub Dark、Solarized Dark 等；SSH 密码以 Windows DPAPI 加密保存
+**Build:** Windows (MSYS2 / MinGW-w64, recommended) · Linux · macOS. See [README.zh-CN.md](README.zh-CN.md) for the complete step-by-step build instructions; the one-click script `build-msys2.sh` produces a portable `dist\TerminalPP.exe` with all DLLs.
 
 ---
 
-## 二、编译环境要求
+## 简体中文
 
-| 组件 | 版本 | 说明 |
-|------|------|------|
-| Qt | **6.3+**（推荐 6.5 / 6.6） | 需含 `Widgets`、`Network`、`PrintSupport`、**`SerialPort`** 模块 |
-| **libssh2** | 1.9+ | SSH 功能依赖，原生客户端 |
-| 编译器 | Windows: **MinGW-w64**（Qt 自带）；Linux: **g++** / clang | |
-| 构建工具 | CMake 3.19+ **或** qmake | 两种都提供 |
-| 系统 | Windows 10/11 x64、Linux、macOS | 全平台通用 |
+**Terminal++** 是一款用 **Qt 6** 开发的一体化终端与编辑器工具，在同一个带标签页的窗口里集成：
 
-> ⚠️ 安装 Qt 时请在 Qt Maintenance Tool 里勾选 **Qt Serial Port** 附加模块。
->
-> ⚠️ **libssh2** 需单独安装：
-> - Windows(MSYS2)：`pacman -S mingw-w64-x86_64-libssh2`，然后把安装根目录传给 `-DCMAKE_PREFIX_PATH` 或设 `LIBSSH2_DIR`
-> - Debian/Ubuntu：`sudo apt install libssh2-1-dev pkg-config`
-> - Fedora：`sudo dnf install libssh2-devel pkgconf`
-> - Arch：`sudo pacman -S libssh2 pkgconf`
-> - macOS：`brew install libssh2 pkg-config`
+- **代码编辑器** — 多标签、语法高亮、主题、查找/替换、编码、列/块编辑、剪贴板历史、自动保存、内置十六进制查看/编辑器、标签右键菜单。
+- **SSH 终端** — 基于 libssh2 的原生 SSH，自带 tmux、VT100/256 色；密码以 Windows DPAPI 加密。
+- **串口 / UART 终端** — 可配置串口控制台，与 SSH 共用同一 ANSI 渲染引擎。
+- **文件比较** — 文本、文件夹、十六进制、图片的并排比较（含递归文件夹差异与互拷）。
+- **云盘 / 共享 / SFTP / FTP** — 百度网盘、WebDAV、Windows/Samba 共享、SFTP、FTP，支持上传/下载（含文件夹）、重命名、删除、边下边播，统一的传输面板显示实时进度与历史。
+- **图片查看、编辑、比较** — 所有图片视图（编辑器、比较、云盘浏览）在打开时都会**自动缩放到可视范围**：过大的图片缩小到适配窗口，过小的图片放大到清晰可见；工具栏仍提供 放大 / 缩小 / 适应 / 1:1。
+- **多语言界面（9 种语言）** — English / 简体中文 / 繁體中文 / Español / Français / Deutsch / Русский / 日本語 / 한국어。首次启动默认英文，可通过 **UI Language** 菜单随时切换，选择持久化保存。
+- **启动更快** — 翻译表采用懒加载（英文启动完全跳过），非关键初始化（剪贴板监听等）延迟到窗口显示后执行。
+
+**完整的安装、编译、快捷键、源码结构与设计说明见 [README.zh-CN.md](README.zh-CN.md)**。Windows 推荐使用 MSYS2 / MinGW-w64，运行 `build-msys2.sh` 即可得到免安装、可直接拷走的 `dist\TerminalPP.exe`（含全部运行时 DLL）。
 
 ---
 
-## 三、Windows 完整环境搭建（MSYS2 / MinGW-w64，推荐，已验证）
+## 繁體中文
 
-这是本项目实际用来产出 `dist\` 可执行包的完整、可复现流程。MSYS2 一次性装好
-MinGW-w64 + Qt6 + libssh2 全套工具链，`build-msys2.sh` 会用 g++ 直接编译、
-生成 exe 图标、并把全部运行时 DLL 打包到 `dist\`，得到免安装、可直接拷走的程序。
+**Terminal++** 是以 **Qt 6** 開發的一體化終端與編輯器工具，在同一個分頁視窗中整合：
 
-> **一句话总览**：装 MSYS2 → 用 `pacman` 装工具链和依赖 → 运行 `build-msys2.sh`。
-> 下面是「跑 `build-msys2.sh` 之前」需要做的全部环境准备。
+- **程式碼編輯器** — 多分頁、語法高亮、佈景主題、尋找/取代、編碼、欄/區塊編輯、剪貼簿歷史、自動儲存、內建十六進位檢視/編輯器、分頁右鍵選單。
+- **SSH 終端** — 基於 libssh2 的原生 SSH，內建 tmux、VT100/256 色；密碼以 Windows DPAPI 加密。
+- **序列 / UART 終端** — 可設定的序列主控台，與 SSH 共用同一 ANSI 引擎。
+- **檔案比較** — 文字、資料夾、十六進位、圖片並排比較（含遞迴資料夾差異與互拷）。
+- **雲端 / 共用 / SFTP / FTP** — 百度網盤、WebDAV、Windows/Samba 共用、SFTP、FTP；上傳/下載（含資料夾）、重新命名、刪除、串流播放，統一傳輸面板顯示即時進度與歷史。
+- **圖片檢視、編輯、比較** — 所有圖片檢視（編輯器、比較、雲端瀏覽）開啟時會**自動縮放到可視範圍**：過大的圖片縮小以適配視窗，過小的圖片放大到可清楚觀察；工具列仍可 放大 / 縮小 / 適應 / 1:1。
+- **多語言介面（9 種語言）** — English / 简体中文 / 繁體中文 / Español / Français / Deutsch / Русский / 日本語 / 한국어。第一次啟動預設英文，可透過 **UI Language** 選單切換，選擇會持久化。
+- **啟動更快** — 翻譯表採惰性載入（英文啟動完全跳過），非關鍵初始化（剪貼簿監聽等）延遲到主視窗顯示後執行。
 
-### 1. 安装 MSYS2
-1. 从 https://www.msys2.org 下载安装器（`msys2-x86_64-*.exe`），默认安装到 `C:\msys64`。
-2. 从开始菜单打开 **“MSYS2 MinGW 64-bit”** 终端（蓝色图标，**不要**用 UCRT64 / CLANG64 / MSYS 那几个）。
-3. 先做一次系统更新（更新完若提示关闭终端，关掉后重新打开再执行第二条）：
-   ```bash
-   pacman -Syu          # 更新核心，若要求关闭终端就照做
-   pacman -Su           # 重新打开终端后再更新剩余包
-   ```
-
-### 2. 安装编译工具链与依赖（跑脚本前必须完成）
-在 **MSYS2 MinGW 64-bit** 终端里执行（一条命令装全）：
-```bash
-pacman -S --needed \
-    mingw-w64-x86_64-gcc \
-    mingw-w64-x86_64-qt6-base \
-    mingw-w64-x86_64-qt6-serialport \
-    mingw-w64-x86_64-libssh2 \
-    mingw-w64-x86_64-zlib \
-    mingw-w64-x86_64-zstd
-# 可选：若还想用方式 B 的 CMake/Ninja，另装：
-pacman -S --needed mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
-# 可选：让生成的 exe 带文件图标（需系统 Python + Pillow）
-pacman -S --needed mingw-w64-x86_64-python-pillow
-```
-各包用途：
-| 包 | 提供 | 必需 |
-|----|------|------|
-| `mingw-w64-x86_64-gcc` | g++ / windres / objdump 等编译链 | ✅ |
-| `mingw-w64-x86_64-qt6-base` | Qt6 Core/Gui/Widgets/Network/PrintSupport + moc/rcc | ✅ |
-| `mingw-w64-x86_64-qt6-serialport` | 串口 / UART 模块 | ✅ |
-| `mingw-w64-x86_64-libssh2` | 原生 SSH（含 libssl/libcrypto 依赖） | ✅ |
-| `mingw-w64-x86_64-zlib` / `-zstd` | Qt / 工具链运行时压缩库 | ✅ |
-| `mingw-w64-x86_64-cmake` / `-ninja` | 仅方式 B（CMake 构建）需要 | 可选 |
-| `mingw-w64-x86_64-python-pillow` | 把 `icon.png` 转成 `icon.ico`（exe 文件图标） | 可选 |
-
-> DPAPI 加密（SSH 密码）用的 `crypt32` 随 MinGW 自带，无需额外安装。
-
-### 3. 验证环境（可选但推荐）
-在 **MSYS2 MinGW 64-bit** 终端确认关键工具就位（都应打印出版本/路径）：
-```bash
-which g++ windres objdump                         # 编译链
-/mingw64/share/qt6/bin/moc.exe --version          # Qt moc
-/mingw64/share/qt6/bin/rcc.exe --version          # Qt rcc
-ls /mingw64/include/qt6/QtSerialPort >/dev/null && echo "SerialPort OK"
-ls /mingw64/lib/libssh2* >/dev/null && echo "libssh2 OK"
-```
-若某条报 “not found / 不存在”，回到第 2 步补装对应的包。
-
-### 4. 一键编译 + 打包
-环境就绪后，运行脚本（脚本内部已自动 `export PATH=/mingw64/bin:...`，所以**用哪个 MSYS2 子终端都行**，甚至直接从 Windows CMD 调用）：
-```bash
-# 在 MSYS2 终端里：
-bash /c/dx/myaiprojects/terminal++/TerminalPP/build-msys2.sh
-```
-或直接从 Windows CMD / PowerShell：
-```powershell
-C:\msys64\usr\bin\bash.exe -lc "bash /c/dx/myaiprojects/terminal++/TerminalPP/build-msys2.sh"
-```
-脚本会依次执行：`[1/4] moc` → `[2/4] rcc` → `[2b] 图标` → `[3/4] 编译+链接` → `[4/4] 打包到 dist/`，
-最后打印 `DONE. Portable build in: .../dist/TerminalPP.exe (34 DLLs bundled)`。
-
-完成后产物在 **`TerminalPP\dist\`**：
-- `TerminalPP.exe`（已内嵌窗口图标 + exe 文件图标）
-- 约 34 个运行时 DLL（Qt6 六模块、libssh2、libssl/libcrypto、icu、harfbuzz、freetype、gcc 运行时等）
-- `platforms\qwindows.dll` + `styles\` + `imageformats\` 插件
-
-**双击 `TerminalPP\dist\TerminalPP.exe` 即可运行，无需安装 Qt。**
-
-### 5. 常见问题
-- **`moc: command not found` / `g++: command not found`**：没在 MinGW 64-bit 环境或工具链没装全。重开 “MSYS2 MinGW 64-bit” 终端并重跑第 2 步。
-- **`cannot find -lssh2` / `libssh2.h: No such file`**：未装 `mingw-w64-x86_64-libssh2`，补装后重试。
-- **`Qt6SerialPort` 相关链接错误**：未装 `mingw-w64-x86_64-qt6-serialport`。
-- **`rm: cannot remove '.../dist': Device or resource busy`**：上一次运行的 `TerminalPP.exe` 仍开着，先关掉程序（或 `taskkill /IM TerminalPP.exe /F`）再重跑；该提示不影响编译本身。
-- **exe 没有文件图标**：未装 Pillow（`icon.ico` 跳过），窗口/任务栏图标仍通过 qrc 生效；装 `mingw-w64-x86_64-python-pillow` 后重跑即可。
-- **路径**：把示例中的 `/c/dx/myaiprojects/terminal++/TerminalPP` 换成你本机的实际路径（MSYS2 下 `C:\` 对应 `/c/`）。
+完整的安裝、編譯、快捷鍵、原始碼結構請見 **[README.zh-CN.md](README.zh-CN.md)**。
 
 ---
 
-## 四、其它编译方式（可选）
+## Español
 
-### 方式 B：CMake（MSYS2 环境内）
-```bash
-export PATH=/mingw64/bin:/usr/bin:/bin
-cd /c/dx/myaiprojects/terminal++/TerminalPP
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/mingw64
-cmake --build build -j
-# 可执行文件: build/TerminalPP.exe （运行时需 /mingw64/bin 在 PATH，或用 build-msys2.sh 的打包步骤）
-```
+**Terminal++** es una aplicación **Qt 6** todo-en-uno que combina, dentro de una misma ventana con pestañas:
 
-### 方式 C：官方 Qt 安装版（Qt Online Installer）
-若使用官方 Qt（含 MinGW Kit）而非 MSYS2，用 CMake 构建：
-```powershell
-cd TerminalPP
-cmake -S . -B build -G "MinGW Makefiles" ^
-    -DCMAKE_BUILD_TYPE=Release ^
-    -DCMAKE_PREFIX_PATH="C:\Qt\6.6.0\mingw_64;<libssh2 安装根目录>"
-cmake --build build -j
-windeployqt --release build\TerminalPP.exe   ::（可选）打包 Qt DLL/插件
-```
-> 注意：官方 Qt 不含 libssh2，需另行准备（最简单是复用 MSYS2 的 `C:\msys64\mingw64`），
-> 并把其根目录加入 `CMAKE_PREFIX_PATH`；运行时还需把 `libssh2-1.dll` 拷到 exe 旁。
+- **Editor de código** — pestañas múltiples, resaltado de sintaxis, temas, buscar/reemplazar, codificaciones, edición columna/bloque, historial del portapapeles, autoguardado, visor/editor hexadecimal integrado y menú contextual de pestañas.
+- **Terminal SSH** — sesiones SSH nativas con libssh2, soporte tmux y renderizado VT100/256 colores; contraseñas cifradas con Windows DPAPI.
+- **Terminal serie / UART** — consola serie configurable que comparte el mismo motor ANSI.
+- **Comparación de archivos** — comparación lado a lado de texto, carpetas, hex e imágenes (con comparación recursiva de carpetas y copia entre lados).
+- **Unidades en la nube / Carpetas compartidas / SFTP / FTP** — Baidu Pan, WebDAV, carpetas compartidas Windows/Samba, SFTP y FTP; subida/descarga (archivos y carpetas), renombrar, eliminar, reproducción en streaming, con un panel de Transferencias que muestra progreso e historial en vivo.
+- **Imágenes (ver, editar, comparar)** — en todas las vistas de imagen, las imágenes se **ajustan automáticamente al área visible al abrirlas**: las imágenes grandes se reducen para caber, las pequeñas se amplían para verse cómodamente; la barra de herramientas sigue ofreciendo acercar / alejar / ajustar / 1:1.
+- **Interfaz multilingüe (9 idiomas)** — inglés / chino simplificado / chino tradicional / español / francés / alemán / ruso / japonés / coreano. El primer inicio es en inglés; cambie desde el menú **UI Language**. La elección se guarda.
+- **Inicio rápido** — la tabla de traducción se carga de forma perezosa (los inicios en inglés la omiten por completo); el trabajo no crítico (listener del portapapeles, etc.) se difiere hasta después de pintar la ventana principal.
 
-### 方式 D：Linux / macOS
-```bash
-# Ubuntu: sudo apt install build-essential cmake qt6-base-dev qt6-serialport-dev libssh2-1-dev pkg-config
-cd TerminalPP
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-./build/TerminalPP
-```
-> 或用 qmake：`qmake6 && make -j`。
-
-### 方式 E：Qt Creator
-用 Qt Creator 打开 `TerminalPP/CMakeLists.txt` 或 `TerminalPP/TerminalPP.pro`，选 Qt6 Kit，点运行。
+Las instrucciones completas de compilación y referencia están en [README.zh-CN.md](README.zh-CN.md).
 
 ---
 
-## 五、运行与部署
+## Français
 
-- Windows（推荐）：用 `build-msys2.sh` 产出的 `TerminalPP\dist\` 已自带全部 DLL 与插件，整个 `dist` 目录拷贝到任意 Win10/11 x64 即可运行，无需安装 Qt。
-- Windows（官方 Qt）：执行 `windeployqt --release build\TerminalPP.exe` 打包 Qt6 DLL/插件，另需手动拷贝 `libssh2` 运行时 DLL。
-- Linux 分发：依赖系统的 Qt6 与 libssh2 运行库，或用 `linuxdeployqt` 等工具打包。
+**Terminal++** est une application **Qt 6** tout-en-un qui combine, dans une seule fenêtre à onglets :
 
----
+- **Éditeur de code** — multi-onglets, coloration syntaxique, thèmes, rechercher/remplacer, encodages, édition colonne/bloc, historique du presse-papiers, enregistrement auto, visualiseur/éditeur hexadécimal intégré et menu contextuel d'onglets.
+- **Terminal SSH** — sessions SSH natives via libssh2, prise en charge tmux et rendu VT100/256 couleurs ; mots de passe chiffrés avec Windows DPAPI.
+- **Terminal série / UART** — console série configurable partageant le même moteur ANSI.
+- **Comparaison de fichiers** — comparaison côte à côte de texte, dossiers, hexadécimal et images (avec comparaison récursive de dossiers et copie bidirectionnelle).
+- **Cloud / Dossiers partagés / SFTP / FTP** — Baidu Pan, WebDAV, dossiers partagés Windows/Samba, SFTP et FTP ; téléversement/téléchargement (fichiers et dossiers), renommage, suppression, lecture en streaming, avec un panneau de transferts affichant la progression et l'historique en direct.
+- **Images (voir, éditer, comparer)** — dans toutes les vues d'image, les images sont **automatiquement mises à l'échelle à la zone visible à l'ouverture** : les grandes images sont réduites pour entrer, les petites sont agrandies pour être confortablement visibles ; la barre d'outils propose toujours zoom avant / arrière / ajuster / 1:1.
+- **Interface multilingue (9 langues)** — anglais / chinois simplifié / chinois traditionnel / espagnol / français / allemand / russe / japonais / coréen. Le premier lancement est en anglais ; changez via le menu **UI Language**. Le choix est enregistré.
+- **Démarrage rapide** — la table de traduction est chargée paresseusement (les lancements en anglais la sautent entièrement) ; les tâches non critiques (écouteur du presse-papiers, etc.) sont reportées après le premier affichage.
 
-## 六、键盘快捷键
-
-| 快捷键 | 功能 |
-|--------|------|
-| `Ctrl+N` (File) / `Ctrl+N` (Terminal) | 新建文件 / 新建 SSH 会话 |
-| `Ctrl+O` | 打开文件 |
-| `Ctrl+S` / `Ctrl+Shift+S` | 保存 / 全部保存 |
-| `Ctrl+P` | 打印 |
-| `Ctrl+W` | 关闭当前标签 |
-| `Ctrl+Q` | 退出 |
-| `Ctrl+Z` / `Ctrl+Y` | 撤销 / 重做 |
-| `Ctrl+F` / `Ctrl+H` | 查找 / 替换 |
-| `Ctrl+G` | 跳转到行 |
-| `Ctrl +` / `Ctrl -` / `Ctrl 0` | 放大 / 缩小 / 重置字号（编辑器/图片比较/SSH 与串口终端字体均响应） |
-| `Ctrl+Shift+S` | 全部保存 |
-| `Ctrl+Shift+R` | 重连当前 SSH 会话 |
-| `Ctrl+Shift+C` / `Ctrl+Shift+V` | 终端复制 / 粘贴 |
-| `Ctrl+Shift+V`（编辑器中） | 打开剪贴板历史 |
-| `Ctrl+Shift+K` | 新建比较 |
-| 双击标签栏空白处 | 新建文件标签页 |
-| 右键单击标签 | 关闭当前/关闭其他/关闭向左/关闭向右 |
+Les instructions complètes de compilation sont dans [README.zh-CN.md](README.zh-CN.md).
 
 ---
 
-## 七、源码结构
+## Deutsch
 
-```
-TerminalPP/
-├── CMakeLists.txt          # CMake 构建
-├── TerminalPP.pro          # qmake 构建（备选）
-├── build-msys2.sh          # MSYS2 / MinGW-w64 一键编译 + 打包脚本（推荐）
-├── resources/              # qrc 资源
-└── src/
-    ├── main.cpp
-    ├── mainwindow.{h,cpp}           # 主窗口：菜单/工具栏/状态栏/标签页/侧边栏
-    ├── core/                        # ===== 公共设施 =====
-    │   ├── i18n.{h,cpp}             # 9 语言运行时翻译表
-    │   ├── cliphistory.{h,cpp}      # 剪贴板历史监听与持久化
-    │   ├── cliphistorydialog.{h,cpp}# 剪贴板历史选择对话框
-    │   └── secretstore.{h,cpp}      # SSH 密码加密（Windows DPAPI / XOR 回退）
-    ├── cloud/                        # ===== 云盘浏览 =====
-    │   ├── cloudprovider.h           # 云盘后端抽象接口（list/download/upload/remove/rename/stream...）
-    │   ├── clouddrivestore.{h,cpp}   # 已连接云盘的持久化（令牌加密存储）
-    │   ├── restproviders.{h,cpp}     # OneDrive/GoogleDrive/Dropbox/百度/WebDAV 具体实现（界面仅暴露百度+WebDAV）
-    │   ├── cloudconnectdialog.{h,cpp}# 连接对话框（选服务商+令牌/凭据+代理）
-    │   ├── cloudbrowsertab.{h,cpp}   # 树状浏览 + 右键打开方式/流式/上传/下载/重命名/删除
-    │   ├── streamproxy.{h,cpp}       # 本地中转，为边下边播注入必需请求头
-    │   ├── transfermanager.{h,cpp}   # 全局传输任务模型（进度/取消/重试/状态）
-    │   ├── transferpanel.{h,cpp}     # 传输面板 UI（仅浏览标签页时显示）
-    │   ├── smbprovider.{h,cpp}       # Windows/Samba 共享文件夹（UNC 路径）
-    │   ├── sftpprovider.{h,cpp}      # SFTP（原生 libssh2，独立工作线程）
-    │   └── ftpprovider.{h,cpp}       # FTP（QTcpSocket 实现 RFC959 + PASV）
-    ├── compare/                     # ===== 文件比较 =====
-    │   ├── diffengine.{h,cpp}       # Myers O(ND) 行差异 + 字符级内联差异
-    │   ├── textcomparetab.{h,cpp}   # 文本双栏比较视图
-    │   ├── foldercomparetab.{h,cpp} # 递归文件夹比较 + 互拷
-    │   ├── hexcomparetab.{h,cpp}    # 十六进制比较
-    │   ├── imagecomparetab.{h,cpp}  # 图片比较 + 差异叠加
-    │   └── comparedialog.{h,cpp}    # 新建比较启动对话框
-    ├── editor/                      # ===== 代码编辑器 =====
-    │   ├── codeeditor.{h,cpp}       # 行号 + 当前行高亮 + 缩进 + 缩放 + 列/块编辑
-    │   ├── hexeditortab.{h,cpp}     # 十六进制查看器/编辑器（可编辑字节 + 保存）
-    │   ├── syntaxhighlighter.{h,cpp}# 多语言语法高亮
-    │   ├── finddialog.{h,cpp}       # 查找 / 替换
-    │   ├── gotodialog.{h,cpp}       # 跳转到行
-    │   ├── editortab.{h,cpp}        # 文件读写 / 编码自动识别 / 行尾 / 主题
-    │   └── thememanager.{h,cpp}     # 配色主题
-    └── terminal/                    # ===== SSH + 串口终端 =====
-        ├── ansiparser.{h,cpp}       # VT100/xterm-256 ANSI 引擎（SSH + 串口共用）
-        ├── terminalwidget.{h,cpp}   # 终端渲染 + 键盘 + IME + 选择复制
-        ├── sshsession.{h,cpp}       # 原生 libssh2 SSH 客户端（工作线程）+ tmux
-        ├── sshtab.{h,cpp}           # SSH 标签页
-        ├── sessiondialog.{h,cpp}    # SSH 会话配置对话框
-        ├── sessionmanager.{h,cpp}   # sessions.json 持久化
-        ├── serialsession.{h,cpp}    # QSerialPort 封装
-        ├── serialtab.{h,cpp}        # 串口标签页
-        └── serialdialog.{h,cpp}     # 串口配置对话框
-```
+**Terminal++** ist eine einheitliche **Qt-6**-Anwendung, die in einem einzigen Fenster mit Tabs vereint:
+
+- **Code-Editor** — Multi-Tab, Syntaxhervorhebung, Designs, Suchen/Ersetzen, Kodierungen, Spalten-/Blockbearbeitung, Zwischenablage-Verlauf, Autospeichern, integrierter Hex-Viewer/-Editor und Tab-Kontextmenü.
+- **SSH-Terminal** — native SSH-Sitzungen mit libssh2, tmux-Unterstützung und VT100/256-Farben; Passwörter mit Windows DPAPI verschlüsselt.
+- **Serielles / UART-Terminal** — konfigurierbare serielle Konsole mit derselben ANSI-Engine.
+- **Dateivergleich** — Text-, Ordner-, Hex- und Bildvergleich nebeneinander (einschließlich rekursivem Ordnervergleich und Kopieren zwischen Seiten).
+- **Cloud / Freigegebene Ordner / SFTP / FTP** — Baidu Pan, WebDAV, Windows/Samba-Freigaben, SFTP und FTP; Hoch-/Herunterladen (Dateien und Ordner), Umbenennen, Löschen, Streaming-Wiedergabe, mit einem Übertragungspanel für Live-Fortschritt und Verlauf.
+- **Bilder (anzeigen, bearbeiten, vergleichen)** — in allen Bildansichten werden Bilder **beim Öffnen automatisch auf den sichtbaren Bereich skaliert**: zu große Bilder werden verkleinert, zu kleine vergrößert; die Werkzeugleiste bietet weiterhin Vergrößern / Verkleinern / Anpassen / 1:1.
+- **Mehrsprachige Oberfläche (9 Sprachen)** — Englisch / Vereinfachtes Chinesisch / Traditionelles Chinesisch / Spanisch / Französisch / Deutsch / Russisch / Japanisch / Koreanisch. Erststart ist Englisch; Wechsel über das Menü **UI Language**. Die Wahl wird gespeichert.
+- **Schneller Start** — die Übersetzungstabelle wird faul geladen (englische Starts überspringen sie komplett); unkritische Arbeit (Zwischenablage-Listener etc.) wird hinter das erste Zeichnen des Hauptfensters verschoben.
+
+Vollständige Build-Anweisungen siehe [README.zh-CN.md](README.zh-CN.md).
 
 ---
 
-## 八、设计说明
+## Русский
 
-- **统一终端引擎**：`AnsiParser` 维护屏幕缓冲 + 滚动回看，`TerminalWidget` 负责绘制与输入，SSH 和串口只是不同的数据源（`SshSession` / `SerialSession`），因此两边都拥有完整的 VT100 渲染、256 色、中文 IME、复制粘贴能力。
-- **SSH 原生自包含**：`SshSession` 在独立工作线程里用 libssh2 完成 TCP 连接、SSH 握手、密码/公钥认证、请求 PTY(xterm-256color) 并开 shell（或 `tmux new-session -A`），再把收发字节通过队列信号与 GUI 线程的 `TerminalWidget` 交换。不调用任何外部 ssh / plink 程序，Windows(ws2_32) 与 Linux(BSD socket) 均可编译运行。
-- **编辑器与终端解耦**：编辑器标签页与终端标签页共存于同一 `QTabWidget`，菜单项根据当前标签页类型智能响应。
+**Terminal++** — это единое приложение на **Qt 6**, объединяющее в одном окне с вкладками:
+
+- **Редактор кода** — многовкладочный редактор с подсветкой синтаксиса, темами, поиском/заменой, кодировками, редактированием столбца/блока, историей буфера обмена, автосохранением, встроенным hex-просмотрщиком/редактором и контекстным меню вкладок.
+- **SSH-терминал** — нативные SSH-сеансы на libssh2 с поддержкой tmux и рендерингом VT100/256 цветов; пароли шифруются Windows DPAPI.
+- **Serial / UART-терминал** — настраиваемая последовательная консоль с тем же движком ANSI.
+- **Сравнение файлов** — параллельное сравнение текста, папок, hex и изображений (с рекурсивным сравнением папок и копированием между сторонами).
+- **Облако / Общие папки / SFTP / FTP** — Baidu Pan, WebDAV, Windows/Samba-ресурсы, SFTP и FTP; загрузка/скачивание (файлы и папки), переименование, удаление, потоковое воспроизведение, с панелью передач, показывающей прогресс и историю в реальном времени.
+- **Изображения (просмотр, редактирование, сравнение)** — во всех режимах просмотра изображений картинки **автоматически масштабируются до видимой области при открытии**: слишком большие изображения уменьшаются, слишком маленькие увеличиваются; панель инструментов по-прежнему предоставляет увеличение / уменьшение / вместить / 1:1.
+- **Многоязычный интерфейс (9 языков)** — английский / упрощённый китайский / традиционный китайский / испанский / французский / немецкий / русский / японский / корейский. Первый запуск — на английском; переключение через меню **UI Language**. Выбор сохраняется.
+- **Быстрый запуск** — таблица переводов загружается лениво (запуски на английском полностью её пропускают); некритичная работа (слушатель буфера обмена и т. д.) откладывается до появления главного окна.
+
+Полные инструкции по сборке см. в [README.zh-CN.md](README.zh-CN.md).
+
+---
+
+## 日本語
+
+**Terminal++** は **Qt 6** で作られたオールインワンアプリで、一つのタブ付きウィンドウに以下を統合します:
+
+- **コードエディタ** — マルチタブ、構文強調、テーマ、検索/置換、エンコーディング、列/ブロック編集、クリップボード履歴、自動保存、内蔵 Hex ビューア/エディタ、タブ右クリックメニュー。
+- **SSH 端末** — libssh2 ベースのネイティブ SSH、tmux 対応、VT100/256 色描画。パスワードは Windows DPAPI で暗号化。
+- **シリアル / UART 端末** — 設定可能なシリアルコンソール、SSH と同じ ANSI エンジンを共有。
+- **ファイル比較** — テキスト・フォルダ・Hex・画像の並列比較（再帰的なフォルダ比較と相互コピーを含む）。
+- **クラウド / 共有フォルダ / SFTP / FTP** — Baidu Pan、WebDAV、Windows/Samba 共有、SFTP、FTP。アップロード/ダウンロード（ファイル・フォルダ）、名前変更、削除、ストリーミング再生に対応し、進捗と履歴をリアルタイム表示する転送パネルを備える。
+- **画像（表示・編集・比較）** — すべての画像ビューで、開いた瞬間に**画像を可視範囲に自動的にスケーリング**します: 大きすぎる画像は縮小してウィンドウに収め、小さすぎる画像は十分見える大きさまで拡大。ツールバーから拡大 / 縮小 / 全体表示 / 1:1 も可能。
+- **多言語 UI（9 言語）** — 英語 / 簡体字中国語 / 繁體字中国語 / スペイン語 / フランス語 / ドイツ語 / ロシア語 / 日本語 / 韓国語。初回は英語で起動し、**UI Language** メニューから切り替え可能。選択は保存されます。
+- **高速起動** — 翻訳テーブルは遅延ロード（英語起動では完全にスキップ）、重要でない処理（クリップボードリスナーなど）はメインウィンドウ描画後に後回し。
+
+詳細なビルド手順は [README.zh-CN.md](README.zh-CN.md) を参照してください。
+
+---
+
+## 한국어
+
+**Terminal++**는 **Qt 6** 로 만든 올인원 애플리케이션으로, 하나의 탭 창 안에 다음을 결합합니다:
+
+- **코드 편집기** — 멀티탭, 구문 강조, 테마, 찾기/바꾸기, 인코딩, 열/블록 편집, 클립보드 기록, 자동 저장, 내장 Hex 뷰어/편집기, 탭 우클릭 메뉴.
+- **SSH 터미널** — libssh2 기반 네이티브 SSH, tmux 지원, VT100/256색 렌더링; 비밀번호는 Windows DPAPI 로 암호화.
+- **시리얼 / UART 터미널** — 동일한 ANSI 엔진을 공유하는 구성 가능한 시리얼 콘솔.
+- **파일 비교** — 텍스트, 폴더, 16진수, 사진의 나란히 비교(재귀 폴더 비교 및 양쪽 복사 포함).
+- **클라우드 / 공유 폴더 / SFTP / FTP** — Baidu Pan, WebDAV, Windows/Samba 공유, SFTP, FTP; 업로드/다운로드(파일 및 폴더), 이름 바꾸기, 삭제, 스트리밍 재생을 지원하며 실시간 진행률과 기록을 보여주는 전송 패널을 제공합니다.
+- **이미지(보기·편집·비교)** — 모든 이미지 뷰에서 열 때 **이미지를 보이는 영역에 맞춰 자동 조정**합니다: 너무 큰 이미지는 창에 맞게 축소되고, 너무 작은 이미지는 편안히 보이도록 확대됩니다; 툴바로 확대 / 축소 / 맞춤 / 1:1 도 가능.
+- **다국어 UI(9개 언어)** — 영어 / 简体中文 / 繁體中文 / Español / Français / Deutsch / Русский / 日本語 / 한국어. 처음에는 영어로 실행되며 **UI Language** 메뉴에서 전환 가능. 선택 사항은 저장됩니다.
+- **빠른 시작** — 번역 테이블은 지연 로딩(영어 실행은 완전히 건너뜀); 중요하지 않은 작업(클립보드 리스너 등)은 메인 창이 그려진 뒤로 미룹니다.
+
+자세한 빌드 안내는 [README.zh-CN.md](README.zh-CN.md) 를 참조하세요.

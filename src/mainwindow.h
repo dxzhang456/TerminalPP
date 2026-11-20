@@ -35,13 +35,17 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
-    // Open a file into a new editor tab (used by command line + File menu).
-    EditorTab *openFile(const QString &path);
+    // Open a file, automatically detecting its type via libmagic:
+    //   - image  -> ImageEditorTab (in image editor, fit to view)
+    //   - text   -> EditorTab (in code/text editor)
+    //   - binary -> HexEditorTab (in hex editor)
+    // Returns the created/focused tab widget (EditorTab*, ImageEditorTab*, or HexEditorTab*).
+    QWidget *openFile(const QString &path);
     // Open a local (downloaded) file that originated from a cloud drive /
-    // shared folder / SFTP / FTP connection, remembering where it came from so
-    // Save can offer to push changes back to that remote location.
-    EditorTab *openRemoteFile(const QString &localPath, CloudProvider *provider,
-                              const QString &remotePath, const QString &driveLabel);
+    // shared folder / SFTP / FTP connection, using libmagic to pick the
+    // appropriate editor and recording the remote origin if it is text.
+    QWidget *openRemoteFile(const QString &localPath, CloudProvider *provider,
+                            const QString &remotePath, const QString &driveLabel);
 
     // Remove the first tab if it is still the untouched default empty document
     // (used after opening command-line files so no blank tab lingers).
@@ -57,6 +61,8 @@ private slots:
     void newFile();
     void openFileDialog();
     void openHexEditorDialog();     // pick a file and open it in the hex editor
+    void openImageEditorDialog();   // pick a file and open it in the image editor
+    void manageFileAssociations();  // register/unregister default-program + Open With
     void openRecentFile();          // open the file from a Recent menu action
     void clearRecentFiles();
     bool saveFile();
@@ -97,6 +103,10 @@ private slots:
     void manageSessions();
     void connectSelectedSession();
     void reconnectCurrent();
+
+    // --- Terminal: local shells ---
+    void newCmdTerminal();           // open a local cmd.exe terminal tab
+    void newPowerShellTerminal();    // open a local PowerShell terminal tab
 
     // --- Terminal: Serial ---
     void newSerialSession();
@@ -145,6 +155,10 @@ private:
     void closeTabsToLeft(int index);
     // Open any file in an editable hex-editor tab (view + edit + save).
     void openHexEditor(const QString &path);
+    // Open any image in the full image-editor tab (edit + filters + export).
+    void openImageEditor(const QString &path);
+    // Open a local shell terminal (0 = cmd, 1 = PowerShell).
+    void openLocalShell(int shell);
 
     // Recent-files list (most-recent first, capped at 20). Persisted in
     // QSettings and rebuilt into the File > Open Recent submenu.

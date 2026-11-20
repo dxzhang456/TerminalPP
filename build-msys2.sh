@@ -87,10 +87,12 @@ MOC_HEADERS=(
   "$SRC/editor/codeeditor.h"      "$SRC/editor/syntaxhighlighter.h"
   "$SRC/editor/finddialog.h"      "$SRC/editor/gotodialog.h"
   "$SRC/editor/editortab.h"       "$SRC/editor/hexeditortab.h"
+  "$SRC/editor/imageeditortab.h"
   "$SRC/terminal/terminalwidget.h" "$SRC/terminal/ansiparser.h"
   "$SRC/terminal/sshsession.h"     "$SRC/terminal/sshtab.h"
   "$SRC/terminal/sessiondialog.h"  "$SRC/terminal/serialsession.h"
   "$SRC/terminal/serialtab.h"      "$SRC/terminal/serialdialog.h"
+  "$SRC/terminal/localshelltab.h"
 )
 echo "[1/4] moc"
 MOC_CPP=()
@@ -105,7 +107,7 @@ done
 # Some .cpp files declare inline Q_OBJECT classes and #include their own
 # "<base>.moc". Generate those into $OUT/moc so they are found via -I.
 for pair in "compare/textcomparetab" "compare/imagecomparetab" "editor/hexeditortab" \
-           "cloud/sftpprovider" "cloud/ftpprovider"; do
+           "editor/imageeditortab" "cloud/sftpprovider" "cloud/ftpprovider"; do
     base="$(basename "$pair")"
     mocout="$OUT/moc/$base.moc"
     if newer_than "$SRC/$pair.cpp" "$mocout"; then
@@ -178,7 +180,7 @@ done
 echo "  ($compiled source(s) (re)compiled)"
 
 LIBS="-lQt6Widgets -lQt6Gui -lQt6Core -lQt6Network -lQt6PrintSupport \
-      -lQt6SerialPort -lssh2 -lws2_32 -lmswsock -lcrypt32 -lmpr"
+      -lQt6SerialPort -lssh2 -lmagic -lws2_32 -lmswsock -lcrypt32 -lmpr"
 
 # Link only if something changed or the exe is missing.
 EXE="$OUT/TerminalPP.exe"
@@ -225,11 +227,15 @@ for pass in 1 2 3 4 5 6; do
     done
     [ "$changed" = "0" ] && break
 done
-# Ensure gcc runtime + SSH/TLS libs (OpenSSL required for HTTPS cloud APIs).
+# Ensure gcc runtime + SSH/TLS/magic libs (OpenSSL for HTTPS, libmagic for file sniffing).
 for d in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll \
-         libssh2-1.dll libssl-3-x64.dll libcrypto-3-x64.dll libz-1.dll zlib1.dll; do
+         libssh2-1.dll libmagic-1.dll libssl-3-x64.dll libcrypto-3-x64.dll libz-1.dll zlib1.dll; do
     [ ! -f "$d" ] && [ -f "/mingw64/bin/$d" ] && cp "/mingw64/bin/$d" .
 done
+# Bundle the compiled libmagic database file (magic.mgc) next to the exe
+mkdir -p "$DIST/share/misc"
+[ -f "/mingw64/share/misc/magic.mgc" ] && cp "/mingw64/share/misc/magic.mgc" "$DIST/" 2>/dev/null
+[ -f "/mingw64/share/misc/magic.mgc" ] && cp "/mingw64/share/misc/magic.mgc" "$DIST/share/misc/" 2>/dev/null
 # OpenSSL may be named without the -x64 suffix on some MSYS2 installs.
 for d in libssl-3.dll libcrypto-3.dll; do
     [ ! -f "$d" ] && [ -f "/mingw64/bin/$d" ] && cp "/mingw64/bin/$d" .
