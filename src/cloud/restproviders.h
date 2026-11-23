@@ -135,9 +135,20 @@ public:
 private:
     // Resolve a file's temporary download link (dlink) from its fs_id, then
     // invoke `onDlink(url)`. Baidu needs the fs_id, not the path.
+    //
+    // Self-healing: if the fs_id is not in the cache yet (the common case right
+    // after an upload, because only list() fills the cache), the parent folder
+    // is silently re-listed first and the lookup retried. `retriesLeft` guards
+    // against infinite recursion when the file genuinely does not exist.
     void resolveDlink(const QString &remotePath,
-                      std::function<void(const QString &)> onDlink);
-    QHash<QString, QString> m_fsIdByPath;   // path -> fs_id, filled by list()
+                      std::function<void(const QString &)> onDlink,
+                      int retriesLeft = 2);
+    // Ask Baidu for a single file's metadata by path and cache its fs_id, then
+    // invoke `done(ok)`. Used to recover the fs_id of a freshly uploaded file
+    // without requiring the user to refresh the folder.
+    void fetchFsIdByPath(const QString &remotePath,
+                         std::function<void(bool)> done);
+    QHash<QString, QString> m_fsIdByPath;   // path -> fs_id (list()/upload fill it)
 };
 
 // ---- Generic WebDAV (Nutstore/坚果云, self-hosted, etc.) ----

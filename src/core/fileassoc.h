@@ -28,7 +28,8 @@ public:
     static QStringList textExtensions();
     static QStringList sourceCodeExtensions();
     static QStringList imageExtensions();
-    // Convenience: text + source + image, de-duplicated.
+    static QStringList pdfExtensions();
+    // Convenience: text + source + image + pdf, de-duplicated.
     static QStringList allExtensions();
 
     // True on Windows (where association is implemented).

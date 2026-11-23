@@ -92,7 +92,11 @@ MOC_HEADERS=(
   "$SRC/terminal/sshsession.h"     "$SRC/terminal/sshtab.h"
   "$SRC/terminal/sessiondialog.h"  "$SRC/terminal/serialsession.h"
   "$SRC/terminal/serialtab.h"      "$SRC/terminal/serialdialog.h"
+  "$SRC/pdf/pdftab.h"
 )
+# NOTE: src/pdf/pdfium.{h,cpp} is a plain (non-QObject) class, so it needs no
+# moc entry — it is picked up automatically by the "$SRC"/pdf/*.cpp glob in
+# the SOURCES list below.
 echo "[1/4] moc"
 MOC_CPP=()
 for h in "${MOC_HEADERS[@]}"; do
@@ -106,7 +110,8 @@ done
 # Some .cpp files declare inline Q_OBJECT classes and #include their own
 # "<base>.moc". Generate those into $OUT/moc so they are found via -I.
 for pair in "compare/textcomparetab" "compare/imagecomparetab" "editor/hexeditortab" \
-           "editor/imageeditortab" "cloud/sftpprovider" "cloud/ftpprovider"; do
+           "editor/imageeditortab" "cloud/sftpprovider" "cloud/ftpprovider" \
+           "pdf/pdftab"; do
     base="$(basename "$pair")"
     mocout="$OUT/moc/$base.moc"
     if newer_than "$SRC/$pair.cpp" "$mocout"; then
@@ -153,6 +158,7 @@ SOURCES=(
   "$SRC"/core/*.cpp
   "$SRC"/compare/*.cpp
   "$SRC"/cloud/*.cpp
+  "$SRC"/pdf/*.cpp
   "$SRC"/editor/*.cpp
   "$SRC"/terminal/*.cpp
 )
@@ -160,8 +166,17 @@ SOURCES+=("${MOC_CPP[@]}")
 [ "$USE_QRC" = "1" ] && SOURCES+=("$QRC_CPP")
 
 # Map each .cpp to a unique .o under $OBJ (flatten path to avoid collisions).
+#
+# Compilation runs in PARALLEL across all CPU cores. Each Qt translation unit
+# takes 20-30 s on its own, so a from-scratch `rebuild` of ~70 files used to
+# take 10+ minutes of wall time and looked like it had hung on whichever file
+# happened to be last printed. With -j <cores> the same rebuild finishes in a
+# fraction of that time.
+JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 OBJECTS=()
 compiled=0
+TODO_SRC=()
+TODO_OBJ=()
 for s in "${SOURCES[@]}"; do
     [ -f "$s" ] || continue
     # Build a flat, collision-free object name from the path relative to $PROJ.
@@ -169,17 +184,56 @@ for s in "${SOURCES[@]}"; do
     flat="$(echo "$rel" | sed 's#[/\\]#__#g; s#\.cpp$#.o#')"
     o="$OBJ/$flat"
     if newer_than "$s" "$o"; then
-        echo "  CC  $rel"
-        g++ $CXXFLAGS -c "$s" -o "$o" || { echo "compile failed: $s"; exit 3; }
-        compiled=$((compiled+1))
+        TODO_SRC+=("$s")
+        TODO_OBJ+=("$o")
     fi
     OBJECTS+=("$o")
 done
+
+total=${#TODO_SRC[@]}
+if [ "$total" -gt 0 ]; then
+    echo "  compiling $total file(s) with -j$JOBS"
+    FAILDIR="$(mktemp -d)"
+    idx=0
+    for i in "${!TODO_SRC[@]}"; do
+        s="${TODO_SRC[$i]}"
+        o="${TODO_OBJ[$i]}"
+        rel="${s#$PROJ/}"
+        idx=$((idx+1))
+        # Throttle to $JOBS concurrent compilers.
+        while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n 2>/dev/null || sleep 0.2; done
+        # NOTE: use the loop index (not $$) for the per-file log name — inside a
+        # subshell $$ is the PARENT pid, so every job would share one file and
+        # the error output would be interleaved/lost.
+        (
+            if g++ $CXXFLAGS -c "$s" -o "$o" > "$FAILDIR/out.$idx" 2>&1; then
+                printf '  [%d/%d] CC  %s\n' "$idx" "$total" "$rel"
+                rm -f "$FAILDIR/out.$idx"
+            else
+                printf '  [%d/%d] FAILED %s\n' "$idx" "$total" "$rel"
+                { echo "=== $rel ==="; cat "$FAILDIR/out.$idx"; } \
+                    > "$FAILDIR/failed.$idx"
+                rm -f "$FAILDIR/out.$idx"
+            fi
+        ) &
+    done
+    wait
+    if ls "$FAILDIR"/failed.* >/dev/null 2>&1; then
+        echo ""
+        echo "===================== COMPILE ERRORS ====================="
+        cat "$FAILDIR"/failed.* 
+        echo "=========================================================="
+        rm -rf "$FAILDIR"
+        exit 3
+    fi
+    rm -rf "$FAILDIR"
+    compiled=$total
+fi
 [ -n "$RES_OBJ" ] && OBJECTS+=("$RES_OBJ")
 echo "  ($compiled source(s) (re)compiled)"
 
 LIBS="-lQt6Widgets -lQt6Gui -lQt6Core -lQt6Network -lQt6PrintSupport \
-      -lQt6SerialPort -lssh2 -lmagic -lws2_32 -lmswsock -lcrypt32 -lmpr"
+      -lQt6SerialPort -lssh2 -lmagic -lws2_32 -lmswsock -lcrypt32 -lmpr -lz"
 
 # Link only if something changed or the exe is missing.
 EXE="$OUT/TerminalPP.exe"
@@ -239,5 +293,35 @@ mkdir -p "$DIST/share/misc"
 for d in libssl-3.dll libcrypto-3.dll; do
     [ ! -f "$d" ] && [ -f "/mingw64/bin/$d" ] && cp "/mingw64/bin/$d" .
 done
+
+# ---- 4b) bundle pdfium.dll into dist/pdfium/ --------------------------------
+# The PDF viewer renders pages with PDFium, loaded dynamically at run time.
+# src/pdf/pdfium.cpp searches several locations and uses dist/pdfium/pdfium.dll
+# as the LAST RESORT, so shipping a copy here guarantees real page rendering
+# even on a machine that has no PDFium installed anywhere.
+mkdir -p "$DIST/pdfium"
+if [ ! -f "$DIST/pdfium/pdfium.dll" ]; then
+    for src in \
+        "$PROJ/thirdparty/pdfium/pdfium.dll" \
+        "/c/Program Files/Netskope/EPDLP/win/pdfium.dll" \
+        "/c/Program Files (x86)/Netskope/EPDLP Deployment/x64/pdfium.dll" \
+        "/c/Program Files/Windows Defender Advanced Threat Protection/Classification/Dprt/pdfium.dll" ; do
+        if [ -f "$src" ]; then
+            # Only take a 64-bit build; a 32-bit DLL cannot be loaded by our exe.
+            if objdump -f "$src" 2>/dev/null | grep -q 'pei-x86-64'; then
+                cp "$src" "$DIST/pdfium/pdfium.dll" && \
+                    echo "  pdfium.dll bundled from: $src"
+                break
+            fi
+        fi
+    done
+fi
+if [ -f "$DIST/pdfium/pdfium.dll" ]; then
+    PDFIUM_SZ=$(stat -c %s "$DIST/pdfium/pdfium.dll" 2>/dev/null || echo "?")
+    echo "  pdfium: dist/pdfium/pdfium.dll ($PDFIUM_SZ bytes)"
+else
+    echo "  pdfium: NOT bundled — put a 64-bit pdfium.dll in thirdparty/pdfium/"
+    echo "          (the viewer still works; pages fall back to the built-in engine)"
+fi
 
 echo "DONE. Portable build in: $DIST/TerminalPP.exe  ($(ls *.dll | wc -l) DLLs bundled)"

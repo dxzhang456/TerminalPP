@@ -261,6 +261,17 @@ signals:
 private:
     void applyFreehand(const QPoint &a, const QPoint &b)
     {
+        // IMPORTANT: the mosaic path must be handled BEFORE any QPainter is
+        // opened on m_image. Qt allows only one painter per paint device, so
+        // calling pixelateBlock() (which paints and reads pixels itself) while
+        // an outer painter was still active silently did nothing — that was the
+        // reason the mosaic tool appeared broken.
+        if (m_tool == ToolMosaic) {
+            pixelateAlong(a, b);
+            update();
+            return;
+        }
+
         QPainter p(&m_image);
         p.setRenderHint(QPainter::Antialiasing, true);
         if (m_tool == ToolEraser) {
@@ -268,9 +279,6 @@ private:
             QPen pen(Qt::transparent, m_brushWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
             p.setPen(pen);
             p.drawLine(a, b);
-        } else if (m_tool == ToolMosaic) {
-            // Pixelate a square block around the stroke point.
-            pixelateBlock(b);
         } else { // brush
             QPen pen(m_brushColor, m_brushWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
             p.setPen(pen);
@@ -279,23 +287,57 @@ private:
         update();
     }
 
+    // Pixelate every grid cell the segment a->b passes through. Interpolating
+    // along the segment (instead of only stamping the end point) means a fast
+    // drag no longer leaves un-pixelated gaps between mouse events.
+    void pixelateAlong(const QPoint &a, const QPoint &b)
+    {
+        const int block = qMax(2, m_mosaicBlock);
+        const int dx = b.x() - a.x();
+        const int dy = b.y() - a.y();
+        const int dist = int(std::sqrt(double(dx) * dx + double(dy) * dy));
+        // Step at most half a block so consecutive stamps always overlap.
+        const int steps = qMax(1, dist / qMax(1, block / 2));
+        for (int i = 0; i <= steps; ++i) {
+            const int x = a.x() + dx * i / steps;
+            const int y = a.y() + dy * i / steps;
+            pixelateBlock(QPoint(x, y));
+        }
+    }
+
+    // Average the colours of the grid cell containing `center` and flood the
+    // whole cell with that average. Snapping to a fixed grid (rather than
+    // centring on the cursor) is what produces the classic blocky mosaic and
+    // keeps repeated passes over the same area stable.
     void pixelateBlock(const QPoint &center)
     {
-        const int half = m_mosaicBlock;
-        QRect r(center.x()-half, center.y()-half, half*2, half*2);
+        const int block = qMax(2, m_mosaicBlock);
+        // Snap to a block-aligned grid cell.
+        const int gx = (center.x() / block) * block;
+        const int gy = (center.y() / block) * block;
+        QRect r(gx, gy, block, block);
         r = r.intersected(m_image.rect());
-        if (!r.isValid()) return;
-        // Average color over the block, then fill.
-        qint64 rr=0, gg=0, bb=0, aa=0, n=0;
-        for (int y=r.top(); y<=r.bottom(); ++y)
-            for (int x=r.left(); x<=r.right(); ++x) {
-                const QColor c = m_image.pixelColor(x,y);
-                rr+=c.red(); gg+=c.green(); bb+=c.blue(); aa+=c.alpha(); ++n;
+        if (r.isEmpty())
+            return;
+
+        // Average colour over the cell. Read pixels with NO painter active.
+        qint64 rr = 0, gg = 0, bb = 0, aa = 0, n = 0;
+        for (int y = r.top(); y <= r.bottom(); ++y) {
+            for (int x = r.left(); x <= r.right(); ++x) {
+                const QColor c = m_image.pixelColor(x, y);
+                rr += c.red(); gg += c.green(); bb += c.blue(); aa += c.alpha();
+                ++n;
             }
-        if (n==0) return;
-        const QColor avg(int(rr/n), int(gg/n), int(bb/n), int(aa/n));
-        QPainter p(&m_image);
-        p.fillRect(r, avg);
+        }
+        if (n == 0)
+            return;
+        const QColor avg(int(rr / n), int(gg / n), int(bb / n), int(aa / n));
+
+        // Fill the cell directly (setPixelColor avoids needing a painter and
+        // works correctly for both ARGB32 and RGB32 images).
+        for (int y = r.top(); y <= r.bottom(); ++y)
+            for (int x = r.left(); x <= r.right(); ++x)
+                m_image.setPixelColor(x, y, avg);
     }
 
     void commitShape(const QPoint &a, const QPoint &b)

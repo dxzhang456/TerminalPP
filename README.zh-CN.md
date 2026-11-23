@@ -105,8 +105,51 @@ File → Open as Image... 可将任意图片打开为完整图片编辑器标签
 - 水印：文字水印、图片水印
 - 导出：Export As / Compress & Export（可选质量 1-100）
 
-### 7. 共用框架
-- 统一标签页：编辑器 / SSH / 串口 / 各类比较 / 云盘可任意混排
+### 7. PDF 查看 / 编辑器
+File → Open as PDF... 可将 PDF 打开为完整的 PDF 查看/编辑标签页；也可一次选中多张图片，自动合成为一个 PDF（图片转 PDF）。
+
+该模块采用**双引擎**架构：
+
+| 引擎 | 职责 | 说明 |
+|------|------|------|
+| **PDFium**（优先） | **页面渲染** | 与 Chrome / Edge 同款引擎，运行时从 `pdfium.dll` **动态加载**（无编译期依赖）。文字、矢量图形、嵌入字体、透明度都能像浏览器一样完整渲染，并在当前缩放级别重新栅格化以保持清晰。**实测 20 个真实 PDF：20/20 全部打开，232/232 页全部成功渲染**（旧引擎只有 26 页能出图）。 |
+| **内置引擎**（仅 Qt + zlib） | **结构编辑 + 渲染兜底** | 所有*结构性*操作（合并/拆分/旋转/批注/水印/加密/表单/保存）始终由它完成，产出标准合法的 PDF。当机器上找不到任何 `pdfium.dll` 时，它也负责显示页面（此时只有内嵌整页图像的扫描件能出图，其余页面显示说明文字）。 |
+
+> `pdfium.dll` 的查找顺序见上文「PDFium 自动打包」。构建脚本已把一份 64 位 DLL 打包进 `dist/pdfium/`，因此开箱即可完整渲染；该 DLL 缺失时程序仍能正常启动与编辑，只是渲染降级。
+
+主要功能：
+
+- **页面导航**：工具栏最左侧提供 **首页 / 上一页 / 下一页 / 末页** 按钮，中间是可直接输入跳转的**页码框**与总页数（`3 / 85`）。上一页 / 下一页 还分别绑定了 **PageUp / PageDown** 快捷键；左侧缩略图列表的选中项与页码框会双向同步。
+- **缩放**：**缩小（－）/ 放大（＋）** 按钮之间实时显示当前缩放百分比，另有 **实际大小**、**适合宽度**、**适合页面** 三种模式（与 SumatraPDF 的 Fit Width / Fit Page 一致）。菜单的 Ctrl + / Ctrl − / Ctrl 0 同样作用于 PDF 标签页。
+- **等比例缩放（不再变形）**：页面渲染时先用 `Qt::KeepAspectRatio` 把页面图像装进页面矩形再居中绘制，**绝不会把图像拉伸填满**，因此原始宽高比始终保留。同时正确处理页面的 `/Rotate` 属性：`90°` / `270°` 的页面会自动交换显示宽高，并围绕中心旋转绘制（PDFium 已把 `/Rotate` 折算进它返回的页面尺寸，此时视图不再重复旋转）。
+- **自动判定 portrait / landscape**：页面的版式**完全按照 PDF 自身页面框的宽高比决定**——横版（宽 > 高）的幻灯片类 PDF 自动以横向呈现，竖版文稿自动以纵向呈现，无需任何手动切换。左侧缩略图同样遵循各页自己的方向（横版页产生宽缩略图，竖版页产生高缩略图），底部状态行会明确显示当前页被判定为 `横向` 还是 `纵向`。
+- **解析能力（这是“部分 PDF 打不开”的修复点）**：
+  - **压缩对象流（`/Type /ObjStm`）**：PDF 1.5 之后，页面树、文档目录等结构对象通常被打包压缩进对象流里。暴力扫描 `N G obj` 看不到它们，因此这类文件以前会直接报“找不到页面”。现在解析器会在构建页面树**之前**展开所有对象流，把其中的对象提升到全局对象表（顶层定义优先）。实测本机 20 个真实 PDF：修复前 2 个完全打不开、共识别 158 页；修复后 **0 个打不开、共识别 261 页**。
+  - **过滤器**：`FlateDecode`、`LZWDecode`（可变码长 9–12 位、含 earlyChange）、`RunLengthDecode`、`ASCIIHexDecode`、`ASCII85Decode`，并支持 `/DecodeParms` 的 **PNG 预测器（10–15：None/Sub/Up/Average/Paeth）与 TIFF 预测器（2）**。`DCTDecode` / `JPXDecode` / `CCITTFaxDecode` / `JBIG2Decode` 这类图像专用编码会原样交给 Qt 的图像插件解码。
+  - **色彩空间与位深**：`DeviceRGB`、`DeviceGray`、`DeviceCMYK`、`CalRGB`、`CalGray`、`Lab`、`Indexed`（含调色板查表）、`ICCBased`（按 `/N` 推断分量数）、`Separation`、`DeviceN`，位深支持 **1 / 2 / 4 / 8 / 16 位每分量**，并处理 `/ImageMask` 蒙版与 `/Decode [1 0]` 反相。
+- **失败可诊断（不再静默空白）**：打不开时状态栏会给出**具体原因**（文件被截断 / 已加密 / 交叉引用损坏 / 页面树为空等）并附带解析统计（对象数、从对象流展开的对象数、页数）。若文档能打开但某一页无法栅格化，该页会直接显示提示文字，告知“文本提取与所有页面/批注工具仍然可用”。
+- **批注标注**：高亮、下划线、删除线、文本框、便签、画笔、图章。在页面上直接绘制，保存时会被“烘焙”进 PDF 内容流，产出标准、合法的 PDF。
+- **页面管理**：合并 PDF、拆分 PDF、删除 / 插入 / 提取页面、旋转页面（↺ / ↻）、调整页序（上移 / 下移）。
+- **简单签名**：手绘签名（弹出画板手写）、上传图片签名，盖在当前页。
+- **基础转换**：PDF → 图片（每页导出为 PNG/JPG）；选图片 → PDF；PDF → Word（导出 RTF 文本，有排版损耗）。
+- **压缩 PDF**：重新序列化并去除冗余，减小体积并报告压缩比。
+- **添加水印**：文字水印（45° 对角、半透明）、图片水印（居中、可调缩放与透明度），可对全部页面或单页。
+- **基础保护**：设置打开密码（RC4-128 标准安全处理，另存为加密 PDF）。
+- **填充表单**：读取 AcroForm 文本字段并逐项填写。
+- **完整多语言**：PDF 模块的**每一个**按钮、对话框标题、提示与状态栏消息都已翻译成全部 9 种界面语言。由于工具栏只在构造时创建一次，`PdfTab` 额外监听 `I18n::languageChanged` 并实现了 `retranslate()`，因此切换语言后 PDF 工具栏会**立即**更新，无需重新打开标签页。导航 / 旋转按钮使用语言中立的符号（`⏮ ◀ ▶ ⏭ － ＋ ↺ ↻`），其完整名称以**已翻译的工具提示**呈现。
+- **自动识别**：双击 `.pdf` 或“打开方式 → Terminal++”会自动用 PDF 视图打开（以 `%PDF-` 文件头或 `.pdf` 扩展名判定）。
+- **界面布局**：左侧为页面缩略图列表，中间为页面视图（页面以带阴影的白纸样式呈现在灰色画布上），底部状态行显示 `页码 / 总页数 — 尺寸 pt — 旋转角度 — 缩放百分比`。
+- **打印**：File → Print 会逐页打印（每页一张），可打印预览，也可直接打印到 PDF 文件。
+
+> **关于“复刻 SumatraPDF”的实现路径。** SumatraPDF 的渲染能力来自 MuPDF，而 `mingw64` 工具链没有可直接链接的 Qt PDF / Poppler / MuPDF 包（`pacman` 只为 `ucrt64` / `clang64` 提供 `qt6-pdf`，`poppler` 虽有 `mingw64` 包但需引入一大串编译期依赖）。最终采用的方案是**运行时动态加载 PDFium**：
+> - **没有编译期依赖**——不需要导入库、不需要头文件，`src/pdf/pdfium.cpp` 里按 PDFium 稳定的公开 C ABI 自行声明函数指针，用 `LoadLibraryW` + `GetProcAddress` 解析；工具链里装不装 PDF 库都能编译通过。
+> - **渲染质量对标浏览器**——页面通过 `FPDF_RenderPageBitmap` 直接栅格化到 `QImage` 的像素缓冲（BGRA 布局与 `QImage::Format_ARGB32` 一致，零拷贝），文字/矢量/字体/透明度与 Chrome 一致，并带 `FPDF_ANNOT | FPDF_LCD_TEXT`。
+> - **优雅降级**——找不到 DLL 时 `PdfiumRenderer::isAvailable()` 返回 false，自动回落到内置引擎，程序绝不会因缺少 DLL 而无法启动或打不开文件；状态栏会明确提示当前用的是哪个渲染器。
+> - **非 ASCII 路径安全**——统一先用 `QFile` 读入字节再调用 `FPDF_LoadMemDocument`，绕开 `FPDF_LoadDocument` 的 `char*` 路径在中文文件名下失败的问题。
+
+### 8. 共用框架
+- 统一标签页：编辑器 / SSH / 串口 / 各类比较 / 云盘 / PDF 可任意混排
+- **单实例**：双击文件或使用资源管理器“打开方式”时，会把文件作为**新标签页**在已打开的窗口中打开（并将窗口置顶激活），而不是再启动一个新进程（基于 QLocalServer / QLocalSocket 实现）。
 - 统一菜单栏、工具栏、状态栏
 - 关闭时统一提示保存、统一断开所有连接
 - 跨平台：Windows 与 Linux（及 macOS）均可编译运行
@@ -207,12 +250,17 @@ bash /c/dx/myaiprojects/terminal++/TerminalPP/build-msys2.sh
 C:\msys64\usr\bin\bash.exe -lc "bash /c/dx/myaiprojects/terminal++/TerminalPP/build-msys2.sh"
 ```
 脚本会依次执行：`[1/4] moc` → `[2/4] rcc` → `[2b] 图标` → `[3/4] 编译+链接` → `[4/4] 打包到 dist/`，
-最后打印 `DONE. Portable build in: .../dist/TerminalPP.exe (34 DLLs bundled)`。
+最后打印 `DONE. Portable build in: .../dist/TerminalPP.exe (41 DLLs bundled)`。
+
+> **并行编译**：单个 Qt 源文件的编译需要 20–30 秒，整个工程约 80 个文件；若串行编译需要 30 分钟以上，并且进度条长时间停在某一个文件名上，很容易被误认为"卡死"。因此脚本会自动按 CPU 核数并行编译（`-j$(nproc)`），并打印 `[n/总数] CC 文件名` 的进度。**实测（16 核）完整 `rebuild` 80 个文件共 384 秒（约 6.5 分钟）、0 错误**。如需限制并发数（例如内存紧张时），可用 `JOBS=4 ./build-msys2.sh rebuild`。编译失败时，所有出错文件的完整报错会在末尾的 `COMPILE ERRORS` 区块中统一打印，不会被其它并行任务的输出冲掉。
+
+> **PDFium 自动打包**：`[4/4]` 阶段会把一份 64 位 `pdfium.dll` 复制到 `dist/pdfium/pdfium.dll`。运行时的查找顺序为：`TERMINALPP_PDFIUM` 环境变量 → exe 同目录的 `pdfium.dll` → 本机其它软件自带的 PDFium（Netskope / Windows Defender 等）→ 系统 DLL 搜索路径 → **最后兜底**使用 `dist/pdfium/pdfium.dll`。若想指定自己的版本，把 DLL 放到 `thirdparty/pdfium/pdfium.dll` 即可（该目录优先级最高）。
 
 完成后产物在 **`TerminalPP\dist\`**：
 - `TerminalPP.exe`（已内嵌窗口图标 + exe 文件图标）
-- 约 34 个运行时 DLL（Qt6 六模块、libssh2、libssl/libcrypto、icu、harfbuzz、freetype、gcc 运行时等）
-- `platforms\qwindows.dll` + `styles\` + `imageformats\` 插件
+- 41 个运行时 DLL（Qt6 六模块、libssh2、libssl/libcrypto、icu、harfbuzz、freetype、gcc 运行时等）
+- `platforms\qwindows.dll` + `styles\` + `imageformats\` + `tls\` 插件
+- `pdfium\pdfium.dll` — PDF 页面渲染引擎（运行时动态加载，见上文说明）
 
 **双击 `TerminalPP\dist\TerminalPP.exe` 即可运行，无需安装 Qt。**
 

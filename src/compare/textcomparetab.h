@@ -55,9 +55,46 @@ public slots:
     void saveLeft();
     void saveRight();
 
+private slots:
+    // Row-level operations on the current selection (one line or many).
+    // "Copy" overwrites the matching lines on the other side; "Move" copies
+    // and then deletes them from the source side; "Delete" removes them from
+    // the side they were selected in. Every operation re-runs the diff so the
+    // comparison result updates immediately.
+    void copySelectionToRight();
+    void copySelectionToLeft();
+    void moveSelectionToRight();
+    void moveSelectionToLeft();
+    void deleteSelection();
+    // Edit the first selected line in place (context menu "Edit Line..." and
+    // double-clicking a row both land here). The change is applied to the
+    // in-memory line list and the diff is recomputed immediately; use
+    // "Save L" / "Save R" to write it back to disk.
+    void editSelectedLine();
+    // Pop up the row action menu for the pane the request came from.
+    void showRowMenu(const QPoint &globalPos, bool fromLeft);
+
 private:
     void rebuildFromRows();
     void updateStats();
+
+    // Shared implementation for the five row operations above.
+    //   fromLeft : the side the selected rows belong to
+    //   copy     : write the selected lines onto the other side
+    //   erase    : delete the selected lines from their own side
+    // (copy=true, erase=false) == Copy, (true,true) == Move,
+    // (false,true) == Delete.
+    void applyRowOperation(bool fromLeft, bool copy, bool erase);
+    // Translate the pane's selected row range into this side's line indices.
+    // Returns false when the selection covers only gap rows.
+    bool selectionLineRange(bool fromLeft, int *firstLine, int *lastLine,
+                            int *insertAtOther) const;
+
+    // The pane the selection currently lives in and its row range, tracked so
+    // the context menu knows what to act on.
+    bool m_selFromLeft = true;
+    int  m_selFirstRow = -1;
+    int  m_selLastRow = -1;
 
     DiffPane *m_left = nullptr;
     DiffPane *m_right = nullptr;

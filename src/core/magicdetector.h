@@ -19,7 +19,8 @@ public:
     enum FileType {
         Text,
         Image,
-        Binary
+        Binary,
+        Pdf
     };
 
     // Detect the type of a local file by content using libmagic.

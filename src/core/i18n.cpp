@@ -657,6 +657,16 @@ void I18n::loadTable()
         "просмотр Baidu Pan и WebDAV, загрузка/скачивание (файлов и папок), переименование, удаление и потоковое воспроизведение, с панелью передач, показывающей прогресс и историю в реальном времени.",
         "Baidu Pan と WebDAV の参照、アップロード/ダウンロード（ファイル・フォルダ）、名前変更、削除、ストリーミング再生に対応し、進捗と履歴をリアルタイム表示する転送パネルを備える。",
         "Baidu Pan 및 WebDAV 탐색, 업로드/다운로드(파일 및 폴더), 이름 바꾸기, 삭제, 스트리밍 재생을 지원하며 실시간 진행률과 기록을 보여주는 전송 패널을 제공합니다.");
+    add("a built-in, dependency-free PDF engine: page navigation (first / previous / next / last, jump-to-page) with zoom in / zoom out, actual size, fit width and fit page; pages are always scaled proportionally (the original aspect ratio is preserved) and /Rotate is honoured. Reads PDF 1.0-2.0 including compressed object streams, cross-reference streams and the FlateDecode, LZWDecode, RunLengthDecode, ASCIIHex and ASCII85 filters with PNG/TIFF predictors; renders DeviceRGB / DeviceGray / DeviceCMYK / Indexed / ICCBased images at 1, 2, 4, 8 and 16 bits per component. Annotate (highlight, underline, strikethrough, text box, sticky note, pen, stamp), manage pages (merge, split, delete / insert / extract, rotate, reorder), hand-drawn and image signatures, PDF <-> image conversion, PDF -> Word (RTF text, with layout loss), compression, text and image watermarks, open-password protection, and AcroForm filling. Every PDF control is fully localized in all 9 UI languages and follows the language switch live.",
+        "内置、无外部依赖的 PDF 引擎：页面导航（首页/上一页/下一页/末页、跳转到指定页），并提供放大/缩小、实际大小、适合宽度与适合页面；页面始终按比例缩放（保留原始宽高比），并遵循 /Rotate 旋转设置。可读取 PDF 1.0-2.0，包括压缩对象流、交叉引用流，以及 FlateDecode、LZWDecode、RunLengthDecode、ASCIIHex 与 ASCII85 过滤器和 PNG/TIFF 预测器；可渲染 DeviceRGB / DeviceGray / DeviceCMYK / Indexed / ICCBased 图像，支持每分量 1、2、4、8、16 位。支持批注（高亮、下划线、删除线、文本框、便笺、画笔、图章）、页面管理（合并、拆分、删除/插入/提取、旋转、重排）、手绘与图片签名、PDF ↔ 图片转换、PDF → Word（RTF 文本，有排版损耗）、压缩、文字与图片水印、打开密码保护以及 AcroForm 表单填写。所有 PDF 控件均已完整本地化为 9 种界面语言，并随语言切换实时更新。",
+        "內建、無外部依賴的 PDF 引擎：頁面導覽（第一頁/上一頁/下一頁/最後一頁、跳至指定頁），並提供放大/縮小、實際大小、符合寬度與符合頁面；頁面一律等比例縮放（保留原始長寬比），並遵循 /Rotate 旋轉設定。可讀取 PDF 1.0-2.0，包括壓縮物件流、交互參照流，以及 FlateDecode、LZWDecode、RunLengthDecode、ASCIIHex 與 ASCII85 過濾器和 PNG/TIFF 預測器；可算繪 DeviceRGB / DeviceGray / DeviceCMYK / Indexed / ICCBased 圖像，支援每分量 1、2、4、8、16 位元。支援註解（螢光標示、底線、刪除線、文字方塊、便利貼、畫筆、圖章）、頁面管理（合併、分割、刪除/插入/擷取、旋轉、重排）、手繪與圖片簽名、PDF ↔ 圖片轉換、PDF → Word（RTF 文字，有排版損耗）、壓縮、文字與圖片水印、開啟密碼保護以及 AcroForm 表單填寫。所有 PDF 控件均已完整本地化為 9 種介面語言，並隨語言切換即時更新。",
+        "un motor PDF integrado y sin dependencias: navegación de páginas (primera / anterior / siguiente / última, ir a página) con acercar / alejar, tamaño real, ajustar al ancho y ajustar a la página; las páginas siempre se escalan proporcionalmente (se conserva la relación de aspecto original) y se respeta /Rotate. Lee PDF 1.0-2.0 incluyendo flujos de objetos comprimidos, flujos de referencias cruzadas y los filtros FlateDecode, LZWDecode, RunLengthDecode, ASCIIHex y ASCII85 con predictores PNG/TIFF; representa imágenes DeviceRGB / DeviceGray / DeviceCMYK / Indexed / ICCBased a 1, 2, 4, 8 y 16 bits por componente. Anotaciones (resaltar, subrayar, tachar, cuadro de texto, nota adhesiva, lápiz, sello), gestión de páginas (combinar, dividir, eliminar / insertar / extraer, rotar, reordenar), firmas dibujadas y de imagen, conversión PDF ↔ imagen, PDF → Word (texto RTF, con pérdida de diseño), compresión, marcas de agua de texto e imagen, protección con contraseña de apertura y relleno de AcroForm. Todos los controles PDF están totalmente localizados en los 9 idiomas y siguen el cambio de idioma en vivo.",
+        "un moteur PDF intégré et sans dépendance : navigation entre les pages (première / précédente / suivante / dernière, aller à la page) avec zoom avant / arrière, taille réelle, ajuster à la largeur et ajuster à la page ; les pages sont toujours mises à l'échelle proportionnellement (le rapport d'aspect d'origine est préservé) et /Rotate est respecté. Lit les PDF 1.0-2.0 y compris les flux d'objets compressés, les flux de références croisées et les filtres FlateDecode, LZWDecode, RunLengthDecode, ASCIIHex et ASCII85 avec prédicteurs PNG/TIFF ; restitue les images DeviceRGB / DeviceGray / DeviceCMYK / Indexed / ICCBased à 1, 2, 4, 8 et 16 bits par composante. Annotations (surligner, souligner, barrer, zone de texte, pense-bête, stylo, tampon), gestion des pages (fusionner, diviser, supprimer / insérer / extraire, pivoter, réordonner), signatures dessinées et image, conversion PDF ↔ image, PDF → Word (texte RTF, avec perte de mise en page), compression, filigranes texte et image, protection par mot de passe d'ouverture et remplissage d'AcroForm. Tous les contrôles PDF sont entièrement localisés dans les 9 langues et suivent le changement de langue en direct.",
+        "eine integrierte, abhängigkeitsfreie PDF-Engine: Seitennavigation (erste / vorherige / nächste / letzte, Gehe zu Seite) mit Vergrößern / Verkleinern, Originalgröße, Breite anpassen und Seite anpassen; Seiten werden stets proportional skaliert (das ursprüngliche Seitenverhältnis bleibt erhalten) und /Rotate wird beachtet. Liest PDF 1.0-2.0 einschließlich komprimierter Objektströme, Querverweisströme sowie der Filter FlateDecode, LZWDecode, RunLengthDecode, ASCIIHex und ASCII85 mit PNG-/TIFF-Prädiktoren; rendert DeviceRGB- / DeviceGray- / DeviceCMYK- / Indexed- / ICCBased-Bilder mit 1, 2, 4, 8 und 16 Bit pro Komponente. Anmerkungen (Hervorheben, Unterstreichen, Durchstreichen, Textfeld, Notizzettel, Stift, Stempel), Seitenverwaltung (Zusammenführen, Teilen, Löschen / Einfügen / Extrahieren, Drehen, Neuordnen), handgezeichnete und Bildsignaturen, PDF-↔-Bild-Konvertierung, PDF → Word (RTF-Text, mit Layoutverlust), Komprimierung, Text- und Bildwasserzeichen, Öffnen-Kennwortschutz und AcroForm-Ausfüllen. Alle PDF-Bedienelemente sind in allen 9 Sprachen vollständig lokalisiert und folgen dem Sprachwechsel live.",
+        "встроенный PDF-движок без внешних зависимостей: навигация по страницам (первая / предыдущая / следующая / последняя, переход к странице) с увеличением / уменьшением, реальным размером, по ширине и по размеру страницы; страницы всегда масштабируются пропорционально (исходное соотношение сторон сохраняется), учитывается /Rotate. Читает PDF 1.0-2.0, включая сжатые объектные потоки, потоки перекрёстных ссылок и фильтры FlateDecode, LZWDecode, RunLengthDecode, ASCIIHex и ASCII85 с предикторами PNG/TIFF; отрисовывает изображения DeviceRGB / DeviceGray / DeviceCMYK / Indexed / ICCBased при 1, 2, 4, 8 и 16 битах на компонент. Аннотации (выделение, подчёркивание, зачёркивание, текстовое поле, заметка, карандаш, штамп), управление страницами (объединение, разделение, удаление / вставка / извлечение, поворот, переупорядочивание), рисованные и графические подписи, преобразование PDF ↔ изображение, PDF → Word (текст RTF, с потерей макета), сжатие, текстовые и графические водяные знаки, защита паролем открытия и заполнение AcroForm. Все элементы управления PDF полностью локализованы на все 9 языков и мгновенно следуют смене языка.",
+        "依存関係のない内蔵 PDF エンジン：ページ移動（最初/前/次/最後のページ、ページ番号へジャンプ）に加え、拡大/縮小、実際のサイズ、幅に合わせる、ページに合わせるに対応。ページは常に縦横比を保ったまま比例拡大縮小され、/Rotate も反映されます。圧縮オブジェクトストリーム、相互参照ストリーム、FlateDecode・LZWDecode・RunLengthDecode・ASCIIHex・ASCII85 フィルターと PNG/TIFF 予測器を含む PDF 1.0-2.0 を読み取り、DeviceRGB / DeviceGray / DeviceCMYK / Indexed / ICCBased 画像を 1・2・4・8・16 ビット/成分で描画します。注釈（ハイライト、下線、取り消し線、テキストボックス、付箋、ペン、スタンプ）、ページ管理（結合、分割、削除/挿入/抽出、回転、並べ替え）、手書きおよび画像署名、PDF ↔ 画像変換、PDF → Word（RTF テキスト、レイアウトは失われます）、圧縮、テキストおよび画像の透かし、開くパスワード保護、AcroForm 入力に対応。すべての PDF コントロールは 9 言語に完全対応し、言語切り替えに即座に追従します。",
+        "의존성 없는 내장 PDF 엔진: 페이지 이동(첫/이전/다음/마지막 페이지, 페이지로 이동)과 확대/축소, 실제 크기, 너비 맞춤, 페이지 맞춤을 제공합니다. 페이지는 항상 원본 가로세로 비율을 유지하며 비례 축척되고 /Rotate 값도 반영됩니다. 압축 객체 스트림, 상호 참조 스트림, FlateDecode·LZWDecode·RunLengthDecode·ASCIIHex·ASCII85 필터와 PNG/TIFF 예측기를 포함한 PDF 1.0-2.0을 읽고, DeviceRGB / DeviceGray / DeviceCMYK / Indexed / ICCBased 이미지를 성분당 1, 2, 4, 8, 16비트로 렌더링합니다. 주석(형광펜, 밑줄, 취소선, 텍스트 상자, 메모, 펜, 스탬프), 페이지 관리(병합, 분할, 삭제/삽입/추출, 회전, 재배열), 손그림 및 이미지 서명, PDF ↔ 이미지 변환, PDF → Word(RTF 텍스트, 레이아웃 손실), 압축, 텍스트·이미지 워터마크, 열기 비밀번호 보호, AcroForm 채우기를 지원합니다. 모든 PDF 컨트롤은 9개 언어로 완전히 현지화되어 언어 전환에 즉시 반영됩니다.");
+
     add("Multi-language UI (9 languages), VS Code-like themes applied across all tabs.",
         "多语言界面（9 种语言），VS Code 系主题应用于所有标签页。",
         "多語言介面（9 種語言），VS Code 系佈景主題套用於所有分頁。",
@@ -876,4 +886,208 @@ void I18n::loadTable()
         "Язык изменён. Некоторые элементы обновляются сразу; откройте диалоги заново для полного обновления.",
         "言語が変更されました。一部はすぐに更新されます。ダイアログを再度開くと完全に反映されます。",
         "언어가 변경되었습니다. 일부 요소는 즉시 업데이트됩니다. 대화상자를 다시 열면 완전히 새로 고쳐집니다.");
+
+    // ---- PDF viewer / editor (toolbar, dialogs, status messages) ----
+    // Every string emitted by src/pdf/pdftab.cpp goes through TR(), and the
+    // PdfTab toolbar retranslates itself live on I18n::languageChanged, so all
+    // of the following entries take effect without reopening the tab.
+
+    // --- MainWindow "Open as PDF" entry points (new request #1) ----------
+    add("Open as &PDF...",   "以 PDF 打开(&P)...","以 PDF 開啟(&P)...","Abrir como &PDF...","Ouvrir comme &PDF...","Als &PDF öffnen...","Открыть как &PDF...","PDF として開く(&P)...","PDF로 열기(&P)...");
+    add("Open as PDF",       "以 PDF 打开","以 PDF 開啟","Abrir como PDF","Ouvrir comme PDF","Als PDF öffnen","Открыть как PDF","PDF として開く","PDF로 열기");
+    add("PDF or Images (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;PDF Files (*.pdf);;Images (*.png *.jpg *.jpeg *.bmp *.webp);;All Files (*)",
+        "PDF 或图片 (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;PDF 文件 (*.pdf);;图片 (*.png *.jpg *.jpeg *.bmp *.webp);;所有文件 (*)",
+        "PDF 或圖片 (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;PDF 檔案 (*.pdf);;圖片 (*.png *.jpg *.jpeg *.bmp *.webp);;所有檔案 (*)",
+        "PDF o imágenes (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;Archivos PDF (*.pdf);;Imágenes (*.png *.jpg *.jpeg *.bmp *.webp);;Todos los archivos (*)",
+        "PDF ou images (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;Fichiers PDF (*.pdf);;Images (*.png *.jpg *.jpeg *.bmp *.webp);;Tous les fichiers (*)",
+        "PDF oder Bilder (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;PDF-Dateien (*.pdf);;Bilder (*.png *.jpg *.jpeg *.bmp *.webp);;Alle Dateien (*)",
+        "PDF или изображения (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;Файлы PDF (*.pdf);;Изображения (*.png *.jpg *.jpeg *.bmp *.webp);;Все файлы (*)",
+        "PDF または画像 (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;PDF ファイル (*.pdf);;画像 (*.png *.jpg *.jpeg *.bmp *.webp);;すべてのファイル (*)",
+        "PDF 또는 이미지 (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;PDF 파일 (*.pdf);;이미지 (*.png *.jpg *.jpeg *.bmp *.webp);;모든 파일 (*)");
+    add("Could not build a PDF: %1","无法生成 PDF：%1","無法產生 PDF：%1","No se pudo crear el PDF: %1","Impossible de créer le PDF : %1","PDF konnte nicht erstellt werden: %1","Не удалось создать PDF: %1","PDF を作成できませんでした：%1","PDF를 만들 수 없습니다: %1");
+    add("Save new PDF",      "保存新的 PDF","儲存新的 PDF","Guardar el nuevo PDF","Enregistrer le nouveau PDF","Neues PDF speichern","Сохранить новый PDF","新しい PDF を保存","새 PDF 저장");
+    add("Cannot open PDF:\n%1","无法打开 PDF：\n%1","無法開啟 PDF：\n%1","No se puede abrir el PDF:\n%1","Impossible d'ouvrir le PDF :\n%1","PDF kann nicht geöffnet werden:\n%1","Не удалось открыть PDF:\n%1","PDF を開けません：\n%1","PDF를 열 수 없습니다:\n%1");
+    add("PDF: %1",           "PDF：%1",   "PDF：%1",   "PDF: %1",      "PDF : %1",      "PDF: %1",       "PDF: %1",         "PDF: %1",       "PDF: %1");
+    add("PDF documents (.pdf)","PDF 文档 (.pdf)","PDF 文件 (.pdf)","Documentos PDF (.pdf)","Documents PDF (.pdf)","PDF-Dokumente (.pdf)","Документы PDF (.pdf)","PDF 文書 (.pdf)","PDF 문서 (.pdf)");
+    add("Print to PDF",      "打印为 PDF","列印為 PDF","Imprimir a PDF","Imprimer en PDF","Als PDF drucken","Печать в PDF","PDF に印刷",    "PDF로 인쇄");
+
+    // --- Rendering backend status (new request #2: PDFium) ----------------
+    // About-dialog sentence describing the PDFium rendering backend, so the
+    // whole About text stays translated in every language.
+    add("a dual-engine PDF module. Pages are rendered by PDFium (the same engine Chrome/Edge use), loaded dynamically at run time from pdfium.dll with no compile-time dependency, so text, vector graphics, embedded fonts and transparency render exactly as in a browser and are re-rasterised at the current zoom to stay crisp. A copy of pdfium.dll ships in dist/pdfium/ as the last-resort fallback; if no PDFium is found the viewer degrades gracefully to the built-in engine. The portrait / landscape layout is chosen automatically from the PDF's own page box, so a landscape slide deck lays out landscape with no user action.",
+        "双引擎 PDF 模块。页面由 PDFium（与 Chrome / Edge 同款引擎）渲染，运行时从 pdfium.dll 动态加载、无任何编译期依赖，因此文字、矩量图形、嵌入字体与透明度都能像浏览器一样完整呈现，并在当前缩放级别重新栅格化以保持清晰。构建时会把一份 pdfium.dll 打包进 dist/pdfium/ 作为最终兜底；若找不到 PDFium，则优雅降级到内置引擎。纵向 / 横向版式根据 PDF 自身页面框自动判定，因此横版幻灯片无需任何操作即以横向呈现。",
+        "雙引擎 PDF 模組。頁面由 PDFium（與 Chrome / Edge 同款引擎）算繪，執行時從 pdfium.dll 動態載入、無任何編譯期依賴，因此文字、矩量圖形、嵌入字型與透明度都能像瀏覽器一樣完整呈现，並在目前縮放級別重新算繪以保持清晰。建置時會把一份 pdfium.dll 打包進 dist/pdfium/ 作為最終備援；若找不到 PDFium，則優雅降級到内建引擎。縱向 / 橪向版式依 PDF 自身頁面框自動判定，因此橪版简報無需任何操作即以橪向呈现。",
+        "un módulo PDF de doble motor. Las páginas se representan con PDFium (el mismo motor que usan Chrome/Edge), cargado dinámicamente en tiempo de ejecución desde pdfium.dll sin dependencia de compilación, por lo que el texto, los gráficos vectoriales, las fuentes incrustadas y la transparencia se muestran exactamente como en un navegador y se vuelven a rasterizar al zoom actual para mantenerse nítidos. Una copia de pdfium.dll se incluye en dist/pdfium/ como último recurso; si no se encuentra PDFium, el visor recurre al motor integrado. La orientación vertical / horizontal se elige automáticamente a partir del propio cuadro de página del PDF.",
+        "un module PDF à double moteur. Les pages sont rendues par PDFium (le moteur utilisé par Chrome/Edge), chargé dynamiquement à l'exécution depuis pdfium.dll sans dépendance de compilation, de sorte que le texte, les graphiques vectoriels, les polices intégrées et la transparence s'affichent exactement comme dans un navigateur et sont ré-rastérisés au zoom courant pour rester nets. Une copie de pdfium.dll est livrée dans dist/pdfium/ en dernier recours ; si aucun PDFium n'est trouvé, la visionneuse revient au moteur intégré. L'orientation portrait / paysage est choisie automatiquement d'après la boîte de page du PDF.",
+        "ein PDF-Modul mit zwei Engines. Seiten werden von PDFium gerendert (derselben Engine, die Chrome/Edge verwenden), zur Laufzeit dynamisch aus pdfium.dll geladen und ohne Abhängigkeit zur Kompilierzeit, sodass Text, Vektorgrafiken, eingebettete Schriften und Transparenz exakt wie im Browser erscheinen und beim aktuellen Zoom neu gerastert werden. Eine Kopie von pdfium.dll liegt als letzte Rückfalloption in dist/pdfium/; wird kein PDFium gefunden, weicht der Betrachter elegant auf die integrierte Engine aus. Hoch- / Querformat wird automatisch aus dem Seitenrahmen des PDFs bestimmt.",
+        "модуль PDF с двумя движками. Страницы отрисовывает PDFium (тот же движок, что в Chrome/Edge), загружаемый динамически во время выполнения из pdfium.dll без зависимости на этапе сборки, поэтому текст, векторная графика, встроенные шрифты и прозрачность отображаются точно как в браузере и повторно растеризуются при текущем масштабе. Копия pdfium.dll поставляется в dist/pdfium/ как последний резерв; если PDFium не найден, просмотрщик корректно переходит на встроенный движок. Книжная / альбомная ориентация выбирается автоматически по странице самого PDF.",
+        "デュアルエンジンの PDF モジュール。プージは PDFium（Chrome/Edge と同じエンジン）で描画されます。pdfium.dll から実行時に動的読み込みされ、コンパイル時の依存関係はありません。そのためテキスト・ベクター画像・埋め込みフォント・透明度がブラウザと同じように描画され、現在のズームで再ラスタライズされて鮮明さを保ちます。pdfium.dll のコピーは最終フォールバックとして dist/pdfium/ に同梁されます。PDFium が見つからない場合は内蔵エンジンへ適切に切り替わります。縦向き / 横向きのレイアウトは PDF 自身のプージ枠から自動判定されます。",
+        "듀얼 엔진 PDF 모듈입니다. 페이지는 PDFium(Chrome/Edge와 동일한 엔진)으로 렌더링되며, 추촜 시 의존성 없이 실행 시점에 pdfium.dll에서 동적으로 로드됩니다. 따라서 텍스트, 벡터 그래픽, 임베드 폰트, 투명도가 브라우자와 동일하게 표시되고 현재 확대 수준에서 다시 래스터화되어 선명하게 유지됩니다. pdfium.dll 사본은 최후의 대체 수단으로 dist/pdfium/ 에 포함됩니다. PDFium을 찾지 못하면 뷰어는 내장 엔진으로 자연스럽게 전환됩니다. 세로 / 가로 레이아웃은 PDF 자제 페이지 박스에서 자동으로 결정됩니다.");
+
+    add("rendered by PDFium","由 PDFium 渲染","由 PDFium 算繪","renderizado por PDFium","rendu par PDFium","gerendert von PDFium","отрисовано PDFium","PDFium で描画","PDFium으로 렌더링");
+    add("built-in renderer (install pdfium.dll for full page rendering)",
+        "内置渲染器（安装 pdfium.dll 可完整渲染页面）",
+        "內建算繪器（安裝 pdfium.dll 可完整算繪頁面）",
+        "renderizador integrado (instale pdfium.dll para renderizar páginas completas)",
+        "moteur de rendu intégré (installez pdfium.dll pour un rendu complet des pages)",
+        "integrierter Renderer (pdfium.dll installieren für vollständiges Seiten-Rendering)",
+        "встроенный визуализатор (установите pdfium.dll для полной отрисовки страниц)",
+        "内蔵レンダラー（ページ全体を描画するには pdfium.dll を導入してください）",
+        "내장 렌더러 (전체 페이지 렌더링에는 pdfium.dll 필요)");
+    add("Full page rendering needs pdfium.dll. Place it next to TerminalPP.exe to render every page; text extraction and all page / annotation tools work without it.",
+        "完整页面渲染需要 pdfium.dll。将其放在 TerminalPP.exe 同目录即可渲染所有页面；没有它时，文本提取以及所有页面/批注工具仍可正常使用。",
+        "完整頁面算繪需要 pdfium.dll。將其放在 TerminalPP.exe 同目錄即可算繪所有頁面；沒有它時，文字擷取以及所有頁面/註解工具仍可正常使用。",
+        "La representación completa de páginas necesita pdfium.dll. Colóquelo junto a TerminalPP.exe para representar todas las páginas; la extracción de texto y todas las herramientas de página / anotación funcionan sin él.",
+        "Le rendu complet des pages nécessite pdfium.dll. Placez-le à côté de TerminalPP.exe pour afficher toutes les pages ; l'extraction de texte et tous les outils de page / annotation fonctionnent sans lui.",
+        "Für vollständiges Seiten-Rendering wird pdfium.dll benötigt. Legen Sie sie neben TerminalPP.exe, um jede Seite zu rendern; Textextraktion und alle Seiten-/Anmerkungswerkzeuge funktionieren auch ohne sie.",
+        "Для полной отрисовки страниц нужна pdfium.dll. Поместите её рядом с TerminalPP.exe, чтобы отрисовывать все страницы; извлечение текста и все инструменты страниц / аннотаций работают и без неё.",
+        "ページ全体の描画には pdfium.dll が必要です。TerminalPP.exe と同じ場所に置くとすべてのページを描画できます。なくてもテキスト抽出とすべてのページ/注釈ツールは動作します。",
+        "전체 페이지 렌더링에는 pdfium.dll이 필요합니다. TerminalPP.exe 옆에 두면 모든 페이지를 렌더링합니다. 없어도 텍스트 추출과 모든 페이지/주석 도구는 작동합니다.");
+    add("portrait",          "纵向",      "縱向",      "vertical",     "portrait",      "Hochformat",    "книжная",         "縦向き",        "세로");
+    add("landscape",         "横向",      "橫向",      "horizontal",   "paysage",       "Querformat",    "альбомная",       "横向き",        "가로");
+    add("Page %1 / %2   —   %3 × %4 pt (%5)   —   rotation %6°   —   zoom %7%",
+        "第 %1 / %2 页   —   %3 × %4 pt（%5）   —   旋转 %6°   —   缩放 %7%",
+        "第 %1 / %2 頁   —   %3 × %4 pt（%5）   —   旋轉 %6°   —   縮放 %7%",
+        "Página %1 / %2   —   %3 × %4 pt (%5)   —   rotación %6°   —   zoom %7%",
+        "Page %1 / %2   —   %3 × %4 pt (%5)   —   rotation %6°   —   zoom %7%",
+        "Seite %1 / %2   —   %3 × %4 pt (%5)   —   Drehung %6°   —   Zoom %7%",
+        "Страница %1 / %2   —   %3 × %4 pt (%5)   —   поворот %6°   —   масштаб %7%",
+        "%1 / %2 ページ   —   %3 × %4 pt（%5）   —   回転 %6°   —   ズーム %7%",
+        "%1 / %2 페이지   —   %3 × %4 pt (%5)   —   회전 %6°   —   확대 %7%");
+
+    // Navigation + zoom (Prev / Next page, Zoom Out / Zoom In, fit modes).
+    add("First Page",        "首页",      "第一頁",    "Primera página","Première page","Erste Seite",  "Первая страница", "最初のページ",  "첫 페이지");
+    add("Previous Page",     "上一页",    "上一頁",    "Página anterior","Page précédente","Vorherige Seite","Предыдущая страница","前のページ","이전 페이지");
+    add("Next Page",         "下一页",    "下一頁",    "Página siguiente","Page suivante","Nächste Seite","Следующая страница","次のページ",  "다음 페이지");
+    add("Last Page",         "末页",      "最後一頁",  "Última página","Dernière page", "Letzte Seite",  "Последняя страница","最後のページ","마지막 페이지");
+    add("Go to page",        "跳转到页",  "跳至頁面",  "Ir a la página","Aller à la page","Gehe zu Seite","Перейти к странице","ページへ移動","페이지로 이동");
+    add("Actual Size",       "实际大小",  "實際大小",  "Tamaño real",  "Taille réelle", "Originalgröße", "Реальный размер", "実際のサイズ",  "실제 크기");
+    add("Fit Width",         "适合宽度",  "符合寬度",  "Ajustar al ancho","Ajuster à la largeur","Breite anpassen","По ширине",     "幅に合わせる",  "너비 맞춤");
+    add("Fit Page",          "适合页面",  "符合頁面",  "Ajustar a la página","Ajuster à la page","Seite anpassen","По размеру страницы","ページに合わせる","페이지 맞춤");
+    add("Page %1",           "第 %1 页",  "第 %1 頁",  "Página %1",    "Page %1",       "Seite %1",      "Страница %1",     "%1 ページ",     "%1 페이지");
+    add("Page %1 / %2   —   %3 × %4 pt   —   rotation %5°   —   zoom %6%",
+        "第 %1 / %2 页   —   %3 × %4 pt   —   旋转 %5°   —   缩放 %6%",
+        "第 %1 / %2 頁   —   %3 × %4 pt   —   旋轉 %5°   —   縮放 %6%",
+        "Página %1 / %2   —   %3 × %4 pt   —   rotación %5°   —   zoom %6%",
+        "Page %1 / %2   —   %3 × %4 pt   —   rotation %5°   —   zoom %6%",
+        "Seite %1 / %2   —   %3 × %4 pt   —   Drehung %5°   —   Zoom %6%",
+        "Страница %1 / %2   —   %3 × %4 pt   —   поворот %5°   —   масштаб %6%",
+        "%1 / %2 ページ   —   %3 × %4 pt   —   回転 %5°   —   ズーム %6%",
+        "%1 / %2 페이지   —   %3 × %4 pt   —   회전 %5°   —   확대 %6%");
+    // Placeholder drawn on pages the engine could not rasterise.
+    add("%1 × %2 pt",        "%1 × %2 pt","%1 × %2 pt","%1 × %2 pt",   "%1 × %2 pt",    "%1 × %2 pt",    "%1 × %2 pt",      "%1 × %2 pt",    "%1 × %2 pt");
+    add("   (rotated %1°)",
+        "   （已旋转 %1°）",
+        "   （已旋轉 %1°）",
+        "   (rotado %1°)",
+        "   (pivoté de %1°)",
+        "   (um %1° gedreht)",
+        "   (повёрнуто на %1°)",
+        "   （%1° 回転）",
+        "   (%1° 회전됨)");
+    add("This page could not be rendered as an image. Text extraction and all page / annotation tools still work.",
+        "此页无法渲染为图像。文本提取以及所有页面/批注工具仍可正常使用。",
+        "此頁無法算繪為圖像。文字擷取以及所有頁面/註解工具仍可正常使用。",
+        "Esta página no se pudo representar como imagen. La extracción de texto y todas las herramientas de página / anotación siguen funcionando.",
+        "Cette page n'a pas pu être rendue en image. L'extraction de texte et tous les outils de page / annotation fonctionnent toujours.",
+        "Diese Seite konnte nicht als Bild gerendert werden. Textextraktion und alle Seiten-/Anmerkungswerkzeuge funktionieren weiterhin.",
+        "Эту страницу не удалось отрисовать как изображение. Извлечение текста и все инструменты страниц / аннотаций по-прежнему работают.",
+        "このページは画像としてレンダリングできませんでした。テキスト抽出とすべてのページ/注釈ツールは引き続き使用できます。",
+        "이 페이지를 이미지로 렌더링할 수 없습니다. 텍스트 추출과 모든 페이지/주석 도구는 계속 사용할 수 있습니다.");
+
+    // Annotation tools.
+    add("Highlight",         "高亮",      "螢光標示",  "Resaltar",     "Surligner",     "Hervorheben",   "Выделение",       "ハイライト",    "형광펜");
+    add("Underline",         "下划线",    "底線",      "Subrayar",     "Souligner",     "Unterstreichen","Подчёркивание",   "下線",          "밑줄");
+    add("Strike",            "删除线",    "刪除線",    "Tachar",       "Barrer",        "Durchstreichen","Зачёркивание",    "取り消し線",    "취소선");
+    add("Text Box",          "文本框",    "文字方塊",  "Cuadro de texto","Zone de texte","Textfeld",      "Текстовое поле",  "テキストボックス","텍스트 상자");
+    add("Sticky Note",       "便笺",      "便利貼",    "Nota adhesiva","Pense-bête",    "Notizzettel",   "Заметка",         "付箋",          "메모");
+    add("Pen",               "画笔",      "畫筆",      "Lápiz",        "Stylo",         "Stift",         "Карандаш",        "ペン",          "펜");
+    add("Stamp",             "图章",      "圖章",      "Sello",        "Tampon",        "Stempel",       "Штамп",           "スタンプ",      "스탬프");
+    add("Color...",          "颜色...",   "顏色...",   "Color...",     "Couleur...",    "Farbe...",      "Цвет...",         "色...",         "색상...");
+    add("Annotation Color",  "批注颜色",  "註解顏色",  "Color de anotación","Couleur d'annotation","Anmerkungsfarbe","Цвет аннотации","注釈の色",      "주석 색상");
+    add("Enter annotation text:","输入批注文本：","輸入註解文字：","Introduzca el texto de la anotación:","Saisissez le texte de l'annotation :","Anmerkungstext eingeben:","Введите текст аннотации:","注釈テキストを入力：","주석 텍스트 입력:");
+
+    // Page management.
+    add("Merge",             "合并",      "合併",      "Combinar",     "Fusionner",     "Zusammenführen","Объединить",      "結合",          "병합");
+    add("Merged %1 file(s).","已合并 %1 个文件。","已合併 %1 個檔案。","Se combinaron %1 archivo(s).","%1 fichier(s) fusionné(s).","%1 Datei(en) zusammengeführt.","Объединено файлов: %1.","%1 件のファイルを結合しました。","%1개 파일을 병합했습니다.");
+    add("Split",             "拆分",      "分割",      "Dividir",      "Diviser",       "Teilen",        "Разделить",       "分割",          "분할");
+    add("Split PDF",         "拆分 PDF",  "分割 PDF",  "Dividir PDF",  "Diviser le PDF","PDF teilen",    "Разделить PDF",   "PDF を分割",    "PDF 분할");
+    add("Split AFTER page number:","在此页码之后拆分：","在此頁碼之後分割：","Dividir DESPUÉS de la página número:","Diviser APRÈS la page numéro :","Teilen NACH Seitennummer:","Разделить ПОСЛЕ страницы номер:","このページ番号の後で分割：","다음 페이지 번호 뒤에서 분할:");
+    add("Nothing to split.", "没有可拆分的内容。","沒有可分割的內容。","No hay nada que dividir.","Rien à diviser.","Nichts zu teilen.","Нечего разделять.","分割するものがありません。","분할할 내용이 없습니다.");
+    add("Split into 2 files in %1","已拆分为 2 个文件，位于 %1","已分割為 2 個檔案，位於 %1","Dividido en 2 archivos en %1","Divisé en 2 fichiers dans %1","In 2 Dateien geteilt in %1","Разделено на 2 файла в %1","%1 に 2 つのファイルへ分割しました","%1 에 2개 파일로 분할했습니다");
+    add("Delete Page",       "删除页面",  "刪除頁面",  "Eliminar página","Supprimer la page","Seite löschen","Удалить страницу","ページを削除",  "페이지 삭제");
+    add("A PDF must have at least one page.","PDF 至少必须包含一页。","PDF 至少必須包含一頁。","Un PDF debe tener al menos una página.","Un PDF doit comporter au moins une page.","Ein PDF muss mindestens eine Seite haben.","В PDF должна быть хотя бы одна страница.","PDF には少なくとも 1 ページが必要です。","PDF에는 최소 한 페이지가 있어야 합니다.");
+    add("Insert",            "插入",      "插入",      "Insertar",     "Insérer",       "Einfügen",      "Вставить",        "挿入",          "삽입");
+    add("Inserted %1 file(s).","已插入 %1 个文件。","已插入 %1 個檔案。","Se insertaron %1 archivo(s).","%1 fichier(s) inséré(s).","%1 Datei(en) eingefügt.","Вставлено файлов: %1.","%1 件のファイルを挿入しました。","%1개 파일을 삽입했습니다.");
+    add("Extract",           "提取",      "擷取",      "Extraer",      "Extraire",      "Extrahieren",   "Извлечь",         "抽出",          "추출");
+    add("Extract Pages",     "提取页面",  "擷取頁面",  "Extraer páginas","Extraire des pages","Seiten extrahieren","Извлечь страницы","ページを抽出",  "페이지 추출");
+    add("Pages to extract (e.g. 1-3,5,8):","要提取的页面（例如 1-3,5,8）：","要擷取的頁面（例如 1-3,5,8）：","Páginas a extraer (p. ej. 1-3,5,8):","Pages à extraire (ex. 1-3,5,8) :","Zu extrahierende Seiten (z. B. 1-3,5,8):","Страницы для извлечения (напр. 1-3,5,8):","抽出するページ（例: 1-3,5,8）：","추출할 페이지 (예: 1-3,5,8):");
+    add("Extracted %1 page(s) to %2","已提取 %1 页到 %2","已擷取 %1 頁至 %2","Se extrajeron %1 página(s) a %2","%1 page(s) extraite(s) vers %2","%1 Seite(n) extrahiert nach %2","Извлечено страниц: %1 в %2","%1 ページを %2 に抽出しました","%1개 페이지를 %2 에 추출했습니다");
+    add("Save extracted PDF","保存提取的 PDF","儲存擷取的 PDF","Guardar el PDF extraído","Enregistrer le PDF extrait","Extrahiertes PDF speichern","Сохранить извлечённый PDF","抽出した PDF を保存","추출한 PDF 저장");
+    add("Move Up",           "上移",      "上移",      "Subir",        "Monter",        "Nach oben",     "Вверх",           "上へ移動",      "위로 이동");
+    add("Move Down",         "下移",      "下移",      "Bajar",        "Descendre",     "Nach unten",    "Вниз",            "下へ移動",      "아래로 이동");
+    add("Select PDF(s) to append","选择要追加的 PDF","選擇要附加的 PDF","Seleccione el/los PDF a añadir","Sélectionnez le(s) PDF à ajouter","PDF(s) zum Anhängen auswählen","Выберите PDF для добавления","追加する PDF を選択","추가할 PDF 선택");
+    add("Select PDF(s) to insert","选择要插入的 PDF","選擇要插入的 PDF","Seleccione el/los PDF a insertar","Sélectionnez le(s) PDF à insérer","PDF(s) zum Einfügen auswählen","Выберите PDF для вставки","挿入する PDF を選択","삽입할 PDF 선택");
+    add("Output folder",     "输出文件夹","輸出資料夾","Carpeta de salida","Dossier de sortie","Ausgabeordner","Папка вывода",    "出力フォルダー","출력 폴더");
+    add("PDF Files (*.pdf)", "PDF 文件 (*.pdf)","PDF 檔案 (*.pdf)","Archivos PDF (*.pdf)","Fichiers PDF (*.pdf)","PDF-Dateien (*.pdf)","Файлы PDF (*.pdf)","PDF ファイル (*.pdf)","PDF 파일 (*.pdf)");
+    add("Images (*.png *.jpg *.jpeg *.bmp)","图像 (*.png *.jpg *.jpeg *.bmp)","圖像 (*.png *.jpg *.jpeg *.bmp)","Imágenes (*.png *.jpg *.jpeg *.bmp)","Images (*.png *.jpg *.jpeg *.bmp)","Bilder (*.png *.jpg *.jpeg *.bmp)","Изображения (*.png *.jpg *.jpeg *.bmp)","画像 (*.png *.jpg *.jpeg *.bmp)","이미지 (*.png *.jpg *.jpeg *.bmp)");
+
+    // Open / save status messages.
+    add("Failed to open PDF: %1","打开 PDF 失败：%1","開啟 PDF 失敗：%1","No se pudo abrir el PDF: %1","Échec de l'ouverture du PDF : %1","PDF konnte nicht geöffnet werden: %1","Не удалось открыть PDF: %1","PDF を開けませんでした：%1","PDF를 열지 못했습니다: %1");
+    add("Opened %1 (%2 pages)","已打开 %1（%2 页）","已開啟 %1（%2 頁）","Se abrió %1 (%2 páginas)","%1 ouvert (%2 pages)","%1 geöffnet (%2 Seiten)","Открыт %1 (%2 стр.)","%1 を開きました（%2 ページ）","%1 을 열었습니다 (%2 페이지)");
+    add("Cannot write %1",   "无法写入 %1","無法寫入 %1","No se puede escribir %1","Impossible d'écrire %1","%1 kann nicht geschrieben werden","Не удаётся записать %1","%1 に書き込めません","%1 에 쓸 수 없습니다");
+    add("untitled.pdf",      "未命名.pdf","未命名.pdf","sin_titulo.pdf","sans-titre.pdf","unbenannt.pdf", "без_имени.pdf",   "無題.pdf",      "제목없음.pdf");
+
+    // Signatures.
+    add("Sign (draw)",       "签名（手绘）","簽名（手繪）","Firmar (dibujar)","Signer (dessiner)","Signieren (zeichnen)","Подпись (рисунок)","署名（手書き）","서명 (그리기)");
+    add("Sign (image)",      "签名（图片）","簽名（圖片）","Firmar (imagen)","Signer (image)","Signieren (Bild)","Подпись (изображение)","署名（画像）","서명 (이미지)");
+    add("Draw Signature",    "绘制签名",  "繪製簽名",  "Dibujar firma","Dessiner la signature","Signatur zeichnen","Нарисовать подпись","署名を描く",    "서명 그리기");
+    add("Draw your signature below, then click OK.","请在下方绘制签名，然后点击确定。","請在下方繪製簽名，然後按一下確定。","Dibuje su firma abajo y luego haga clic en Aceptar.","Dessinez votre signature ci-dessous, puis cliquez sur OK.","Zeichnen Sie unten Ihre Signatur und klicken Sie dann auf OK.","Нарисуйте подпись ниже, затем нажмите OK.","下に署名を描いてから OK をクリックしてください。","아래에 서명을 그린 다음 확인을 클릭하세요.");
+    add("Signature added to page %1.","已将签名添加到第 %1 页。","已將簽名新增至第 %1 頁。","Firma añadida a la página %1.","Signature ajoutée à la page %1.","Signatur zu Seite %1 hinzugefügt.","Подпись добавлена на страницу %1.","%1 ページに署名を追加しました。","%1 페이지에 서명을 추가했습니다.");
+    add("Choose signature image","选择签名图片","選擇簽名圖片","Elegir imagen de firma","Choisir l'image de signature","Signaturbild auswählen","Выберите изображение подписи","署名画像を選択","서명 이미지 선택");
+    add("Image signature added.","已添加图片签名。","已新增圖片簽名。","Firma de imagen añadida.","Signature image ajoutée.","Bildsignatur hinzugefügt.","Подпись-изображение добавлена.","画像署名を追加しました。","이미지 서명을 추가했습니다.");
+
+    // Conversion / export.
+    add("To Images",         "转为图片",  "轉為圖片",  "A imágenes",   "Vers images",   "Zu Bildern",    "В изображения",   "画像へ",        "이미지로");
+    add("Image Format",      "图片格式",  "圖片格式",  "Formato de imagen","Format d'image","Bildformat",  "Формат изображения","画像形式",      "이미지 형식");
+    add("Export each page as:","将每页导出为：","將每頁匯出為：","Exportar cada página como:","Exporter chaque page en :","Jede Seite exportieren als:","Экспортировать каждую страницу как:","各ページを次の形式でエクスポート：","각 페이지를 다음으로 내보내기:");
+    add("Exported %1 page image(s) to %2","已导出 %1 张页面图片到 %2","已匯出 %1 張頁面圖片至 %2","Se exportaron %1 imagen(es) de página a %2","%1 image(s) de page exportée(s) vers %2","%1 Seitenbild(er) exportiert nach %2","Экспортировано изображений страниц: %1 в %2","%1 枚のページ画像を %2 にエクスポートしました","%1개 페이지 이미지를 %2 에 내보냈습니다");
+    add("To Word",           "转为 Word", "轉為 Word", "A Word",       "Vers Word",     "Zu Word",       "В Word",          "Word へ",       "Word로");
+    add("Export to Word (RTF)","导出为 Word (RTF)","匯出為 Word (RTF)","Exportar a Word (RTF)","Exporter vers Word (RTF)","Nach Word (RTF) exportieren","Экспорт в Word (RTF)","Word (RTF) にエクスポート","Word (RTF)로 내보내기");
+    add("Word / RTF document (*.rtf)","Word / RTF 文档 (*.rtf)","Word / RTF 文件 (*.rtf)","Documento Word / RTF (*.rtf)","Document Word / RTF (*.rtf)","Word-/RTF-Dokument (*.rtf)","Документ Word / RTF (*.rtf)","Word / RTF 文書 (*.rtf)","Word / RTF 문서 (*.rtf)");
+    add("Exported text to %1 (layout not preserved).","已将文本导出到 %1（未保留版面）。","已將文字匯出至 %1（未保留版面）。","Texto exportado a %1 (no se conserva el diseño).","Texte exporté vers %1 (mise en page non conservée).","Text nach %1 exportiert (Layout nicht erhalten).","Текст экспортирован в %1 (макет не сохранён).","テキストを %1 にエクスポートしました（レイアウトは保持されません）。","텍스트를 %1 에 내보냈습니다 (레이아웃은 유지되지 않음).");
+    add("No extractable text was found. This PDF may be a scanned image; use \"To Images\" instead.",
+        "未找到可提取的文本。此 PDF 可能是扫描图片；请改用“转为图片”。",
+        "找不到可擷取的文字。此 PDF 可能是掃描圖片；請改用「轉為圖片」。",
+        "No se encontró texto extraíble. Este PDF puede ser una imagen escaneada; utilice \"A imágenes\" en su lugar.",
+        "Aucun texte extractible trouvé. Ce PDF est peut-être une image numérisée ; utilisez « Vers images » à la place.",
+        "Kein extrahierbarer Text gefunden. Dieses PDF ist möglicherweise ein Scan; verwenden Sie stattdessen \"Zu Bildern\".",
+        "Извлекаемый текст не найден. Возможно, это отсканированный PDF; используйте «В изображения».",
+        "抽出可能なテキストが見つかりません。この PDF はスキャン画像の可能性があります。「画像へ」をご利用ください。",
+        "추출 가능한 텍스트가 없습니다. 이 PDF는 스캔 이미지일 수 있습니다. 대신 \"이미지로\"를 사용하세요.");
+
+    // Compression.
+    add("Compress",          "压缩",      "壓縮",      "Comprimir",    "Compresser",    "Komprimieren",  "Сжать",           "圧縮",          "압축");
+    add("Save compressed PDF","保存压缩后的 PDF","儲存壓縮後的 PDF","Guardar el PDF comprimido","Enregistrer le PDF compressé","Komprimiertes PDF speichern","Сохранить сжатый PDF","圧縮した PDF を保存","압축한 PDF 저장");
+    add("Compressed: %1 KB → %2 KB (%3% smaller)","已压缩：%1 KB → %2 KB（减小 %3%）","已壓縮：%1 KB → %2 KB（縮小 %3%）","Comprimido: %1 KB → %2 KB (%3% menos)","Compressé : %1 KB → %2 KB (%3% de moins)","Komprimiert: %1 KB → %2 KB (%3% kleiner)","Сжато: %1 КБ → %2 КБ (на %3% меньше)","圧縮：%1 KB → %2 KB（%3% 削減）","압축: %1 KB → %2 KB (%3% 감소)");
+
+    // Watermark.
+    add("Text WM",           "文字水印",  "文字水印",  "Marca de agua (texto)","Filigrane texte","Text-WZ",   "Текст. водяной знак","テキスト透かし","텍스트 워터마크");
+    add("Image WM",          "图片水印",  "圖片水印",  "Marca de agua (imagen)","Filigrane image","Bild-WZ",  "Изобр. водяной знак","画像透かし",    "이미지 워터마크");
+    add("Text watermark applied to all pages.","已为所有页面添加文字水印。","已為所有頁面套用文字水印。","Marca de agua de texto aplicada a todas las páginas.","Filigrane texte appliqué à toutes les pages.","Textwasserzeichen auf alle Seiten angewendet.","Текстовый водяной знак применён ко всем страницам.","すべてのページにテキスト透かしを適用しました。","모든 페이지에 텍스트 워터마크를 적용했습니다.");
+    add("Choose watermark image","选择水印图片","選擇水印圖片","Elegir imagen de marca de agua","Choisir l'image du filigrane","Wasserzeichenbild auswählen","Выберите изображение водяного знака","透かし画像を選択","워터마크 이미지 선택");
+    add("Image watermark applied to all pages.","已为所有页面添加图片水印。","已為所有頁面套用圖片水印。","Marca de agua de imagen aplicada a todas las páginas.","Filigrane image appliqué à toutes les pages.","Bildwasserzeichen auf alle Seiten angewendet.","Водяной знак-изображение применён ко всем страницам.","すべてのページに画像透かしを適用しました。","모든 페이지에 이미지 워터마크를 적용했습니다.");
+    add("CONFIDENTIAL",      "机密",      "機密",      "CONFIDENCIAL", "CONFIDENTIEL",  "VERTRAULICH",   "КОНФИДЕНЦИАЛЬНО", "機密",          "기밀");
+
+    // Protection.
+    add("Password",          "密码",      "密碼",      "Contraseña",   "Mot de passe",  "Kennwort",      "Пароль",          "パスワード",    "비밀번호");
+    add("Set Open Password", "设置打开密码","設定開啟密碼","Establecer contraseña de apertura","Définir le mot de passe d'ouverture","Öffnen-Kennwort festlegen","Задать пароль открытия","開くパスワードを設定","열기 비밀번호 설정");
+    add("Password required to open the PDF:","打开此 PDF 所需的密码：","開啟此 PDF 所需的密碼：","Contraseña necesaria para abrir el PDF:","Mot de passe requis pour ouvrir le PDF :","Kennwort zum Öffnen des PDFs:","Пароль, необходимый для открытия PDF:","PDF を開くのに必要なパスワード：","PDF를 열기 위한 비밀번호:");
+    add("Save encrypted PDF","保存加密的 PDF","儲存加密的 PDF","Guardar el PDF cifrado","Enregistrer le PDF chiffré","Verschlüsseltes PDF speichern","Сохранить зашифрованный PDF","暗号化した PDF を保存","암호화된 PDF 저장");
+    add("Encrypted PDF written to %1","已将加密的 PDF 写入 %1","已將加密的 PDF 寫入 %1","PDF cifrado escrito en %1","PDF chiffré écrit dans %1","Verschlüsseltes PDF geschrieben nach %1","Зашифрованный PDF записан в %1","暗号化した PDF を %1 に書き込みました","암호화된 PDF를 %1 에 저장했습니다");
+
+    // Forms.
+    add("Fill Form",         "填写表单",  "填寫表單",  "Rellenar formulario","Remplir le formulaire","Formular ausfüllen","Заполнить форму","フォームに入力","양식 채우기");
+    add("No fillable text fields were found in this PDF.","此 PDF 中未找到可填写的文本字段。","此 PDF 中找不到可填寫的文字欄位。","No se encontraron campos de texto rellenables en este PDF.","Aucun champ de texte remplissable trouvé dans ce PDF.","In diesem PDF wurden keine ausfüllbaren Textfelder gefunden.","В этом PDF не найдено заполняемых текстовых полей.","この PDF には入力可能なテキストフィールドがありません。","이 PDF에서 입력 가능한 텍스트 필드를 찾을 수 없습니다.");
+    add("Filled %1 field(s).","已填写 %1 个字段。","已填寫 %1 個欄位。","Se rellenaron %1 campo(s).","%1 champ(s) rempli(s).","%1 Feld(er) ausgefüllt.","Заполнено полей: %1.","%1 件のフィールドに入力しました。","%1개 필드를 채웠습니다.");
 }

@@ -5,6 +5,7 @@
 #include "editor/thememanager.h"
 #include "editor/syntaxhighlighter.h"
 #include "cloud/clouddrivestore.h"
+#include "terminal/sessionmanager.h"
 
 class QTabWidget;
 class QListWidget;
@@ -51,6 +52,12 @@ public:
     // (used after opening command-line files so no blank tab lingers).
     void closeInitialEmptyTab();
 
+    // Bring this (already-running) window to the front and open the given files
+    // as new tabs. Called by the single-instance IPC path in main() when a
+    // second launch (e.g. double-click / "Open with") forwards its file list
+    // to the primary instance instead of starting a new process.
+    void raiseAndOpenFiles(const QStringList &paths);
+
 protected:
     void closeEvent(QCloseEvent *event) override;
     // Catches double-clicks on empty tab-bar space to open a new file tab.
@@ -62,6 +69,7 @@ private slots:
     void openFileDialog();
     void openHexEditorDialog();     // pick a file and open it in the hex editor
     void openImageEditorDialog();   // pick a file and open it in the image editor
+    void openPdfDialog();           // pick a PDF (or images) and open the PDF tab
     void manageFileAssociations();  // register/unregister default-program + Open With
     void openRecentFile();          // open the file from a Recent menu action
     void clearRecentFiles();
@@ -153,6 +161,9 @@ private:
     void openHexEditor(const QString &path);
     // Open any image in the full image-editor tab (edit + filters + export).
     void openImageEditor(const QString &path);
+    // Open a PDF in the full PDF viewer/editor tab (annotate / pages / sign /
+    // convert / compress / watermark / protect / forms).
+    void openPdf(const QString &path);
 
     // Recent-files list (most-recent first, capped at 20). Persisted in
     // QSettings and rebuilt into the File > Open Recent submenu.
@@ -171,6 +182,17 @@ private:
     void openSavedSerialSession(int index);
     void deleteSavedSshSession(int index);
     void deleteSavedSerialSession(int index);
+    // Re-open the configuration dialog pre-filled with the saved values so the
+    // session can be edited in place (then persisted + menu refreshed).
+    void editSavedSshSession(int index);
+    void editSavedSerialSession(int index);
+    // Close any open tab for the session and open a fresh one (reconnect).
+    void reconnectSavedSshSession(int index);
+    void reconnectSavedSerialSession(int index);
+    // Close the open tab belonging to a saved SSH / serial session (by its
+    // stored config). Returns true if a tab was actually closed.
+    bool closeSshTabFor(const SshSessionConfig &cfg);
+    bool closeSerialTabFor(const SerialSessionConfig &cfg);
 
     // Rebuild the Cloud menu: "Connect Cloud Drive..." followed by one entry
     // per saved drive (labelled "BaiduPan-<name>") with Open / Reconnect /

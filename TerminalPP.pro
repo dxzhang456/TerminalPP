@@ -29,7 +29,12 @@ win32 {
         INCLUDEPATH += $$LIBSSH2_DIR/include
         LIBS += -L$$LIBSSH2_DIR/lib
     }
-    LIBS += -lssh2 -lmagic -lws2_32 -lcrypt32 -lmpr
+    LIBS += -lssh2 -lmagic -lws2_32 -lcrypt32 -lmpr -lz
+}
+
+# zlib for the built-in PDF engine (FlateDecode).
+unix {
+    LIBS += -lz
 }
 
 SOURCES += \
@@ -58,6 +63,9 @@ SOURCES += \
     src/cloud/smbprovider.cpp \
     src/cloud/sftpprovider.cpp \
     src/cloud/ftpprovider.cpp \
+    src/pdf/pdfcore.cpp \
+    src/pdf/pdfium.cpp \
+    src/pdf/pdftab.cpp \
     src/editor/codeeditor.cpp \
     src/editor/syntaxhighlighter.cpp \
     src/editor/finddialog.cpp \
@@ -102,6 +110,9 @@ HEADERS += \
     src/cloud/smbprovider.h \
     src/cloud/sftpprovider.h \
     src/cloud/ftpprovider.h \
+    src/pdf/pdfcore.h \
+    src/pdf/pdfium.h \
+    src/pdf/pdftab.h \
     src/editor/codeeditor.h \
     src/editor/syntaxhighlighter.h \
     src/editor/finddialog.h \

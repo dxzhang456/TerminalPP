@@ -43,11 +43,17 @@ QStringList FileAssociations::imageExtensions()
     };
 }
 
+QStringList FileAssociations::pdfExtensions()
+{
+    return { "pdf" };
+}
+
 QStringList FileAssociations::allExtensions()
 {
     QStringList all = textExtensions();
     all += sourceCodeExtensions();
     all += imageExtensions();
+    all += pdfExtensions();
     all.removeDuplicates();
     return all;
 }

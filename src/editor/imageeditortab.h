@@ -55,6 +55,10 @@ public:
     QString filePath() const { return m_filePath; }
     QString fileName() const;
 
+    // The committed image (without any un-applied live slider preview), used
+    // by File > Print to render the picture onto the page.
+    QImage printableImage() const { return currentBaseImage(); }
+
     void applyTheme(const EditorTheme &theme);
 
 protected:

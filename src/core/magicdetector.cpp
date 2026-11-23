@@ -236,6 +236,20 @@ MagicDetector::FileType MagicDetector::detectType(const QString &filePath)
     if (fi.size() == 0)
         return Text; // Empty files open in the text editor
 
+    // 0. PDF: detect by the "%PDF-" header (authoritative) or the .pdf
+    //    extension. User requirement: "以pdf为扩展名 则以pdf格式打开".
+    {
+        if (fi.suffix().compare(QStringLiteral("pdf"), Qt::CaseInsensitive) == 0)
+            return Pdf;
+        QFile f(filePath);
+        if (f.open(QIODevice::ReadOnly)) {
+            QByteArray head = f.read(1024);
+            f.close();
+            if (head.contains("%PDF-"))
+                return Pdf;
+        }
+    }
+
     // 1. If it has a known text extension (.txt, .log, .md, .py, .cpp, etc.)
     // and looks like text (no NUL bytes), classify as Text immediately
     if (hasKnownTextExtension(filePath) && looksLikeTextFallback(filePath)) {

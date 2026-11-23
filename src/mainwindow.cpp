@@ -6,6 +6,7 @@
 #include "editor/gotodialog.h"
 #include "editor/hexeditortab.h"
 #include "editor/imageeditortab.h"
+#include "pdf/pdftab.h"
 #include "terminal/sshtab.h"
 #include "terminal/serialtab.h"
 #include "terminal/sessiondialog.h"
@@ -48,6 +49,12 @@
 #include <QInputDialog>
 #include <QPrinter>
 #include <QPrintDialog>
+#include <QPrinterInfo>
+#include <QPrintPreviewDialog>
+#include <QPageLayout>
+#include <QTextDocument>
+#include <QPainter>
+#include <functional>
 #include <QPushButton>
 #include <QCheckBox>
 #include <QDialog>
@@ -58,6 +65,7 @@
 #include <QSettings>
 #include <QPalette>
 #include <QShortcut>
+#include <QDir>
 
 // Shorthand for the runtime UI translator.
 static inline QString TR(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
@@ -184,6 +192,7 @@ void MainWindow::createMenus()
     m_fileMenu->addAction(TR("&Open..."), QKeySequence::Open, this, &MainWindow::openFileDialog);
     m_fileMenu->addAction(TR("Open as &Hex..."), this, &MainWindow::openHexEditorDialog);
     m_fileMenu->addAction(TR("Open as &Image..."), this, &MainWindow::openImageEditorDialog);
+    m_fileMenu->addAction(TR("Open as &PDF..."), this, &MainWindow::openPdfDialog);
     m_recentMenu = m_fileMenu->addMenu(TR("Open &Recent"));
     rebuildRecentMenu();
     m_fileMenu->addAction(TR("&Save"), QKeySequence::Save, this, &MainWindow::saveFile);
@@ -435,6 +444,9 @@ void MainWindow::rebuildSessionsMenu()
             QMenu *item = sshMenu->addMenu(ssh[i].displayName());
             int idx = i;
             item->addAction(TR("Open"), this, [this, idx]() { openSavedSshSession(idx); });
+            item->addAction(TR("Reconnect"), this, [this, idx]() { reconnectSavedSshSession(idx); });
+            item->addAction(TR("Edit..."), this, [this, idx]() { editSavedSshSession(idx); });
+            item->addSeparator();
             item->addAction(TR("Delete"), this, [this, idx]() { deleteSavedSshSession(idx); });
         }
     }
@@ -452,6 +464,9 @@ void MainWindow::rebuildSessionsMenu()
             QMenu *item = serMenu->addMenu(ser[i].displayName());
             int idx = i;
             item->addAction(TR("Open"), this, [this, idx]() { openSavedSerialSession(idx); });
+            item->addAction(TR("Reconnect"), this, [this, idx]() { reconnectSavedSerialSession(idx); });
+            item->addAction(TR("Edit..."), this, [this, idx]() { editSavedSerialSession(idx); });
+            item->addSeparator();
             item->addAction(TR("Delete"), this, [this, idx]() { deleteSavedSerialSession(idx); });
         }
     }
@@ -611,6 +626,11 @@ QWidget *MainWindow::openFile(const QString &path)
                 m_tabs->setCurrentIndex(i);
                 return hex;
             }
+        } else if (PdfTab *pdf = qobject_cast<PdfTab *>(w)) {
+            if (pdf->filePath() == path) {
+                m_tabs->setCurrentIndex(i);
+                return pdf;
+            }
         }
     }
 
@@ -620,6 +640,11 @@ QWidget *MainWindow::openFile(const QString &path)
     //   - Binary -> open in HexEditorTab
     const MagicDetector::FileType type = MagicDetector::detectType(path);
 
+    if (type == MagicDetector::Pdf) {
+        openPdf(path);
+        addRecentFile(path);
+        return m_tabs->currentWidget();
+    }
     if (type == MagicDetector::Image) {
         openImageEditor(path);
         addRecentFile(path);
@@ -827,6 +852,73 @@ void MainWindow::openImageEditorDialog()
         openImageEditor(f);
 }
 
+// Open the PDF viewer/editor. Selecting a .pdf opens it directly; selecting one
+// or more images builds a brand-new PDF from them (image -> PDF).
+void MainWindow::openPdfDialog()
+{
+    const QStringList files = QFileDialog::getOpenFileNames(this, TR("Open as PDF"),
+        QString(),
+        TR("PDF or Images (*.pdf *.png *.jpg *.jpeg *.bmp *.webp *.tif *.tiff);;"
+           "PDF Files (*.pdf);;Images (*.png *.jpg *.jpeg *.bmp *.webp);;All Files (*)"));
+    if (files.isEmpty())
+        return;
+
+    // A single PDF -> open it. Otherwise (or if any image is selected) build a
+    // PDF from the chosen images.
+    if (files.size() == 1 &&
+        QFileInfo(files.first()).suffix().compare("pdf", Qt::CaseInsensitive) == 0) {
+        openPdf(files.first());
+        addRecentFile(files.first());
+        return;
+    }
+
+    QList<QByteArray> imagePaths;
+    for (const QString &f : files)
+        imagePaths.append(QDir::toNativeSeparators(f).toLocal8Bit());
+    QString err;
+    PdfDocument doc = PdfDocument::fromImages(imagePaths, &err);
+    if (!doc.isValid()) {
+        QMessageBox::warning(this, TR("Open as PDF"),
+                             TR("Could not build a PDF: %1").arg(err));
+        return;
+    }
+    // Write to a temp file, then open it in a PdfTab.
+    QString out = QFileDialog::getSaveFileName(this, TR("Save new PDF"),
+                                               QString(), TR("PDF Files (*.pdf)"));
+    if (out.isEmpty())
+        return;
+    QFile of(out);
+    if (of.open(QIODevice::WriteOnly)) { of.write(doc.serialize()); of.close(); }
+    openPdf(out);
+    addRecentFile(out);
+}
+
+// Open a PDF in the full PDF viewer/editor tab.
+void MainWindow::openPdf(const QString &path)
+{
+    auto *tab = new PdfTab(this);
+    tab->applyTheme(m_themeManager.current());
+    if (!tab->loadFile(path)) {
+        delete tab;
+        QMessageBox::warning(this, TR("Open"),
+                             TR("Cannot open PDF:\n%1").arg(path));
+        return;
+    }
+    connect(tab, &PdfTab::statusMessage, this, [this](const QString &m) {
+        statusBar()->showMessage(m, 4000);
+    });
+    connect(tab, &PdfTab::modificationChanged, this, [this, tab](bool mod) {
+        int i = m_tabs->indexOf(tab);
+        if (i >= 0) {
+            QString t = TR("PDF: %1").arg(QFileInfo(tab->filePath()).fileName());
+            m_tabs->setTabText(i, mod ? t + " *" : t);
+        }
+    });
+    int idx = m_tabs->addTab(tab, TR("PDF: %1").arg(QFileInfo(path).fileName()));
+    m_tabs->setTabToolTip(idx, path);
+    m_tabs->setCurrentIndex(idx);
+}
+
 // Open a file in the full image-editor tab (view + edit + filters + export).
 // Oversized images auto-fit to the viewport on open.
 void MainWindow::openImageEditor(const QString &path)
@@ -867,8 +959,37 @@ void MainWindow::closeInitialEmptyTab()
     }
 }
 
+// Single-instance entry point: the primary (already-running) window receives a
+// forwarded file list from a second launch (double-click / "Open with") and
+// opens each file as a NEW tab in THIS window instead of a new process ever
+// starting. The window is also raised/activated so the user sees it at once.
+void MainWindow::raiseAndOpenFiles(const QStringList &paths)
+{
+    for (const QString &p : paths) {
+        const QString trimmed = p.trimmed();
+        if (!trimmed.isEmpty() && !trimmed.startsWith('-'))
+            openFile(trimmed);   // routes to the right tab type incl. PDF
+    }
+
+    // Restore if minimized, then raise + activate so it comes to the front.
+    if (isMinimized())
+        setWindowState(windowState() & ~Qt::WindowMinimized);
+    show();
+    raise();
+    activateWindow();
+}
+
 bool MainWindow::saveFile()
 {
+    // PDF tab: flush annotations + structural edits back to the PDF file.
+    if (auto *pdf = qobject_cast<PdfTab *>(m_tabs->currentWidget())) {
+        if (pdf->filePath().isEmpty())
+            return saveFileAs();
+        if (pdf->save())
+            return true;
+        QMessageBox::warning(this, TR("Save"), TR("Cannot write file."));
+        return false;
+    }
     // Hex-editor tab: save the edited bytes back to disk.
     if (auto *hex = qobject_cast<HexEditorTab *>(m_tabs->currentWidget())) {
         if (hex->save()) {
@@ -902,6 +1023,21 @@ bool MainWindow::saveFile()
 
 bool MainWindow::saveFileAs()
 {
+    // PDF tab: choose a new path and save the PDF.
+    if (auto *pdf = qobject_cast<PdfTab *>(m_tabs->currentWidget())) {
+        QString path = QFileDialog::getSaveFileName(this, TR("Save As"),
+            pdf->filePath(), TR("PDF Files (*.pdf)"));
+        if (path.isEmpty())
+            return false;
+        if (!pdf->saveAs(path)) {
+            QMessageBox::warning(this, TR("Save"), TR("Cannot write file."));
+            return false;
+        }
+        int i = m_tabs->indexOf(pdf);
+        m_tabs->setTabText(i, TR("PDF: %1").arg(QFileInfo(path).fileName()));
+        m_tabs->setTabToolTip(i, path);
+        return true;
+    }
     // Hex-editor tab: choose a new path and save the edited bytes.
     if (auto *hex = qobject_cast<HexEditorTab *>(m_tabs->currentWidget())) {
         QString path = QFileDialog::getSaveFileName(this, TR("Save As"),
@@ -967,15 +1103,173 @@ bool MainWindow::saveAll()
     return allOk;
 }
 
+// ------------------------------------------------------------------
+// Printing (rewritten)
+//
+// The old implementation only handled a text EditorTab and called
+// QPlainTextEdit::print() directly on a default-constructed QPrinter, which
+// silently did nothing when no printer was configured and offered no preview,
+// no page setup and no support for the other tab types.
+//
+// This version:
+//   * works for text editors, the hex editor, the image editor and PDF tabs;
+//   * verifies a usable printer exists and reports clearly when none is;
+//   * always shows a print *preview* (which also exposes page setup, printer
+//     selection, orientation, zoom and "print to PDF");
+//   * renders each tab type correctly onto the page (text documents paginate,
+//     images are scaled to fit the page preserving aspect ratio, PDF pages are
+//     printed one page per sheet).
+// ------------------------------------------------------------------
 void MainWindow::printFile()
 {
-    EditorTab *tab = currentEditorTab();
-    if (!tab)
+    QWidget *w = m_tabs->currentWidget();
+    if (!w) {
+        statusBar()->showMessage(TR("Nothing to print."), 3000);
         return;
-    QPrinter printer;
-    QPrintDialog dlg(&printer, this);
-    if (dlg.exec() == QDialog::Accepted)
-        tab->editor()->print(&printer);
+    }
+
+    // ---- Decide what to print and build a renderer for it ----------------
+    // A renderer paints the content onto a QPrinter; it is reused by both the
+    // preview and the final print job.
+    std::function<void(QPrinter *)> render;
+    QString jobName;
+
+    if (EditorTab *t = qobject_cast<EditorTab *>(w)) {
+        // Text / source code: print the document, honouring the editor font so
+        // the output matches what is on screen. A QTextDocument paginates
+        // automatically across pages.
+        jobName = t->isUntitled() ? TR("Untitled") : QFileInfo(t->filePath()).fileName();
+        const QString text = t->editor()->toPlainText();
+        const QFont font = t->editor()->font();
+        render = [text, font](QPrinter *printer) {
+            QTextDocument doc;
+            doc.setDefaultFont(font);
+            doc.setPlainText(text);
+            doc.print(printer);
+        };
+    } else if (auto *hex = qobject_cast<HexEditorTab *>(w)) {
+        // Hex editor: print the visible hex dump as monospaced text.
+        jobName = QFileInfo(hex->filePath()).fileName();
+        QFile f(hex->filePath());
+        QByteArray bytes;
+        if (f.open(QIODevice::ReadOnly))
+            bytes = f.readAll();
+        // Build "offset  hex bytes  |ascii|" lines, 16 bytes per line.
+        QString dump;
+        dump.reserve(bytes.size() * 4);
+        for (int i = 0; i < bytes.size(); i += 16) {
+            dump += QString("%1  ").arg(i, 8, 16, QChar('0')).toUpper();
+            QString ascii;
+            for (int j = 0; j < 16; ++j) {
+                if (i + j < bytes.size()) {
+                    const unsigned char b = static_cast<unsigned char>(bytes[i + j]);
+                    dump += QString("%1 ").arg(b, 2, 16, QChar('0')).toUpper();
+                    ascii += (b >= 0x20 && b < 0x7f) ? QChar(b) : QChar('.');
+                } else {
+                    dump += "   ";
+                    ascii += ' ';
+                }
+            }
+            dump += " |" + ascii + "|\n";
+        }
+        render = [dump](QPrinter *printer) {
+            QTextDocument doc;
+            QFont mono("Consolas", 9);
+            mono.setStyleHint(QFont::Monospace);
+            doc.setDefaultFont(mono);
+            doc.setPlainText(dump);
+            doc.print(printer);
+        };
+    } else if (auto *img = qobject_cast<ImageEditorTab *>(w)) {
+        // Image: one page, scaled to fit while preserving the aspect ratio.
+        jobName = QFileInfo(img->filePath()).fileName();
+        const QImage picture = img->printableImage();
+        if (picture.isNull()) {
+            statusBar()->showMessage(TR("Nothing to print."), 3000);
+            return;
+        }
+        render = [picture](QPrinter *printer) {
+            QPainter p(printer);
+            if (!p.isActive())
+                return;
+            const QRect page = printer->pageLayout()
+                                   .paintRectPixels(printer->resolution());
+            QSize scaled = picture.size();
+            scaled.scale(page.size(), Qt::KeepAspectRatio);
+            const QRect target(page.x() + (page.width()  - scaled.width())  / 2,
+                               page.y() + (page.height() - scaled.height()) / 2,
+                               scaled.width(), scaled.height());
+            p.drawImage(target, picture);
+        };
+    } else if (auto *pdf = qobject_cast<PdfTab *>(w)) {
+        // PDF: print every page, one per sheet. Pages that carry an embedded
+        // full-page image (scanned documents) print that image; pages we
+        // cannot rasterise print their extracted text so the output is still
+        // useful rather than blank.
+        jobName = QFileInfo(pdf->filePath()).fileName();
+        const QVector<QImage> pages = pdf->printablePages();
+        if (pages.isEmpty()) {
+            statusBar()->showMessage(TR("Nothing to print."), 3000);
+            return;
+        }
+        render = [pages](QPrinter *printer) {
+            QPainter p(printer);
+            if (!p.isActive())
+                return;
+            for (int i = 0; i < pages.size(); ++i) {
+                if (i > 0)
+                    printer->newPage();
+                const QRect page = printer->pageLayout()
+                                       .paintRectPixels(printer->resolution());
+                QSize scaled = pages[i].size();
+                scaled.scale(page.size(), Qt::KeepAspectRatio);
+                const QRect target(page.x() + (page.width()  - scaled.width())  / 2,
+                                   page.y() + (page.height() - scaled.height()) / 2,
+                                   scaled.width(), scaled.height());
+                p.drawImage(target, pages[i]);
+            }
+        };
+    } else {
+        statusBar()->showMessage(
+            TR("This tab type cannot be printed."), 4000);
+        return;
+    }
+
+    // ---- Make sure printing is actually possible -------------------------
+    // With no printer installed QPrinter falls back to an invalid state and
+    // print() does nothing at all — which is exactly the "print does not work"
+    // symptom. Detect it and tell the user they can still print to PDF.
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setDocName(jobName);
+    if (QPrinterInfo::availablePrinters().isEmpty()) {
+        const auto ret = QMessageBox::question(
+            this, TR("Print"),
+            TR("No printer is installed.\n\n"
+               "Do you want to print to a PDF file instead?"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        if (ret != QMessageBox::Yes)
+            return;
+        const QString out = QFileDialog::getSaveFileName(
+            this, TR("Print to PDF"),
+            jobName.isEmpty() ? QString() : jobName + ".pdf",
+            TR("PDF Files (*.pdf)"));
+        if (out.isEmpty())
+            return;
+        printer.setOutputFormat(QPrinter::PdfFormat);
+        printer.setOutputFileName(out);
+        render(&printer);
+        statusBar()->showMessage(TR("Printed to %1").arg(out), 4000);
+        return;
+    }
+
+    // ---- Preview (also offers printer choice, page setup and print-to-PDF)
+    QPrintPreviewDialog preview(&printer, this);
+    preview.setWindowTitle(TR("Print Preview — %1").arg(jobName));
+    preview.resize(900, 700);
+    connect(&preview, &QPrintPreviewDialog::paintRequested, this,
+            [render](QPrinter *p) { render(p); });
+    if (preview.exec() == QDialog::Accepted)
+        statusBar()->showMessage(TR("Sent %1 to the printer.").arg(jobName), 4000);
 }
 
 void MainWindow::closeCurrentTab()
@@ -1011,6 +1305,15 @@ bool MainWindow::closeTabAt(int index)
                 QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
             if (ret == QMessageBox::Cancel) return false;
             if (ret == QMessageBox::Save) img->save();
+        }
+    } else if (auto *pdf = qobject_cast<PdfTab *>(w)) {
+        if (pdf->isModified()) {
+            auto ret = QMessageBox::warning(this, TR("Terminal++"),
+                TR("The document \"%1\" has unsaved changes.\nDo you want to save?")
+                    .arg(QFileInfo(pdf->filePath()).fileName()),
+                QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+            if (ret == QMessageBox::Cancel) return false;
+            if (ret == QMessageBox::Save) pdf->save();
         }
     } else if (SshTab *s = qobject_cast<SshTab *>(w)) {
         s->disconnectSession();
@@ -1171,6 +1474,7 @@ void MainWindow::zoomIn()
     else if (SerialTab *s = qobject_cast<SerialTab *>(w)) zoomTerminalFont(s->terminal(), +1);
     else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) i->zoomIn();
     else if (ImageEditorTab *i = qobject_cast<ImageEditorTab *>(w)) i->zoomIn();
+    else if (PdfTab *pdf = qobject_cast<PdfTab *>(w)) pdf->zoomIn();
 }
 
 void MainWindow::zoomOut()
@@ -1181,6 +1485,7 @@ void MainWindow::zoomOut()
     else if (SerialTab *s = qobject_cast<SerialTab *>(w)) zoomTerminalFont(s->terminal(), -1);
     else if (ImageCompareTab *i = qobject_cast<ImageCompareTab *>(w)) i->zoomOut();
     else if (ImageEditorTab *i = qobject_cast<ImageEditorTab *>(w)) i->zoomOut();
+    else if (PdfTab *pdf = qobject_cast<PdfTab *>(w)) pdf->zoomOut();
 }
 
 void MainWindow::zoomReset()
@@ -1200,6 +1505,8 @@ void MainWindow::zoomReset()
         i->zoomFit();
     } else if (ImageEditorTab *i = qobject_cast<ImageEditorTab *>(w)) {
         i->zoomReset();
+    } else if (PdfTab *pdf = qobject_cast<PdfTab *>(w)) {
+        pdf->zoomReset();
     }
 }
 
@@ -1398,6 +1705,78 @@ void MainWindow::deleteSavedSshSession(int index)
     rebuildSessionsMenu();
 }
 
+// Close the open tab that belongs to this saved SSH session (matched by the
+// stored host/port/user/name tuple, since several sessions can share a host).
+bool MainWindow::closeSshTabFor(const SshSessionConfig &cfg)
+{
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto *t = qobject_cast<SshTab *>(m_tabs->widget(i));
+        if (!t)
+            continue;
+        const SshSessionConfig &c = t->config();
+        if (c.host == cfg.host && c.port == cfg.port
+            && c.username == cfg.username && c.name == cfg.name) {
+            t->disconnectSession();
+            QWidget *w = m_tabs->widget(i);
+            m_tabs->removeTab(i);
+            w->deleteLater();
+            return true;
+        }
+    }
+    return false;
+}
+
+// Edit: reopen the SSH dialog pre-filled with the saved values, persist the
+// edited configuration, refresh the menu, and if the session was open reopen
+// it so the new settings take effect immediately.
+void MainWindow::editSavedSshSession(int index)
+{
+    // Copy (not reference) the stored config: m_sessions->update() below
+    // rewrites the list, which would dangle a reference into it.
+    const auto list = m_sessions->sessions();
+    if (index < 0 || index >= list.size())
+        return;
+    const SshSessionConfig oldCfg = list.at(index);
+
+    SessionDialog dlg(this);
+    // Make it obvious this edits an existing entry rather than creating one.
+    dlg.setWindowTitle(TR("Edit SSH Session — %1").arg(oldCfg.displayName()));
+    dlg.setConfig(oldCfg);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    SshSessionConfig newCfg = dlg.config();
+    if (newCfg.host.isEmpty()) {
+        QMessageBox::warning(this, TR("SSH"), TR("Host is required."));
+        return;
+    }
+
+    // Replace the entry IN PLACE (never append) and persist.
+    m_sessions->update(index, newCfg);
+    rebuildSessionsMenu();
+
+    // If a tab for the old configuration was open, reopen it with the new one.
+    if (closeSshTabFor(oldCfg))
+        openSavedSshSession(index);
+    statusBar()->showMessage(
+        TR("Updated SSH session \"%1\" (%2 saved sessions).")
+            .arg(newCfg.displayName())
+            .arg(m_sessions->sessions().size()), 4000);
+}
+
+// Reconnect: close the session's tab (if open) and open a fresh one. If no tab
+// is open this simply opens the session.
+void MainWindow::reconnectSavedSshSession(int index)
+{
+    const auto &list = m_sessions->sessions();
+    if (index < 0 || index >= list.size())
+        return;
+    const SshSessionConfig cfg = list.at(index);
+    closeSshTabFor(cfg);
+    openSavedSshSession(index);
+    statusBar()->showMessage(TR("Reconnected %1").arg(cfg.displayName()), 3000);
+}
+
 // Kept for API compatibility (Ctrl+Shift+R).
 void MainWindow::connectSelectedSession()
 {
@@ -1476,6 +1855,80 @@ void MainWindow::deleteSavedSerialSession(int index)
         return;
     m_sessions->removeSerial(index);
     rebuildSessionsMenu();
+}
+
+// Close the open tab that belongs to this saved serial session (matched by
+// port name + baud rate, which uniquely identifies an open port).
+bool MainWindow::closeSerialTabFor(const SerialSessionConfig &cfg)
+{
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto *t = qobject_cast<SerialTab *>(m_tabs->widget(i));
+        if (!t)
+            continue;
+        const SerialConfig &c = t->config();
+        if (c.portName == cfg.portName && c.baudRate == cfg.baudRate) {
+            t->closePort();
+            QWidget *w = m_tabs->widget(i);
+            m_tabs->removeTab(i);
+            w->deleteLater();
+            return true;
+        }
+    }
+    return false;
+}
+
+// Edit: reopen the serial dialog pre-filled with the saved values, persist the
+// edited configuration, refresh the menu, and reopen the tab if it was open.
+void MainWindow::editSavedSerialSession(int index)
+{
+    // Copy (not reference): updateSerial() below rewrites the list.
+    const auto list = m_sessions->serialSessions();
+    if (index < 0 || index >= list.size())
+        return;
+    const SerialSessionConfig oldCfg = list.at(index);
+
+    // Convert the stored (primitive) config into the dialog's SerialConfig.
+    SerialConfig dlgCfg;
+    convertSerial(oldCfg, dlgCfg);
+
+    SerialDialog dlg(this);
+    dlg.setWindowTitle(TR("Edit Serial Session — %1").arg(oldCfg.displayName()));
+    dlg.setConfig(dlgCfg);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    SerialConfig edited = dlg.config();
+    if (edited.portName.isEmpty()) {
+        QMessageBox::warning(this, TR("Serial"), TR("No serial port selected."));
+        return;
+    }
+
+    SerialSessionConfig newCfg;
+    convertSerialBack(edited, newCfg);
+    newCfg.name = oldCfg.name;   // keep the user-visible name
+    // Replace the entry IN PLACE (never append) and persist.
+    m_sessions->updateSerial(index, newCfg);
+    rebuildSessionsMenu();
+
+    // If a tab for the old port was open, reopen it with the new settings.
+    if (closeSerialTabFor(oldCfg))
+        openSavedSerialSession(index);
+    statusBar()->showMessage(
+        TR("Updated serial session \"%1\" (%2 saved sessions).")
+            .arg(newCfg.displayName())
+            .arg(m_sessions->serialSessions().size()), 4000);
+}
+
+// Reconnect: close the serial tab (releasing the port) and reopen it.
+void MainWindow::reconnectSavedSerialSession(int index)
+{
+    const auto &list = m_sessions->serialSessions();
+    if (index < 0 || index >= list.size())
+        return;
+    const SerialSessionConfig cfg = list.at(index);
+    closeSerialTabFor(cfg);
+    openSavedSerialSession(index);
+    statusBar()->showMessage(TR("Reconnected %1").arg(cfg.displayName()), 3000);
 }
 
 // ------------------------------------------------------------------
@@ -1937,7 +2390,7 @@ void MainWindow::loadPreferences()
 void MainWindow::about()
 {
     const QString body =
-        "<h3>Terminal++ 1.4</h3>"
+        "<h3>Terminal++ 1.6</h3>"
         "<p>" + TR("A unified Qt 6 application combining:") + "</p>"
         "<ul>"
         "<li><b>" + TR("Code editor") + "</b> &mdash; " +
@@ -1952,6 +2405,35 @@ void MainWindow::about()
             TR("configurable serial console sharing the same ANSI engine.") + "</li>"
         "<li><b>" + TR("File Compare") + "</b> &mdash; " +
             TR("Side-by-side text, folder, hex and picture comparison.") + "</li>"
+        "<li><b>" + TR("PDF viewer / editor") + "</b> &mdash; " +
+            TR("a dual-engine PDF module. Pages are rendered by PDFium (the "
+               "same engine Chrome/Edge use), loaded dynamically at run time "
+               "from pdfium.dll with no compile-time dependency, so text, "
+               "vector graphics, embedded fonts and transparency render "
+               "exactly as in a browser and are re-rasterised at the current "
+               "zoom to stay crisp. A copy of pdfium.dll ships in "
+               "dist/pdfium/ as the last-resort fallback; if no PDFium is "
+               "found the viewer degrades gracefully to the built-in engine. "
+               "The portrait / landscape layout is chosen automatically from "
+               "the PDF's own page box, so a landscape slide deck lays out "
+               "landscape with no user action.") + " " +
+            TR("a built-in, dependency-free PDF engine: page navigation "
+               "(first / previous / next / last, jump-to-page) with zoom in / "
+               "zoom out, actual size, fit width and fit page; pages are always "
+               "scaled proportionally (the original aspect ratio is preserved) "
+               "and /Rotate is honoured. Reads PDF 1.0-2.0 including compressed "
+               "object streams, cross-reference streams and the FlateDecode, "
+               "LZWDecode, RunLengthDecode, ASCIIHex and ASCII85 filters with "
+               "PNG/TIFF predictors; renders DeviceRGB / DeviceGray / DeviceCMYK "
+               "/ Indexed / ICCBased images at 1, 2, 4, 8 and 16 bits per "
+               "component. Annotate (highlight, underline, strikethrough, text "
+               "box, sticky note, pen, stamp), manage pages (merge, split, "
+               "delete / insert / extract, rotate, reorder), hand-drawn and "
+               "image signatures, PDF <-> image conversion, PDF -> Word (RTF "
+               "text, with layout loss), compression, text and image watermarks, "
+               "open-password protection, and AcroForm filling. Every PDF "
+               "control is fully localized in all 9 UI languages and follows "
+               "the language switch live.") + "</li>"
         "<li><b>" + TR("Cloud Drives") + "</b> &mdash; " +
             TR("Baidu Pan and WebDAV browsing, upload/download (files and "
                "folders), rename, delete, and streaming playback, with a "
@@ -1992,18 +2474,22 @@ void MainWindow::manageFileAssociations()
         TR("Source code (.c, .cpp, .h, .py, .js, .java, .cs, .go, …)"), &dlg);
     auto *cbImage = new QCheckBox(
         TR("Images (.png, .jpg, .bmp, .gif, .webp, .tiff, .ico, .svg)"), &dlg);
+    auto *cbPdf = new QCheckBox(TR("PDF documents (.pdf)"), &dlg);
     cbText->setChecked(true);
     cbCode->setChecked(true);
     cbImage->setChecked(true);
+    cbPdf->setChecked(true);
     v->addWidget(cbText);
     v->addWidget(cbCode);
     v->addWidget(cbImage);
+    v->addWidget(cbPdf);
 
-    auto gatherExts = [cbText, cbCode, cbImage]() {
+    auto gatherExts = [cbText, cbCode, cbImage, cbPdf]() {
         QStringList exts;
         if (cbText->isChecked())  exts += FileAssociations::textExtensions();
         if (cbCode->isChecked())  exts += FileAssociations::sourceCodeExtensions();
         if (cbImage->isChecked()) exts += FileAssociations::imageExtensions();
+        if (cbPdf->isChecked())   exts += FileAssociations::pdfExtensions();
         exts.removeDuplicates();
         return exts;
     };

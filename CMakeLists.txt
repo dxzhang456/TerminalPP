@@ -100,6 +100,18 @@ set(PROJECT_SOURCES
     src/cloud/ftpprovider.cpp
     src/cloud/ftpprovider.h
 
+    # --- PDF viewer / editor ---
+    # pdfcore  : the built-in, dependency-free parser/writer (always used for
+    #            page/structure edits and as the rendering fallback)
+    # pdfium   : a real rasteriser backed by PDFium, loaded dynamically at run
+    #            time (no link-time dependency; absent DLL just disables it)
+    src/pdf/pdfcore.cpp
+    src/pdf/pdfcore.h
+    src/pdf/pdfium.cpp
+    src/pdf/pdfium.h
+    src/pdf/pdftab.cpp
+    src/pdf/pdftab.h
+
     # --- Code editor ---
     src/editor/codeeditor.cpp
     src/editor/codeeditor.h
@@ -190,6 +202,15 @@ if (WIN32)
     target_link_libraries(TerminalPP PRIVATE ws2_32 crypt32 mpr magic)
 else()
     target_link_libraries(TerminalPP PRIVATE magic)
+endif()
+
+# zlib is used by the built-in PDF engine (FlateDecode inflate/deflate).
+find_package(ZLIB QUIET)
+if (ZLIB_FOUND)
+    target_link_libraries(TerminalPP PRIVATE ZLIB::ZLIB)
+else()
+    # MSYS2/MinGW ships zlib on the default path; link by name as a fallback.
+    target_link_libraries(TerminalPP PRIVATE z)
 endif()
 
 # Installation / deployment

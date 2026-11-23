@@ -13,6 +13,7 @@
 #include <QDateTime>
 #include <QXmlStreamReader>
 #include <QCryptographicHash>
+#include <QTimer>
 
 // ===========================================================================
 //  RestCloudBase
@@ -633,13 +634,104 @@ void BaiduPanProvider::list(const QString &path)
     });
 }
 
+// Look up a single file's fs_id by its path and cache it.
+//
+// Baidu has no "metadata by path" call that returns an fs_id directly, so we
+// list the file's parent directory (which does return fs_id for every entry)
+// and cache every file we see. This is what makes a download immediately after
+// an upload work: the freshly created file is not in the cache yet, and this
+// silently repopulates it instead of failing with "fs_id unknown".
+void BaiduPanProvider::fetchFsIdByPath(const QString &remotePath,
+                                       std::function<void(bool)> done)
+{
+    // Parent directory of remotePath ("/a/b/c.txt" -> "/a/b").
+    QString dir = remotePath;
+    const int slash = dir.lastIndexOf('/');
+    dir = (slash > 0) ? dir.left(slash) : QStringLiteral("/");
+
+    QUrl url("https://pan.baidu.com/rest/2.0/xpan/file");
+    QUrlQuery q;
+    q.addQueryItem("method", "list");
+    q.addQueryItem("access_token", m_token);
+    q.addQueryItem("dir", dir);
+    q.addQueryItem("web", "1");
+    url.setQuery(q);
+
+    QNetworkReply *reply = m_net->get(QNetworkRequest(url));
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, remotePath, done]() {
+        bool found = false;
+        if (reply->error() == QNetworkReply::NoError) {
+            // The file name we are looking for, used as a fallback match when
+            // the full paths differ only by normalisation (duplicated or
+            // missing slashes, which Baidu rewrites server-side).
+            QString wantName = remotePath;
+            const int ws = wantName.lastIndexOf('/');
+            if (ws >= 0)
+                wantName = wantName.mid(ws + 1);
+
+            const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            for (const QJsonValue &v : doc.object().value("list").toArray()) {
+                const QJsonObject o = v.toObject();
+                if (o.value("isdir").toInt() == 1)
+                    continue;
+                const QString p = o.value("path").toString();
+                const QString id =
+                    QString::number(o.value("fs_id").toVariant().toLongLong());
+                if (p.isEmpty() || id.isEmpty())
+                    continue;
+                m_fsIdByPath.insert(p, id);         // refresh the whole folder
+                if (p == remotePath) {
+                    found = true;
+                } else if (!found
+                           && o.value("server_filename").toString() == wantName) {
+                    // Same file, different path spelling: register it under the
+                    // path the caller actually asked for so the retry hits.
+                    m_fsIdByPath.insert(remotePath, id);
+                    found = true;
+                }
+            }
+        }
+        reply->deleteLater();
+        done(found);
+    });
+}
+
 // Resolve the temporary dlink for a file via the xpan filemetas API, then
 // call onDlink with the final, token-appended URL.
 void BaiduPanProvider::resolveDlink(const QString &remotePath,
-                                    std::function<void(const QString &)> onDlink)
+                                    std::function<void(const QString &)> onDlink,
+                                    int retriesLeft)
 {
     const QString fsId = m_fsIdByPath.value(remotePath);
     if (fsId.isEmpty()) {
+        // Not cached — typically a file that was just uploaded in this session.
+        // Re-list its parent folder to recover the fs_id, then retry, instead
+        // of asking the user to refresh manually.
+        if (retriesLeft > 0) {
+            fetchFsIdByPath(remotePath, [this, remotePath, onDlink, retriesLeft](bool ok) {
+                if (ok) {
+                    resolveDlink(remotePath, onDlink, retriesLeft - 1);
+                } else {
+                    // Baidu commits an upload asynchronously, so the file can
+                    // still be missing from the listing for a moment. Retry
+                    // once more after a short delay before giving up.
+                    if (retriesLeft > 1) {
+                        QTimer::singleShot(1200, this,
+                            [this, remotePath, onDlink, retriesLeft]() {
+                                resolveDlink(remotePath, onDlink, retriesLeft - 1);
+                            });
+                    } else {
+                        emit errorOccurred(
+                            tr("Baidu Pan: could not resolve the download link for "
+                               "\"%1\" (fs_id not found). The file may still be "
+                               "finalising on the server — refresh the folder and "
+                               "try again.").arg(remotePath));
+                    }
+                }
+            });
+            return;
+        }
         emit errorOccurred(tr("Baidu Pan: fs_id unknown for this file; "
                               "re-open the folder and try again."));
         return;
@@ -826,15 +918,27 @@ void BaiduPanProvider::upload(const QString &localPath, const QString &remoteDir
             crReq.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
             QNetworkReply *crReply = m_net->post(crReq, crForm.toString(QUrl::FullyEncoded).toUtf8());
             connect(crReply, &QNetworkReply::finished, this,
-                    [this, crReply, localPath, remoteDir]() {
+                    [this, crReply, localPath, remoteDir, remotePath]() {
                 QJsonObject r = QJsonDocument::fromJson(crReply->readAll()).object();
                 const int errno_ = r.value("errno").toInt(0);
                 if (crReply->error() != QNetworkReply::NoError)
                     emit errorOccurred(crReply->errorString());
                 else if (errno_ != 0)
                     emit errorOccurred(tr("Baidu Pan create failed (errno=%1).").arg(errno_));
-                else
+                else {
+                    // Cache the new file's fs_id straight from the create
+                    // response so an immediate download works without first
+                    // refreshing the folder (this is what previously failed
+                    // with "fs_id unknown / no dlink").
+                    const qint64 newFsId = r.value("fs_id").toVariant().toLongLong();
+                    if (newFsId != 0) {
+                        const QString p = r.value("path").toString().isEmpty()
+                                              ? remotePath
+                                              : r.value("path").toString();
+                        m_fsIdByPath.insert(p, QString::number(newFsId));
+                    }
                     emit uploadFinished(localPath, remoteDir);
+                }
                 crReply->deleteLater();
             });
         });
