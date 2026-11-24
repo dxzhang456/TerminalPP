@@ -70,6 +70,10 @@ typedef FPDF_TEXTPAGE (PDFIUM_CALL *Fn_TextLoadPage)(FPDF_PAGE);
 typedef void (PDFIUM_CALL *Fn_TextClosePage)(FPDF_TEXTPAGE);
 typedef int  (PDFIUM_CALL *Fn_TextCountChars)(FPDF_TEXTPAGE);
 typedef int  (PDFIUM_CALL *Fn_TextGetText)(FPDF_TEXTPAGE, int, int, unsigned short *);
+// Per-character geometry + code point, used for real text selection.
+typedef int  (PDFIUM_CALL *Fn_TextGetCharBox)(FPDF_TEXTPAGE, int,
+                                              double *, double *, double *, double *);
+typedef unsigned int (PDFIUM_CALL *Fn_TextGetUnicode)(FPDF_TEXTPAGE, int);
 
 // ---------------------------------------------------------------------------
 // The loader: resolves pdfium.dll once, lazily, and thread-safely.
@@ -102,6 +106,8 @@ struct PdfiumApi
     Fn_TextClosePage          TextClosePage = nullptr;
     Fn_TextCountChars         TextCountChars = nullptr;
     Fn_TextGetText            TextGetText = nullptr;
+    Fn_TextGetCharBox         TextGetCharBox = nullptr;
+    Fn_TextGetUnicode         TextGetUnicode = nullptr;
 };
 
 // Candidate locations for pdfium.dll, in priority order.
@@ -204,6 +210,8 @@ PdfiumApi *loadApi()
         api.TextClosePage         = (Fn_TextClosePage)         sym("FPDFText_ClosePage");
         api.TextCountChars        = (Fn_TextCountChars)        sym("FPDFText_CountChars");
         api.TextGetText           = (Fn_TextGetText)           sym("FPDFText_GetText");
+        api.TextGetCharBox        = (Fn_TextGetCharBox)        sym("FPDFText_GetCharBox");
+        api.TextGetUnicode        = (Fn_TextGetUnicode)        sym("FPDFText_GetUnicode");
 
         // The minimum set we cannot work without.
         const bool haveCore =
@@ -504,4 +512,106 @@ QString PdfiumRenderer::pageText(int index) const
         api->TextClosePage(tp);
     api->ClosePage(page);
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// Real text selection: every character of the page's text layer with its box.
+//
+// PDFium reports character boxes in *page* coordinates — points with the
+// origin at the bottom-left corner and y growing upwards. The page view paints
+// with a top-left origin and y growing downwards, so the boxes are flipped
+// here once, which keeps all the selection maths in the view trivial.
+// ---------------------------------------------------------------------------
+QVector<PdfTextChar> PdfiumRenderer::pageChars(int index) const
+{
+    QVector<PdfTextChar> out;
+    PdfiumApi *api = loadApi();
+    if (!api->ok || !m_doc || index < 0 || index >= m_pageCount)
+        return out;
+    if (!api->TextLoadPage || !api->TextCountChars)
+        return out;
+    // Without per-character geometry there is nothing to select.
+    if (!api->TextGetCharBox)
+        return out;
+
+    QMutexLocker lock(renderMutex());
+    FPDF_PAGE page = api->LoadPage(m_doc, index);
+    if (!page)
+        return out;
+
+    double pageH = 0.0;
+    if (api->GetPageHeightF)      pageH = api->GetPageHeightF(page);
+    else if (api->GetPageHeightD) pageH = api->GetPageHeightD(page);
+
+    FPDF_TEXTPAGE tp = api->TextLoadPage(page);
+    if (!tp) {
+        api->ClosePage(page);
+        return out;
+    }
+
+    const int n = api->TextCountChars(tp);
+    if (n > 0) {
+        // Fetch the whole string in one call: FPDFText_GetUnicode may be
+        // missing from older DLLs, and the bulk call is also faster.
+        QString text;
+        if (api->TextGetText) {
+            QVector<unsigned short> buf(n + 1, 0);
+            const int got = api->TextGetText(tp, 0, n, buf.data());
+            if (got > 0)
+                text = QString::fromUtf16(
+                    reinterpret_cast<const char16_t *>(buf.constData()),
+                    qMin(got, n));
+        }
+
+        out.reserve(n);
+        for (int i = 0; i < n; ++i) {
+            PdfTextChar c;
+
+            // Code point: prefer the bulk string (indices line up 1:1 with
+            // the character indices), fall back to the per-char accessor.
+            if (i < text.size())
+                c.ch = text.at(i).unicode();
+            else if (api->TextGetUnicode)
+                c.ch = api->TextGetUnicode(tp, i);
+
+            double left = 0, right = 0, bottom = 0, top = 0;
+            if (api->TextGetCharBox(tp, i, &left, &right, &bottom, &top)) {
+                // Flip to a top-left origin. PDFium's "top" is the larger y.
+                const double yTop = pageH - qMax(top, bottom);
+                const double h = qAbs(top - bottom);
+                c.box = QRectF(qMin(left, right), yTop,
+                               qAbs(right - left), h);
+            }
+            out.append(c);
+        }
+    }
+
+    if (api->TextClosePage)
+        api->TextClosePage(tp);
+    api->ClosePage(page);
+    return out;
+}
+
+bool PdfiumRenderer::pageHasText(int index) const
+{
+    PdfiumApi *api = loadApi();
+    if (!api->ok || !m_doc || index < 0 || index >= m_pageCount)
+        return false;
+    if (!api->TextLoadPage || !api->TextCountChars)
+        return false;
+
+    QMutexLocker lock(renderMutex());
+    FPDF_PAGE page = api->LoadPage(m_doc, index);
+    if (!page)
+        return false;
+    FPDF_TEXTPAGE tp = api->TextLoadPage(page);
+    if (!tp) {
+        api->ClosePage(page);
+        return false;
+    }
+    const int n = api->TextCountChars(tp);
+    if (api->TextClosePage)
+        api->TextClosePage(tp);
+    api->ClosePage(page);
+    return n > 0;
 }

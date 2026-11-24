@@ -75,7 +75,14 @@ public:
 
     void setImage(const QImage &img)
     {
-        m_image = img;
+        // Force an editable, uniform pixel format. Some PNGs come back from
+        // QImageReader as Format_Mono / Format_Indexed8 / Format_RGBA8888
+        // for which setPixelColor() silently ends up remapping to the closest
+        // palette entry — which makes tools like Mosaic appear to do nothing
+        // on specific files (e.g. certain Dropbox-exported PNGs).
+        m_image = img.format() == QImage::Format_ARGB32
+                      ? img
+                      : img.convertToFormat(QImage::Format_ARGB32);
         updateGeometry();
         resize(scaledSize());
         update();

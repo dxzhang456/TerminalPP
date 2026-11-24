@@ -7,6 +7,12 @@
 #include <QString>
 
 // A terminal cell: one character + attributes.
+//
+// East-Asian width: a CJK ideograph, a full-width form or an emoji occupies
+// TWO terminal columns, exactly as it does in PuTTY / xterm. Such a glyph is
+// stored once with `wide = true` and is followed by a placeholder cell with
+// `continuation = true`, so the renderer can give it a two-cell box instead of
+// squeezing it into one (which is what made Chinese text overlap).
 struct TermCell {
     QChar ch = QChar(' ');
     QColor fg;
@@ -17,7 +23,13 @@ struct TermCell {
     bool reverse = false;
     bool hasFg = false;
     bool hasBg = false;
+    bool wide = false;          // this cell carries a double-width glyph
+    bool continuation = false;  // right half of the preceding wide glyph
 };
+
+// True when `c` is rendered two terminal columns wide (East Asian Wide /
+// Fullwidth, plus the common emoji and box ranges that behave the same way).
+bool termCharIsWide(uint c);
 
 // A VT100 / xterm-256color screen buffer + ANSI escape sequence interpreter.
 // Shared by the SSH and Serial terminals, replicating MuxTerm's VT100 engine

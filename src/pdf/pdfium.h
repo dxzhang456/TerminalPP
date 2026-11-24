@@ -3,10 +3,21 @@
 
 #include <QByteArray>
 #include <QImage>
+#include <QRectF>
 #include <QSize>
 #include <QSizeF>
 #include <QString>
 #include <QStringList>
+#include <QVector>
+
+// One extracted character of real (non-image) page text, with the box it
+// occupies on the page. `box` is in PDF points with a TOP-LEFT origin and y
+// growing downwards, i.e. already converted to the same coordinate system the
+// page view paints in, so it can be mapped to widget pixels by a plain scale.
+struct PdfTextChar {
+    uint ch = 0;        // Unicode code point
+    QRectF box;         // points, top-left origin
+};
 
 // ---------------------------------------------------------------------------
 // PdfiumRenderer — a real PDF rasteriser backed by PDFium (the Chrome/Edge PDF
@@ -85,6 +96,17 @@ public:
 
     // Extracted text of a page (UTF-16 from PDFium, converted to QString).
     QString pageText(int index) const;
+
+    // --- Real text selection ----------------------------------------------
+    // Every character of the page's genuine text layer together with its
+    // bounding box, in reading order (the order PDFium reports, which is the
+    // order FPDFText_GetText concatenates). Empty for scanned/image-only pages
+    // that carry no text layer at all.
+    QVector<PdfTextChar> pageChars(int index) const;
+
+    // True when the page has a text layer, i.e. its text really is text and
+    // can be selected/copied rather than being pixels in a picture.
+    bool pageHasText(int index) const;
 
 private:
     void *m_doc = nullptr;          // FPDF_DOCUMENT

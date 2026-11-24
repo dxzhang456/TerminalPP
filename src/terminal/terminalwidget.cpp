@@ -144,8 +144,19 @@ void TerminalWidget::paintEvent(QPaintEvent *)
             if (cell.reverse)
                 std::swap(fg, bg);
 
+            // A double-width glyph (CJK / fullwidth / emoji) owns TWO cells,
+            // and the cell after it is only a placeholder. Painting both of
+            // them one cell wide is what made Chinese text overlap, so the
+            // glyph gets a two-cell box and the placeholder draws nothing but
+            // its background.
+            const int cells = cell.wide ? 2 : 1;
+            const int boxW = m_charWidth * cells;
+
             if (bg != m_defaultBg)
-                p.fillRect(x, y, m_charWidth, m_charHeight, bg);
+                p.fillRect(x, y, boxW, m_charHeight, bg);
+
+            if (cell.continuation)
+                continue;   // right half of the previous glyph: nothing to draw
 
             if (cell.ch != QChar(' ') || cell.hasBg) {
                 QFont cf = m_font;
@@ -154,8 +165,16 @@ void TerminalWidget::paintEvent(QPaintEvent *)
                 cf.setUnderline(cell.underline);
                 p.setFont(cf);
                 p.setPen(fg);
-                p.drawText(x, y + m_charHeight - qRound(QFontMetricsF(cf).descent()),
+                // Centre the glyph inside its (one- or two-cell) box and clip
+                // to that box, so a font whose CJK advance differs slightly
+                // from 2x the Latin advance can never bleed into the
+                // neighbouring cell.
+                const QRect box(x, y, boxW, m_charHeight);
+                p.save();
+                p.setClipRect(box);
+                p.drawText(box, Qt::AlignHCenter | Qt::AlignVCenter,
                            QString(cell.ch));
+                p.restore();
             }
         }
     }
@@ -247,11 +266,20 @@ void TerminalWidget::keyPressEvent(QKeyEvent *event)
     if (event->modifiers().testFlag(Qt::ControlModifier) &&
         event->modifiers().testFlag(Qt::ShiftModifier)) {
         if (event->key() == Qt::Key_C) { copySelection(); return; }
-        if (event->key() == Qt::Key_V) {
-            const QString clip = QApplication::clipboard()->text();
-            emit dataEntered(clip.toUtf8());
-            return;
-        }
+        if (event->key() == Qt::Key_V) { pasteClipboard(); return; }
+    }
+    // Plain Ctrl+V also pastes. (The Edit menu's Ctrl+V accelerator normally
+    // fires first and is routed back here by MainWindow::paste(); this branch
+    // covers the case where the terminal has the keyboard grab.)
+    if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_V) {
+        pasteClipboard();
+        return;
+    }
+    // Shift+Insert: the other universal paste gesture.
+    if (event->modifiers().testFlag(Qt::ShiftModifier)
+        && event->key() == Qt::Key_Insert) {
+        pasteClipboard();
+        return;
     }
 
     QByteArray bytes = keyToBytes(event);
@@ -299,9 +327,14 @@ void TerminalWidget::mousePressEvent(QMouseEvent *event)
         m_selStart = QPoint(col, sbValue + row);
         m_selEnd = m_selStart;
     } else if (event->button() == Qt::MiddleButton) {
-        // Middle-click paste (X11 style).
-        const QString clip = QApplication::clipboard()->text();
-        emit dataEntered(clip.toUtf8());
+        pasteClipboard();       // middle-click paste (X11 style)
+    } else if (event->button() == Qt::RightButton) {
+        // Right-click: copy the selection if there is one, otherwise paste —
+        // the PuTTY convention.
+        if (m_selStart != m_selEnd)
+            copySelection();
+        else
+            pasteClipboard();
     }
     setFocus();
 }
@@ -323,6 +356,35 @@ void TerminalWidget::mouseReleaseEvent(QMouseEvent *event)
         m_selecting = false;
         copySelection();
     }
+}
+
+// --- Clipboard entry points used by the Edit menu --------------------------
+void TerminalWidget::pasteClipboard()
+{
+    QString clip = QApplication::clipboard()->text();
+    if (clip.isEmpty())
+        return;
+    // Terminals expect CR line endings; a Windows clipboard carries CRLF and
+    // pasting that would make the remote shell see a blank line after every
+    // command.
+    clip.replace(QStringLiteral("\r\n"), QStringLiteral("\r"));
+    clip.replace(QLatin1Char('\n'), QLatin1Char('\r'));
+    verticalScrollBar()->setValue(verticalScrollBar()->maximum());
+    emit dataEntered(clip.toUtf8());
+}
+
+void TerminalWidget::copySelectionToClipboard()
+{
+    copySelection();
+}
+
+void TerminalWidget::selectAllVisible()
+{
+    const int sbSize = m_parser->scrollbackSize();
+    m_selStart = QPoint(0, 0);
+    m_selEnd = QPoint(m_cols, sbSize + qMax(0, m_parser->rows() - 1));
+    copySelection();    // selecting everything immediately yields its text
+    viewport()->update();
 }
 
 void TerminalWidget::copySelection()

@@ -1438,6 +1438,45 @@ PdfDocument PdfDocument::fromImages(const QList<QByteArray> &imageFiles, QString
 // ===========================================================================
 // Page manipulation
 // ===========================================================================
+// ---------------------------------------------------------------------------
+// compressStreams — the step that actually makes "Compress" shrink the file.
+//
+// Our writer re-emits every stream exactly as it was parsed, so any stream the
+// producer stored *uncompressed* (no /Filter) stays uncompressed, and the
+// re-serialize-only approach could not reduce the size at all. Here every such
+// stream is Flate-compressed (zlib, the PDF FlateDecode encoding) when that is
+// genuinely smaller, which is lossless: only the encoding changes.
+// ---------------------------------------------------------------------------
+int PdfDocument::compressStreams()
+{
+    int compressed = 0;
+    for (auto it = m_objects.begin(); it != m_objects.end(); ++it) {
+        PdfObject &o = it.value();
+        if (!o.isStream() || o.stream.isEmpty())
+            continue;
+        // Only touch streams that carry no filter at all — anything already
+        // encoded (Flate, DCT/JPEG, JPX, CCITT, ...) must be left alone, both
+        // to stay lossless and to avoid double-encoding image codestreams.
+        if (o.dict.contains("Filter"))
+            continue;
+
+        // qCompress() prepends a 4-byte length header that zlib streams must
+        // not have, so strip it; the remainder is a valid zlib stream.
+        QByteArray z = qCompress(o.stream, 9);
+        if (z.size() <= 4)
+            continue;
+        z.remove(0, 4);
+        if (z.size() >= o.stream.size())
+            continue;                       // compression would not help
+
+        o.stream = z;
+        o.dict["Filter"] = PdfObject::makeName("FlateDecode");
+        o.dict["Length"] = PdfObject::makeInt(z.size());
+        ++compressed;
+    }
+    return compressed;
+}
+
 PdfDocument PdfDocument::extractPages(const QList<int> &indices) const
 {
     // Build a fresh document copying the needed page objects + their closure.
@@ -1702,21 +1741,28 @@ void PdfDocument::addImageWatermark(const QByteArray &imageData, const QByteArra
     stampImageInternalForAll(imageData, fmt, pageIndex, scale, opacity, true);
 }
 
-// Helper so both watermark-image and explicit stamp share image XObject code.
-// Declared below (not in header) via a free function with friend access is not
-// possible, so we implement the shared logic inline in stampImage and call it
-// from addImageWatermark via a private path replicated here.
-void PdfDocument::stampImage(int pageIndex, const QByteArray &imageData,
-                             const QByteArray &fmt, double x, double y,
-                             double w, double h, double opacity)
+// Helper: write an RGB(+alpha) QImage as an Image XObject and return its
+// object number. If `alphaOut` is not null AND the image has a useful alpha
+// channel, an 8-bit soft-mask XObject is also written and its object number
+// returned in *alphaOut (0 otherwise). This is what makes PNG stamps with
+// transparency show through to the page below instead of appearing on an
+// opaque black square — which was the "signature is a black block" bug.
+static int writeImageXObject(PdfDocument *doc,
+                             QHash<int, PdfObject> &objects,
+                             const QImage &src, int *alphaOut,
+                             std::function<int(const PdfObject &)> addObj,
+                             std::function<QByteArray(const QByteArray &)> deflate)
 {
-    if (pageIndex < 0 || pageIndex >= m_pages.size()) return;
-    QImage img;
-    img.loadFromData(imageData, fmt.constData());
-    if (img.isNull()) img.loadFromData(imageData);
-    if (img.isNull()) return;
-    img = img.convertToFormat(QImage::Format_RGB888);
-    int iw = img.width(), ih = img.height();
+    Q_UNUSED(doc);
+    Q_UNUSED(objects);
+    QImage rgb = src.convertToFormat(QImage::Format_RGB888);
+    const int iw = rgb.width();
+    const int ih = rgb.height();
+
+    QByteArray raw;
+    raw.reserve(iw * ih * 3);
+    for (int yy = 0; yy < ih; ++yy)
+        raw.append(reinterpret_cast<const char *>(rgb.constScanLine(yy)), iw * 3);
 
     PdfObject imgObj = PdfObject::makeDict();
     imgObj.type = PdfObject::Stream;
@@ -1727,11 +1773,73 @@ void PdfDocument::stampImage(int pageIndex, const QByteArray &imageData,
     imgObj.dict["ColorSpace"] = PdfObject::makeName("DeviceRGB");
     imgObj.dict["BitsPerComponent"] = PdfObject::makeInt(8);
     imgObj.dict["Filter"] = PdfObject::makeName("FlateDecode");
-    QByteArray raw; raw.reserve(iw * ih * 3);
-    for (int yy = 0; yy < ih; ++yy)
-        raw.append(reinterpret_cast<const char *>(img.constScanLine(yy)), iw * 3);
-    imgObj.stream = zlibDeflate(raw);
-    int imgNum = addObject(imgObj);
+    imgObj.stream = deflate(raw);
+
+    int smaskNum = 0;
+    if (alphaOut && src.hasAlphaChannel()) {
+        QImage alpha = src.convertToFormat(QImage::Format_ARGB32);
+        QByteArray a;
+        a.reserve(iw * ih);
+        bool anyTransparent = false;
+        for (int yy = 0; yy < ih; ++yy) {
+            const QRgb *line = reinterpret_cast<const QRgb *>(alpha.constScanLine(yy));
+            for (int xx = 0; xx < iw; ++xx) {
+                int av = qAlpha(line[xx]);
+                if (av < 255) anyTransparent = true;
+                a.append(char(av));
+            }
+        }
+        if (anyTransparent) {
+            PdfObject smask = PdfObject::makeDict();
+            smask.type = PdfObject::Stream;
+            smask.dict["Type"] = PdfObject::makeName("XObject");
+            smask.dict["Subtype"] = PdfObject::makeName("Image");
+            smask.dict["Width"] = PdfObject::makeInt(iw);
+            smask.dict["Height"] = PdfObject::makeInt(ih);
+            smask.dict["ColorSpace"] = PdfObject::makeName("DeviceGray");
+            smask.dict["BitsPerComponent"] = PdfObject::makeInt(8);
+            smask.dict["Filter"] = PdfObject::makeName("FlateDecode");
+            smask.stream = deflate(a);
+            smaskNum = addObj(smask);
+            imgObj.dict["SMask"] = PdfObject::makeRef(smaskNum);
+        }
+    }
+    int imgNum = addObj(imgObj);
+    if (alphaOut) *alphaOut = smaskNum;
+    return imgNum;
+}
+
+void PdfDocument::stampImage(int pageIndex, const QByteArray &imageData,
+                             const QByteArray &fmt, double x, double y,
+                             double w, double h, double opacity)
+{
+    if (pageIndex < 0 || pageIndex >= m_pages.size()) return;
+    QImage img;
+    img.loadFromData(imageData, fmt.constData());
+    if (img.isNull()) img.loadFromData(imageData);
+    if (img.isNull()) return;
+    stampQImage(pageIndex, img, x, y, w, h, opacity, 0.0);
+}
+
+void PdfDocument::stampQImage(int pageIndex, const QImage &src,
+                              double x, double y, double w, double h,
+                              double opacity, double rotationDeg)
+{
+    if (pageIndex < 0 || pageIndex >= m_pages.size()) return;
+    if (src.isNull()) return;
+
+    // Unique resource names per stamp — without this, baking several stamps on
+    // the same page all reuse /Imst and /GSst, and later /XObject merges
+    // collapse to a single entry so only the last stamp is visible.
+    static int s_stampSeq = 0;
+    const int seq = ++s_stampSeq;
+    const QByteArray imgName = "Ims" + QByteArray::number(seq);
+    const QByteArray gsName  = "GSs" + QByteArray::number(seq);
+
+    int alphaNum = 0;
+    int imgNum = writeImageXObject(this, m_objects, src, &alphaNum,
+        [this](const PdfObject &o) { return this->addObject(o); },
+        [](const QByteArray &in) { return zlibDeflate(in); });
 
     PdfObject gs = PdfObject::makeDict();
     gs.dict["Type"] = PdfObject::makeName("ExtGState");
@@ -1739,18 +1847,40 @@ void PdfDocument::stampImage(int pageIndex, const QByteArray &imageData,
     gs.dict["CA"] = PdfObject::makeReal(opacity);
     int gsNum = addObject(gs);
 
+    auto num = [](double v) { return QByteArray::number(v, 'f', 3); };
+
     QByteArray frag;
-    frag += "/GSst gs\n";
-    frag += QByteArray::number(w, 'f', 2) + " 0 0 " + QByteArray::number(h, 'f', 2)
-            + " " + QByteArray::number(x, 'f', 2) + " " + QByteArray::number(y, 'f', 2) + " cm\n";
-    frag += "/Imst Do\n";
+    frag += "/" + gsName + " gs\n";
+    if (qFuzzyIsNull(rotationDeg)) {
+        // Simple scale+translate.
+        frag += num(w) + " 0 0 " + num(h) + " "
+                + num(x) + " " + num(y) + " cm\n";
+    } else {
+        // Rotate around the stamp's centre so the user-visible anchor (x,y,w,h)
+        // keeps meaning "bounding box".
+        const double rad = rotationDeg * M_PI / 180.0;
+        const double c = std::cos(rad), s = std::sin(rad);
+        const double cx = x + w / 2.0, cy = y + h / 2.0;
+        // 1) translate to centre, 2) rotate, 3) scale, 4) translate back so the
+        //    image is drawn into the unit box centred at origin, 5) move back.
+        // Combined matrix for: Mt(cx,cy) * R(theta) * S(w,h) * T(-0.5,-0.5)
+        const double a_ = w * c;
+        const double b_ = w * s;
+        const double c_ = -h * s;
+        const double d_ = h * c;
+        const double e_ = cx - 0.5 * (a_ + c_);
+        const double f_ = cy - 0.5 * (b_ + d_);
+        frag += num(a_) + " " + num(b_) + " " + num(c_) + " " + num(d_) + " "
+                + num(e_) + " " + num(f_) + " cm\n";
+    }
+    frag += "/" + imgName + " Do\n";
 
     QMap<QByteArray, PdfObject> extra;
     PdfObject xo = PdfObject::makeDict();
-    xo.dict["Imst"] = PdfObject::makeRef(imgNum);
+    xo.dict[imgName] = PdfObject::makeRef(imgNum);
     extra["XObject"] = xo;
     PdfObject gsd = PdfObject::makeDict();
-    gsd.dict["GSst"] = PdfObject::makeRef(gsNum);
+    gsd.dict[gsName] = PdfObject::makeRef(gsNum);
     extra["ExtGState"] = gsd;
     appendPageContent(pageIndex, frag, extra);
 }
