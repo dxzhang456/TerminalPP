@@ -1111,6 +1111,7 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     m_actSelectAllText->setShortcut(QKeySequence::SelectAll);
     m_actSelectAllText->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     m_actCopyPageText = addBtn("Copy Page Text", &PdfTab::copyPageText);
+<<<<<<< HEAD
     tb->addSeparator();
 
     // The top toolbar still carries every feature button (Annotation tools,
@@ -1150,8 +1151,94 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     addBtn("Image WM", &PdfTab::addImageWatermark);
     addBtn("Password", &PdfTab::setOpenPassword);
     addBtn("Fill Form", &PdfTab::fillForms);
+=======
 
     root->addWidget(tb);
+
+    // --- Side toolbar with the rest of the feature buttons -----------------
+    // The top toolbar keeps Save / Undo / Redo / navigation / zoom / text-copy.
+    // The side panel (right) groups Annotations, Pages, Sign, Convert, etc.,
+    // mirroring the image editor's side toolbar for a consistent look.
+    auto *sideBar = new QWidget(this);
+    sideBar->setFixedWidth(200);
+    auto *sl = new QVBoxLayout(sideBar);
+    sl->setContentsMargins(6, 6, 6, 6);
+    sl->setSpacing(6);
+
+    // A helper that creates one labelled button inside a given group box.
+    auto addSideBtn = [&](QVBoxLayout *gv, const char *src, auto slot) {
+        auto *btn = new QPushButton(TR(src), sideBar);
+        btn->setToolTip(TR(src));
+        // Stash the source so retranslate() can update the button's text when
+        // the UI language changes live.
+        QAction *act = new QAction(TR(src), btn);
+        m_actionSources.insert(act, QByteArray(src));
+        connect(btn, &QPushButton::clicked, this, slot);
+        // Keep button text in sync with the (dummy) action, so retranslate()
+        // updates both at once.
+        connect(act, &QAction::changed, btn, [btn, act]() { btn->setText(act->text()); });
+        gv->addWidget(btn);
+        return btn;
+    };
+>>>>>>> f56ebedd4ac859088bdbb3d5d37f7a7ad8bdd6ea
+
+    // Annotations group.
+    auto *annotBox = new QGroupBox(TR("Annotate"), sideBar);
+    m_annotGroup = annotBox;
+    auto *av = new QVBoxLayout(annotBox);
+    av->setSpacing(4);
+    addSideBtn(av, "Select", &PdfTab::setToolSelect);
+    addSideBtn(av, "Highlight", &PdfTab::setToolHighlight);
+    addSideBtn(av, "Underline", &PdfTab::setToolUnderline);
+    addSideBtn(av, "Strike", &PdfTab::setToolStrike);
+    addSideBtn(av, "Text Box", &PdfTab::setToolTextBox);
+    addSideBtn(av, "Sticky Note", &PdfTab::setToolStickyNote);
+    addSideBtn(av, "Pen", &PdfTab::setToolPen);
+    addSideBtn(av, "Stamp", &PdfTab::setToolStamp);
+    addSideBtn(av, "Color...", &PdfTab::pickAnnotColor);
+    sl->addWidget(annotBox);
+
+    // Pages group.
+    auto *pagesBox = new QGroupBox(TR("Pages"), sideBar);
+    m_pagesGroup = pagesBox;
+    auto *pv = new QVBoxLayout(pagesBox);
+    pv->setSpacing(4);
+    addSideBtn(pv, "Merge", &PdfTab::mergePdf);
+    addSideBtn(pv, "Split", &PdfTab::splitPdf);
+    addSideBtn(pv, "Delete Page", &PdfTab::deleteCurrentPage);
+    addSideBtn(pv, "Insert", &PdfTab::insertPages);
+    addSideBtn(pv, "Extract", &PdfTab::extractPages);
+    addSideBtn(pv, "Rotate Left", &PdfTab::rotateCurrentLeft);
+    addSideBtn(pv, "Rotate Right", &PdfTab::rotateCurrentRight);
+    addSideBtn(pv, "Move Up", &PdfTab::movePageUp);
+    addSideBtn(pv, "Move Down", &PdfTab::movePageDown);
+    sl->addWidget(pagesBox);
+
+    // Sign / convert / etc. group.
+    auto *moreBox = new QGroupBox(TR("More"), sideBar);
+    m_moreGroup = moreBox;
+    auto *mv = new QVBoxLayout(moreBox);
+    mv->setSpacing(4);
+    addSideBtn(mv, "Sign (draw)", &PdfTab::drawSignature);
+    addSideBtn(mv, "Sign (image)", &PdfTab::imageSignature);
+    addSideBtn(mv, "To Images", &PdfTab::exportToImages);
+    addSideBtn(mv, "To Word", &PdfTab::exportToWord);
+    addSideBtn(mv, "Compress", &PdfTab::compressPdf);
+    addSideBtn(mv, "Text WM", &PdfTab::addTextWatermark);
+    addSideBtn(mv, "Image WM", &PdfTab::addImageWatermark);
+    addSideBtn(mv, "Password", &PdfTab::setOpenPassword);
+    addSideBtn(mv, "Fill Form", &PdfTab::fillForms);
+    sl->addWidget(moreBox);
+
+    sl->addStretch(1);
+
+    // Wrap the side panel in its own scroll area so it works on short windows
+    // and small screens.
+    m_sideScroll = new QScrollArea(this);
+    m_sideScroll->setWidgetResizable(true);
+    m_sideScroll->setWidget(sideBar);
+    m_sideScroll->setFixedWidth(220);
+    m_sideScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     auto *mid = new QHBoxLayout();
     mid->setContentsMargins(0, 0, 0, 0);
@@ -1173,6 +1260,10 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
             this, &PdfTab::onViewContextMenu);
     m_scroll->setWidget(m_view);
     mid->addWidget(m_scroll, 1);
+
+    // The side-toolbar lives on the right of the page viewport, like the
+    // image editor's side panel.
+    mid->addWidget(m_sideScroll);
 
     auto *midWrap = new QWidget(this);
     midWrap->setLayout(mid);
@@ -1753,7 +1844,22 @@ void PdfTab::reloadFromBytes(const QByteArray &data)
         if (m_currentPage >= m_doc.pageCount())
             m_currentPage = qMax(0, m_doc.pageCount() - 1);
         refreshAfterEdit();
+<<<<<<< HEAD
     }
+}
+
+void PdfTab::saveFromToolbar()
+{
+    if (m_filePath.isEmpty()) {
+        const QString path = QFileDialog::getSaveFileName(
+            this, TR("Save As"), QString(), TR("PDF Files (*.pdf)"));
+        if (path.isEmpty()) return;
+        saveAs(path);
+        return;
+=======
+>>>>>>> f56ebedd4ac859088bdbb3d5d37f7a7ad8bdd6ea
+    }
+    save();
 }
 
 void PdfTab::saveFromToolbar()
