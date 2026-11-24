@@ -27,6 +27,15 @@ public:
 
     void clearScreen();
 
+    // --- Clipboard ---------------------------------------------------------
+    // Exposed publicly because the main window's Edit menu owns the Ctrl+C /
+    // Ctrl+V / Ctrl+A accelerators: a QAction shortcut always wins over a
+    // widget key press, so without routing Edit > Paste here Ctrl+V would do
+    // nothing at all in a terminal tab.
+    void pasteClipboard();        // clipboard -> remote side
+    void copySelectionToClipboard();
+    void selectAllVisible();      // select the whole scrollback + screen
+
 signals:
     // Bytes the user typed, to be sent to the remote side.
     void dataEntered(const QByteArray &data);

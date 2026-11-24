@@ -152,6 +152,28 @@ void AnsiParser::feed(const QByteArray &data)
     emit screenUpdated();
 }
 
+// East-Asian width table (the ranges that matter in a terminal). Keeping this
+// in one place means the parser and the renderer always agree on how many
+// columns a glyph owns.
+bool termCharIsWide(uint c)
+{
+    return (c >= 0x1100 && c <= 0x115F)     // Hangul Jamo initial consonants
+        || (c >= 0x2E80 && c <= 0x303E)     // CJK radicals, Kangxi, punctuation
+        || (c >= 0x3041 && c <= 0x33FF)     // Hiragana..CJK compatibility
+        || (c >= 0x3400 && c <= 0x4DBF)     // CJK ext A
+        || (c >= 0x4E00 && c <= 0x9FFF)     // CJK unified ideographs
+        || (c >= 0xA000 && c <= 0xA4CF)     // Yi
+        || (c >= 0xAC00 && c <= 0xD7A3)     // Hangul syllables
+        || (c >= 0xF900 && c <= 0xFAFF)     // CJK compatibility ideographs
+        || (c >= 0xFE10 && c <= 0xFE19)     // vertical forms
+        || (c >= 0xFE30 && c <= 0xFE6F)     // CJK compatibility forms
+        || (c >= 0xFF00 && c <= 0xFF60)     // fullwidth forms
+        || (c >= 0xFFE0 && c <= 0xFFE6)     // fullwidth signs
+        || (c >= 0x1F300 && c <= 0x1F64F)   // emoji / pictographs
+        || (c >= 0x1F900 && c <= 0x1F9FF)
+        || (c >= 0x20000 && c <= 0x3FFFD);  // CJK ext B..
+}
+
 void AnsiParser::putChar(QChar c)
 {
     if (m_wrapPending) {
@@ -162,9 +184,40 @@ void AnsiParser::putChar(QChar c)
     if (m_curRow < 0 || m_curRow >= m_rows)
         clampCursor();
 
+    // A double-width glyph needs two columns. When only one column is left on
+    // the line, wrap first so the glyph is never split across the edge.
+    const bool wide = termCharIsWide(c.unicode());
+    if (wide && m_curCol >= m_cols - 1) {
+        m_screen[m_curRow][m_curCol] = blankCell();
+        m_curCol = 0;
+        newline();
+        if (m_curRow < 0 || m_curRow >= m_rows)
+            clampCursor();
+    }
+
     TermCell cell = m_currentAttr;
     cell.ch = c;
+    cell.wide = wide;
+    cell.continuation = false;
     m_screen[m_curRow][m_curCol] = cell;
+
+    if (wide) {
+        // Reserve the right half: same attributes, no glyph of its own.
+        if (m_curCol + 1 < m_cols) {
+            TermCell cont = m_currentAttr;
+            cont.ch = QChar(' ');
+            cont.wide = false;
+            cont.continuation = true;
+            m_screen[m_curRow][m_curCol + 1] = cont;
+        }
+        if (m_curCol + 2 > m_cols - 1) {
+            m_curCol = m_cols - 1;
+            m_wrapPending = true;
+        } else {
+            m_curCol += 2;
+        }
+        return;
+    }
 
     if (m_curCol >= m_cols - 1) {
         m_wrapPending = true;

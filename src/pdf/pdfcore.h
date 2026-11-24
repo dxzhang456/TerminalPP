@@ -10,6 +10,8 @@
 #include <QVector>
 #include <QVariant>
 
+class QImage;
+
 // ---------------------------------------------------------------------------
 // PdfCore — a lightweight, self-contained PDF reader/writer.
 //
@@ -129,6 +131,12 @@ public:
     // Serialize the current model to a valid PDF byte stream.
     QByteArray serialize() const;
 
+    // Flate-compress every stream that is still stored uncompressed (no
+    // /Filter), which is what actually shrinks a PDF — our writer otherwise
+    // re-emits such streams verbatim. Returns the number of streams that were
+    // compressed. Lossless: only the encoding changes.
+    int compressStreams();
+
     // Build helpers return brand-new PdfDocument models.
     static PdfDocument fromImages(const QList<QByteArray> &imageFiles,
                                   QString *err = nullptr);
@@ -164,10 +172,19 @@ public:
                            double opacity = 0.3);
 
     // Stamp an arbitrary image at page coordinates (points, origin bottom-left)
-    // on one page — used for image signatures and stamps.
+    // on one page — used for image signatures and stamps. If the image carries
+    // an alpha channel (PNG transparency, Qt QImage with ARGB), an SMask is
+    // written so the background shows through instead of being filled black.
     void stampImage(int pageIndex, const QByteArray &imageData,
                     const QByteArray &fmt, double x, double y,
                     double w, double h, double opacity = 1.0);
+
+    // Same, but takes a QImage directly — used by the annotation layer to bake
+    // rendered text / stickies / stamps that need an alpha channel to keep the
+    // page content visible around them.
+    void stampQImage(int pageIndex, const QImage &img, double x, double y,
+                     double w, double h, double opacity = 1.0,
+                     double rotationDeg = 0.0);
 
     // Append raw marking content (already a valid content-stream fragment in
     // page coordinate space) to a page — used by the annotation layer to bake

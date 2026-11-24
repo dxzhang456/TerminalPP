@@ -120,6 +120,10 @@ private slots:
     // Tick the Language-menu entry that matches the active editor's current
     // (possibly auto-detected) syntax language.
     void syncLanguageMenu();
+    // Tick the Encoding entry matching the active file's auto-detected
+    // encoding, and disable the whole menu for tabs without text encoding
+    // (images, PDFs, terminals).
+    void syncEncodingMenu();
     void setEncoding(const QString &enc);
     void setEol(int eol);
 
@@ -284,6 +288,7 @@ private:
     QAction *m_actWordWrap = nullptr;
     QAction *m_actAutoSave = nullptr;
     QActionGroup *m_langGroup = nullptr;
+    QActionGroup *m_encGroup = nullptr;   // exclusive group of Encoding entries
     QActionGroup *m_uiLangGroup = nullptr;
 
     // Auto-save support.

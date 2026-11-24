@@ -9,6 +9,9 @@
 static inline QString TRc(const char *s){ return I18n::instance()->tr(QString::fromUtf8(s)); }
 #include <QTextStream>
 #include <QStringDecoder>
+#ifdef Q_OS_WIN
+#  include <windows.h>
+#endif
 #include <QStringEncoder>
 #include <QStringConverter>
 #include <QPalette>
@@ -98,6 +101,22 @@ QString EditorTab::eolName() const
     }
 }
 
+// The user-facing name of the local 8-bit ("ANSI") codepage, chosen so it
+// matches one of the entries in the Encoding menu. Only the codepages that
+// the menu offers are named explicitly; anything else stays "System".
+static QString systemCodepageEncodingName()
+{
+#ifdef Q_OS_WIN
+    switch (GetACP()) {
+    case 936:   return QStringLiteral("GB18030");    // Simplified Chinese (GBK)
+    case 54936: return QStringLiteral("GB18030");
+    case 1252:  return QStringLiteral("ISO-8859-1"); // Western European
+    default:    break;
+    }
+#endif
+    return QStringLiteral("System");
+}
+
 bool EditorTab::loadFile(const QString &path, const QString &encoding)
 {
     QFile file(path);
@@ -135,7 +154,13 @@ bool EditorTab::loadFile(const QString &path, const QString &encoding)
                 QString asSystem = sys.decode(raw);
                 if (!sys.hasError()) {
                     text = asSystem;
-                    usedEncoding = "System";
+                    // Report the *concrete* codepage rather than the generic
+                    // "System", so the Encoding menu can tick the entry that
+                    // actually describes the file and the label is usable as a
+                    // recognition reference. On a Chinese Windows the ANSI
+                    // codepage is CP936 (GBK), whose superset GB18030 is the
+                    // menu entry users expect to see checked.
+                    usedEncoding = systemCodepageEncodingName();
                 } else {
                     // Last resort: Latin-1 never fails, so no byte is lost.
                     QStringDecoder l1(QStringConverter::Latin1);

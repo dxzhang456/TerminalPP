@@ -340,10 +340,19 @@ void MainWindow::createMenus()
     syncLanguageMenu();
 
     // ---------- Encoding ----------
+    // The entries are checkable and grouped exclusively, so the encoding the
+    // file was actually decoded with is ticked automatically after opening —
+    // the menu doubles as the detection read-out. The whole menu is disabled
+    // for tabs that have no text encoding at all (images, PDFs, terminals).
     m_encMenu = menuBar()->addMenu(TR("E&ncoding"));
+    m_encGroup = new QActionGroup(this);
+    m_encGroup->setExclusive(true);
     const QStringList encs = {"UTF-8", "UTF-16LE", "UTF-16BE", "System", "ISO-8859-1", "GB18030"};
     for (const QString &e : encs) {
         QAction *a = m_encMenu->addAction(e);
+        a->setCheckable(true);
+        a->setData(e);
+        m_encGroup->addAction(a);
         connect(a, &QAction::triggered, this, [this, e]() { setEncoding(e); });
     }
     m_encMenu->addSeparator();
@@ -351,6 +360,8 @@ void MainWindow::createMenus()
     eolMenu->addAction(TR("Windows (CRLF)"), this, [this]() { setEol(EditorTab::CRLF); });
     eolMenu->addAction(TR("Unix (LF)"), this, [this]() { setEol(EditorTab::LF); });
     eolMenu->addAction(TR("Mac (CR)"), this, [this]() { setEol(EditorTab::CR); });
+    // Tick the detected encoding of whatever tab is currently active.
+    syncEncodingMenu();
 
     // ---------- Terminal ----------
     m_termMenu = menuBar()->addMenu(TR("&Terminal"));
@@ -930,6 +941,12 @@ void MainWindow::openPdf(const QString &path)
             m_tabs->setTabText(i, mod ? t + " *" : t);
         }
     });
+    // When Split / Extract produces a derived PDF, auto-open it as a new tab
+    // so the user sees the result immediately (request:
+    // "生成新的pdf后自动打开为新的tab").
+    connect(tab, &PdfTab::openPdfRequested, this, [this](const QString &p) {
+        openPdf(p);
+    });
     int idx = m_tabs->addTab(tab, TR("PDF: %1").arg(QFileInfo(path).fileName()));
     m_tabs->setTabToolTip(idx, path);
     m_tabs->setCurrentIndex(idx);
@@ -1411,12 +1428,72 @@ void MainWindow::onTabContextMenu(const QPoint &pos)
 // ------------------------------------------------------------------
 // Edit operations
 // ------------------------------------------------------------------
-void MainWindow::undo()       { if (EditorTab *t = currentEditorTab()) t->editor()->undo(); }
-void MainWindow::redo()       { if (EditorTab *t = currentEditorTab()) t->editor()->redo(); }
-void MainWindow::cut()        { if (EditorTab *t = currentEditorTab()) t->editor()->cut(); }
-void MainWindow::copy()       { if (EditorTab *t = currentEditorTab()) t->editor()->copy(); }
-void MainWindow::paste()      { if (EditorTab *t = currentEditorTab()) t->editor()->paste(); }
-void MainWindow::selectAll()  { if (EditorTab *t = currentEditorTab()) t->editor()->selectAll(); }
+// The current tab's terminal, or nullptr when the tab is not a terminal.
+// Edit > Copy / Paste / Select All own the Ctrl+C / Ctrl+V / Ctrl+A
+// accelerators application-wide, and a QAction shortcut always wins over a
+// widget key press — so without routing them here Ctrl+V did nothing at all
+// inside an SSH or serial session.
+static TerminalWidget *terminalOf(QWidget *w)
+{
+    if (SshTab *s = qobject_cast<SshTab *>(w))
+        return s->terminal();
+    if (SerialTab *s = qobject_cast<SerialTab *>(w))
+        return s->terminal();
+    return nullptr;
+}
+
+void MainWindow::undo()
+{
+    if (EditorTab *t = currentEditorTab()) { t->editor()->undo(); return; }
+    // The PDF tab owns its own uncommitted-annotation undo stack so Ctrl+Z
+    // removes / restores the last highlight / signature / sticky note etc.
+    if (auto *pdf = qobject_cast<PdfTab *>(m_tabs->currentWidget()))
+        pdf->annotUndo();
+}
+void MainWindow::redo()
+{
+    if (EditorTab *t = currentEditorTab()) { t->editor()->redo(); return; }
+    if (auto *pdf = qobject_cast<PdfTab *>(m_tabs->currentWidget()))
+        pdf->annotRedo();
+}
+
+void MainWindow::cut()
+{
+    if (EditorTab *t = currentEditorTab()) { t->editor()->cut(); return; }
+    // A terminal has no "cut"; copying the selection is the sane equivalent.
+    if (TerminalWidget *term = terminalOf(m_tabs->currentWidget()))
+        term->copySelectionToClipboard();
+}
+
+void MainWindow::copy()
+{
+    if (EditorTab *t = currentEditorTab()) { t->editor()->copy(); return; }
+    if (TerminalWidget *term = terminalOf(m_tabs->currentWidget())) {
+        term->copySelectionToClipboard();
+        return;
+    }
+    // A PDF tab copies its selected (real) text.
+    if (auto *pdf = qobject_cast<PdfTab *>(m_tabs->currentWidget()))
+        pdf->copySelectedText();
+}
+
+void MainWindow::paste()
+{
+    if (EditorTab *t = currentEditorTab()) { t->editor()->paste(); return; }
+    if (TerminalWidget *term = terminalOf(m_tabs->currentWidget()))
+        term->pasteClipboard();
+}
+
+void MainWindow::selectAll()
+{
+    if (EditorTab *t = currentEditorTab()) { t->editor()->selectAll(); return; }
+    if (TerminalWidget *term = terminalOf(m_tabs->currentWidget())) {
+        term->selectAllVisible();
+        return;
+    }
+    if (auto *pdf = qobject_cast<PdfTab *>(m_tabs->currentWidget()))
+        pdf->selectAllText();
+}
 
 void MainWindow::showFind()
 {
@@ -1565,6 +1642,53 @@ void MainWindow::setLanguage(int lang)
     t->highlighter()->setLanguage(static_cast<SyntaxHighlighter::Language>(lang));
     syncLanguageMenu();
     updateStatusBar();
+}
+
+// ---------------------------------------------------------------------------
+// syncEncodingMenu — tick the encoding the active file was decoded with.
+//
+// Opening a text file auto-detects its encoding (BOM -> UTF-8/16/32, otherwise
+// a validity check that falls back to the local ANSI codepage), and this makes
+// that result visible: the matching Encoding entry is checked, so the menu can
+// be used as a recognition reference. Image, PDF and terminal tabs have no
+// text encoding, so the whole menu is disabled and nothing is checked for them.
+// ---------------------------------------------------------------------------
+void MainWindow::syncEncodingMenu()
+{
+    if (!m_encGroup)
+        return;
+    EditorTab *t = currentEditorTab();
+    const QString current = t ? t->encoding() : QString();
+
+    if (m_encMenu)
+        m_encMenu->setEnabled(t != nullptr);
+
+    const QList<QAction *> actions = m_encGroup->actions();
+    QAction *match = nullptr;
+    for (QAction *a : actions) {
+        if (!current.isEmpty()
+            && a->data().toString().compare(current, Qt::CaseInsensitive) == 0)
+            match = a;
+    }
+    // "UTF-8" is also reported as "UTF-8" by Qt; a BOM-ed UTF-16 file reports
+    // "UTF-16LE"/"UTF-16BE"; the local codepage reports its concrete name
+    // (e.g. GB18030) or "System". Anything we cannot map leaves the menu
+    // unchecked rather than ticking a wrong entry.
+    for (QAction *a : actions) {
+        a->blockSignals(true);          // never re-trigger setEncoding()
+        a->setChecked(a == match);
+        a->blockSignals(false);
+    }
+    if (!match) {
+        // QActionGroup is exclusive; allow "nothing checked" for a moment.
+        m_encGroup->setExclusive(false);
+        for (QAction *a : actions) {
+            a->blockSignals(true);
+            a->setChecked(false);
+            a->blockSignals(false);
+        }
+        m_encGroup->setExclusive(true);
+    }
 }
 
 // Tick the Language-menu entry matching the active editor's current (possibly
@@ -2403,71 +2527,16 @@ void MainWindow::loadPreferences()
 // ------------------------------------------------------------------
 // Misc
 // ------------------------------------------------------------------
+// Deliberately short: one sentence listing what the app is, one line of
+// credits. (Kept well under 200 characters per the user's request — the long
+// feature catalogue lives in the README, not in a modal dialog.)
 void MainWindow::about()
 {
     const QString body =
-        "<h3>Terminal++ 1.6</h3>"
-        "<p>" + TR("A unified Qt 6 application combining:") + "</p>"
-        "<ul>"
-        "<li><b>" + TR("Code editor") + "</b> &mdash; " +
-            TR("multi-tab editor with syntax highlighting, themes, find/replace, "
-               "encodings, column/block edit, clipboard history, auto-save, "
-               "a built-in hex viewer/editor, and a tab-bar context menu "
-               "(close / close others / close to the left or right).") + "</li>"
-        "<li><b>" + TR("SSH terminal") + "</b> &mdash; " +
-            TR("native libssh2 SSH sessions with tmux support and VT100/256-color "
-               "rendering; passwords encrypted with Windows DPAPI.") + "</li>"
-        "<li><b>" + TR("Serial / UART") + "</b> &mdash; " +
-            TR("configurable serial console sharing the same ANSI engine.") + "</li>"
-        "<li><b>" + TR("File Compare") + "</b> &mdash; " +
-            TR("Side-by-side text, folder, hex and picture comparison.") + "</li>"
-        "<li><b>" + TR("PDF viewer / editor") + "</b> &mdash; " +
-            TR("a dual-engine PDF module. Pages are rendered by PDFium (the "
-               "same engine Chrome/Edge use), loaded dynamically at run time "
-               "from pdfium.dll with no compile-time dependency, so text, "
-               "vector graphics, embedded fonts and transparency render "
-               "exactly as in a browser and are re-rasterised at the current "
-               "zoom to stay crisp. A copy of pdfium.dll ships in "
-               "dist/pdfium/ as the last-resort fallback; if no PDFium is "
-               "found the viewer degrades gracefully to the built-in engine. "
-               "The portrait / landscape layout is chosen automatically from "
-               "the PDF's own page box, so a landscape slide deck lays out "
-               "landscape with no user action.") + " " +
-            TR("a built-in, dependency-free PDF engine: page navigation "
-               "(first / previous / next / last, jump-to-page) with zoom in / "
-               "zoom out, actual size, fit width and fit page; pages are always "
-               "scaled proportionally (the original aspect ratio is preserved) "
-               "and /Rotate is honoured. Reads PDF 1.0-2.0 including compressed "
-               "object streams, cross-reference streams and the FlateDecode, "
-               "LZWDecode, RunLengthDecode, ASCIIHex and ASCII85 filters with "
-               "PNG/TIFF predictors; renders DeviceRGB / DeviceGray / DeviceCMYK "
-               "/ Indexed / ICCBased images at 1, 2, 4, 8 and 16 bits per "
-               "component. Annotate (highlight, underline, strikethrough, text "
-               "box, sticky note, pen, stamp), manage pages (merge, split, "
-               "delete / insert / extract, rotate, reorder), hand-drawn and "
-               "image signatures, PDF <-> image conversion, PDF -> Word (RTF "
-               "text, with layout loss), compression, text and image watermarks, "
-               "open-password protection, and AcroForm filling. Every PDF "
-               "control is fully localized in all 9 UI languages and follows "
-               "the language switch live.") + "</li>"
-        "<li><b>" + TR("Cloud Drives") + "</b> &mdash; " +
-            TR("Baidu Pan and WebDAV browsing, upload/download (files and "
-               "folders), rename, delete, and streaming playback, with a "
-               "Transfers panel showing live progress and history.") + "</li>"
-        "<li><b>" + TR("Drag & Drop") + "</b> &mdash; " +
-            TR("drop a text file, a source file, an image, a PDF or any binary "
-               "anywhere on the window and it opens in the matching tab: the "
-               "format is detected from the file's own content (libmagic "
-               "sniffing, not the extension), so text and source code go to "
-               "the editor, images to the image editor, PDFs to the PDF "
-               "viewer, and everything else to the hex editor. Several files "
-               "can be dropped at once (each one is routed individually and a "
-               "per-type summary is reported), and dropping exactly two "
-               "folders starts a folder comparison.") + "</li>"
-        "</ul>"
-        "<p>" + TR("Multi-language UI (9 languages), VS Code-like themes applied "
-                   "across all tabs.") + "</p>"
-        "<p>" + TR("Built with MinGW + Qt 6 + libssh2.") + "</p>";
+        "<h3>Terminal++ 1.7</h3>"
+        "<p>" + TR("Editor, hex, image, PDF, SSH and serial terminal, file "
+                   "compare and cloud drives in one tabbed window.") + "</p>"
+        "<p>" + TR("Qt 6 / MinGW. 9 UI languages.") + "</p>";
     QMessageBox::about(this, TR("About Terminal++"), body);
 }
 
@@ -2599,11 +2668,14 @@ void MainWindow::updateStatusBar()
 {
     EditorTab *t = currentEditorTab();
     if (!t) {
-        // Terminal tab selected.
+        // A non-text tab (terminal, image, PDF, compare, hex): there is no
+        // text encoding to report, so the field is cleared and the Encoding
+        // menu is disabled by syncEncodingMenu().
         m_posLabel->setText("");
         m_langLabel->setText(TR("Terminal"));
-        m_encLabel->setText("UTF-8");
+        m_encLabel->setText("");
         m_eolLabel->setText("");
+        syncEncodingMenu();
         return;
     }
 
@@ -2617,6 +2689,8 @@ void MainWindow::updateStatusBar()
 
     // Keep the Language menu's checkmark on the active tab's detected language.
     syncLanguageMenu();
+    // ...and the Encoding menu's checkmark on its detected encoding.
+    syncEncodingMenu();
 
     // Reflect the active editor's column (block) edit state.
     if (m_colLabel)

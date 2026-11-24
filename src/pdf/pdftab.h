@@ -20,6 +20,7 @@ class QLabel;
 class QToolBar;
 class QComboBox;
 class QSpinBox;
+class QGroupBox;
 class PdfPageView;   // internal annotation overlay surface (defined in the .cpp)
 
 // ---------------------------------------------------------------------------
@@ -27,38 +28,25 @@ class PdfPageView;   // internal annotation overlay surface (defined in the .cpp
 //
 // Rendering strategy (two backends, best one wins per file):
 //   1. PDFium (preferred) — the same engine Chrome/Edge use, loaded
-//      dynamically at run time from pdfium.dll. It is a full rasteriser, so
-//      text, vector graphics, embedded fonts and transparency all render
-//      exactly as in a browser. Pages are re-rendered at the current zoom so
-//      the result is always crisp rather than an upscaled bitmap.
-//   2. The built-in PdfDocument — used when no pdfium.dll is present. It is
-//      not a rasteriser, so a page shows either its embedded full-page image
-//      (scanned documents) or a schematic sheet with a short explanation.
+//      dynamically at run time from pdfium.dll.
+//   2. The built-in PdfDocument — used when no pdfium.dll is present.
 //
-// Either way the page is presented at its true aspect ratio, and the
-// portrait/landscape orientation follows the PDF's own page box, so a
-// landscape slide deck is laid out landscape without any user action.
+// Annotations (highlight, underline, strike, text box, sticky note, pen,
+// stamp, image signature) live on an overlay layer per page until Save. Before
+// saving they can all be dragged and resized, and the overlay supports full
+// undo/redo via Ctrl+Z / Ctrl+Y.
 //
-// All *structural* editing always goes through the built-in PdfDocument, and
-// the annotation overlay bakes vector marks back into the PDF content stream
-// on save, so the produced file is a real, standards-compliant PDF.
-//
-// Toolbar features (all implemented against PdfDocument):
-//   * Annotate : highlight, underline, strikethrough, text box, sticky note,
-//                freehand pen, stamp
-//   * Pages    : merge, split, delete / insert / extract, rotate, reorder
-//   * Sign     : hand-drawn signature, image signature
-//   * Convert  : PDF <-> image (JPG/PNG)
-//   * Compress : shrink file size
-//   * Watermark: text / image
-//   * Protect  : set an open password
-//   * Forms    : fill AcroForm text fields
+// Text with non-Latin characters (Chinese/Japanese/Korean) is rendered through
+// Qt's font engine into a transparent QImage and stamped into the PDF with an
+// SMask, which is what lets watermarks, text boxes and sticky note titles
+// display correctly without us having to embed a CID font in the PDF.
 // ---------------------------------------------------------------------------
 class PdfTab : public QWidget
 {
     Q_OBJECT
 public:
     explicit PdfTab(QWidget *parent = nullptr);
+    ~PdfTab() override;
 
     bool loadFile(const QString &path);
     bool save();                       // save to current path
@@ -67,12 +55,6 @@ public:
     QString filePath() const { return m_filePath; }
     QString fileName() const;
 
-    // Rasterised pages for File > Print — one QImage per PDF page.
-    // Pages that embed a full-page image (scanned documents) return that
-    // image; text-based pages return a synthesised white page with the
-    // extracted text drawn onto it, so printing never produces blank sheets.
-    // Non-const because the underlying PdfDocument lazily parses objects while
-    // the pages are being read.
     QVector<QImage> printablePages();
 
     void applyTheme(const EditorTheme &theme);
@@ -80,6 +62,9 @@ public:
 signals:
     void statusMessage(const QString &msg);
     void modificationChanged(bool modified);
+    // A new PDF was produced by Split / Extract: ask the main window to open
+    // it as a new tab so the result is immediately visible.
+    void openPdfRequested(const QString &path);
 
 public slots:
     void zoomIn();
@@ -88,20 +73,30 @@ public slots:
     void fitWidth();
     void fitPage();
 
-    // Page navigation (also exposed on the toolbar as Previous / Next).
     void prevPage();
     void nextPage();
     void firstPage();
     void lastPage();
 
-    // Re-apply the current UI language to every toolbar action / label. Wired
-    // to I18n::languageChanged so the PDF toolbar follows the global language
-    // switch live, without having to reopen the tab.
+    void copySelectedText();
+    void selectAllText();
+    void copyPageText();
+    void copyAllText();
+
     void retranslate();
+    void saveFromToolbar();
+
+    // Annotation edit-history slots (Ctrl+Z / Ctrl+Y). These only affect the
+    // uncommitted (overlay) annotations; a Save bakes whatever remains.
+    void annotUndo();
+    void annotRedo();
 
 private slots:
     void onPageSelected(int row);
     void onPageSpinChanged(int value);
+    void onViewContextMenu(const QPoint &pos);
+    void onSelectionChanged();
+    void onOverlayChanged();           // view says: annotations list changed
 
     // Annotation tools.
     void setToolHighlight();
@@ -111,6 +106,7 @@ private slots:
     void setToolStickyNote();
     void setToolPen();
     void setToolStamp();
+    void setToolSelect();              // the default: pick/drag/resize
     void pickAnnotColor();
 
     // Page management.
@@ -130,7 +126,7 @@ private slots:
 
     // Conversion.
     void exportToImages();
-    void exportToWord();        // PDF -> Word (.rtf text, layout loss)
+    void exportToWord();
     void imagesToPdfReplace();
 
     // Compression.
@@ -150,42 +146,38 @@ private:
     void rebuildThumbnails();
     void showPage(int index);
     void markModified(bool on = true);
-    QByteArray currentPdfBytes() const;           // serialize working doc
-    void reloadFromBytes(const QByteArray &data);  // reparse after a structural op
-    void bakeAnnotationsForCurrentPage();          // flush overlay -> PDF content
+    QByteArray currentPdfBytes() const;
+    void reloadFromBytes(const QByteArray &data);
+    // Bake every uncommitted annotation (on *every* page) into the real PDF.
+    // Called from save() / saveAs() so uncommitted marks survive a round-trip.
+    void bakeAllPendingAnnotations();
 
-    void setZoom(double z);            // clamp + apply + refresh the zoom label
-    void updateNavState();             // enable/disable nav buttons, sync spin
-    void updatePageInfoLabel();        // bottom status line
+    void setZoom(double z);
+    void updateNavState();
+    void updatePageInfoLabel();
 
-    // Page count from whichever backend opened the file (PDFium can read
-    // documents the built-in parser cannot).
     int pageCount() const;
-    // Rasterise one page at the given on-screen pixel size, preferring PDFium
-    // and falling back to the built-in engine's embedded-image extraction.
-    // The result is cached per (page, size) so repaints do not re-render.
     QImage renderPage(int index, const QSize &targetPx) const;
-    // Page size in PDF points, taken from whichever backend opened the file.
     QSizeF pageSizePts(int index) const;
-    // Drop the cached raster (after a zoom change or a structural edit).
     void invalidatePageCache();
+
+    void loadTextLayerForCurrentPage();
+    QString pageTextOf(int index) const;
+
+    void refreshAfterEdit();
+
+    // Save as helper that writes a sub-document to disk and asks MainWindow
+    // to open it as a new tab (used by Split / Extract so the just-produced
+    // PDF appears immediately).
+    bool writeAndOpenDerived(const PdfDocument &part, const QString &suggestedPath);
 
     QString m_filePath;
     bool m_modified = false;
 
     PdfDocument m_doc;             // working document (mutated in place)
 
-    // --- Rendering backend -------------------------------------------------
-    // PDFium is a real rasteriser (the Chrome PDF engine) loaded dynamically
-    // at run time. When it is available every page renders exactly as it does
-    // in a browser — text, vector art, embedded fonts and transparency. The
-    // built-in PdfDocument stays responsible for all *structural* editing
-    // (merge/split/rotate/annotate/watermark/...) and is also the rendering
-    // fallback on machines where no pdfium.dll can be found.
     PdfiumRenderer m_pdfium;
-    bool m_usePdfium = false;      // true once the current file opened in PDFium
-    // Re-render on demand and cache, so panning/repaints are cheap but a zoom
-    // change still produces a crisp raster instead of an upscaled blur.
+    bool m_usePdfium = false;
     mutable QImage m_pageCache;
     mutable int m_pageCacheIndex = -1;
     mutable QSize m_pageCacheSize;
@@ -193,13 +185,12 @@ private:
     int m_currentPage = 0;
     double m_zoom = 1.0;
 
-    QToolBar *m_tb = nullptr;          // main toolbar
-    QListWidget *m_thumbs = nullptr;   // page list (left)
-    QScrollArea *m_scroll = nullptr;   // page viewport (center)
-    PdfPageView *m_view = nullptr;     // annotation surface
-    QLabel *m_info = nullptr;          // status / page info
+    QToolBar *m_tb = nullptr;
+    QListWidget *m_thumbs = nullptr;
+    QScrollArea *m_scroll = nullptr;
+    PdfPageView *m_view = nullptr;
+    QLabel *m_info = nullptr;
 
-    // --- Navigation / zoom widgets (request: Prev/Next + Zoom Out/In) ---
     QAction *m_actPrev = nullptr;
     QAction *m_actNext = nullptr;
     QAction *m_actFirst = nullptr;
@@ -209,16 +200,33 @@ private:
     QAction *m_actZoomReset = nullptr;
     QAction *m_actFitWidth = nullptr;
     QAction *m_actFitPage = nullptr;
-    QSpinBox *m_pageSpin = nullptr;    // current page number indicator / jump
-    QLabel *m_pageTotal = nullptr;     // " / N"
-    QLabel *m_zoomLabel = nullptr;     // "100%"
+    QAction *m_actSave = nullptr;
+    QAction *m_actUndo = nullptr;
+    QAction *m_actRedo = nullptr;
+    QAction *m_actCopyText = nullptr;
+    QAction *m_actSelectAllText = nullptr;
+    QAction *m_actCopyPageText = nullptr;
+    QSpinBox *m_pageSpin = nullptr;
+    QLabel *m_pageTotal = nullptr;
+    QLabel *m_zoomLabel = nullptr;
 
-    // Every translatable toolbar action keeps its English source string so the
-    // toolbar can be retranslated in place when the UI language changes.
+    // Side toolbar (mirrors the image editor's side panel).
+    QScrollArea *m_sideScroll = nullptr;
+    QGroupBox *m_annotGroup = nullptr;
+    QGroupBox *m_pagesGroup = nullptr;
+    QGroupBox *m_moreGroup = nullptr;
+
     QHash<QAction *, QByteArray> m_actionSources;
-    QList<QAction *> m_tooltipOnly;    // actions whose text is a glyph/symbol
+    QList<QAction *> m_tooltipOnly;
 
-    QColor m_annotColor = QColor(255, 220, 0);  // highlight yellow by default
+    QColor m_annotColor = QColor(255, 220, 0);
+
+    QString m_fallbackPageText;
+
+    QString m_renderTempPath;
+
+    QString m_openPassword;
+    bool m_readOnlyEncrypted = false;
 };
 
 #endif // PDFTAB_H

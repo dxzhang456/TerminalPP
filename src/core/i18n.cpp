@@ -29,10 +29,12 @@ void I18n::initialize()
 {
     // Language codes and their self-localized display names (needed for the
     // UI Language menu, which is built up front).
+    // Order shown in the UI Language menu: Simplified Chinese first, then
+    // Traditional Chinese, then English, then the rest.
     m_codes = {
-        QStringLiteral("en"), QStringLiteral("zh_CN"), QStringLiteral("zh_TW"),
-        QStringLiteral("es"), QStringLiteral("fr"),    QStringLiteral("de"),
-        QStringLiteral("ru"), QStringLiteral("ja"),    QStringLiteral("ko"),
+        QStringLiteral("zh_CN"), QStringLiteral("zh_TW"), QStringLiteral("en"),
+        QStringLiteral("es"),    QStringLiteral("fr"),    QStringLiteral("de"),
+        QStringLiteral("ru"),    QStringLiteral("ja"),    QStringLiteral("ko"),
     };
     m_displayNames = {
         {QStringLiteral("en"),    QStringLiteral("English")},
@@ -887,6 +889,33 @@ void I18n::loadTable()
         "言語が変更されました。一部はすぐに更新されます。ダイアログを再度開くと完全に反映されます。",
         "언어가 변경되었습니다. 일부 요소는 즉시 업데이트됩니다. 대화상자를 다시 열면 완전히 새로 고쳐집니다.");
 
+    // ---- Round-2 fixes: short About, PDF password, compression ----
+    add("Editor, hex, image, PDF, SSH and serial terminal, file compare and cloud drives in one tabbed window.", "编辑器、十六进制、图片、PDF、SSH 与串口终端、文件比较与云盘，全部集成在一个多标签窗口里。", "編輯器、十六進位、圖片、PDF、SSH 與序列終端、檔案比較與雲端，全部整合在一個多分頁視窗裡。", "Editor, hex, imágenes, PDF, terminal SSH y serie, comparación de archivos y unidades en la nube en una sola ventana con pestañas.", "Éditeur, hex, images, PDF, terminal SSH et série, comparaison de fichiers et disques cloud dans une seule fenêtre à onglets.", "Editor, Hex, Bilder, PDF, SSH- und Seriell-Terminal, Dateivergleich und Cloud-Laufwerke in einem Fenster mit Tabs.", "Редактор, hex, изображения, PDF, SSH- и Serial-терминал, сравнение файлов и облачные диски в одном окне с вкладками.", "エディタ、Hex、画像、PDF、SSH ・ シリアル端末、ファイル比較、クラウドドライブを 1 つのタブウィンドウに統合。", "에디토, Hex, 이미지, PDF, SSH 및 시리얼 토밍널, 파일 변교, 클라우드 드라이버를 하나의 탭 창에 통합.");
+    add("Qt 6 / MinGW. 9 UI languages.", "Qt 6 / MinGW 构建，支持 9 种界面语言。", "Qt 6 / MinGW 建置，支援 9 種介面語言。", "Qt 6 / MinGW. 9 idiomas de interfaz.", "Qt 6 / MinGW. 9 langues d'interface.", "Qt 6 / MinGW. 9 Oberflächensprachen.", "Qt 6 / MinGW. 9 языков интерфейса.", "Qt 6 / MinGW。UI 9 言語対応。", "Qt 6 / MinGW. UI 9개 언어.");
+    add("Password Required", "需要密码", "需要密碼", "Se requiere contraseña", "Mot de passe requis", "Kennwort erforderlich", "Требуется пароль", "パスワードが必要です", "보호 번호 필요");
+    add("This PDF is password-protected.\nEnter the password to open it:", "此 PDF 已用密码保护。\n请输入打开密码：", "此 PDF 已用密碼保護。\n請輸入開啟密碼：", "Este PDF está protegido con contraseña.\nIntroduzca la contraseña para abrirlo:", "Ce PDF est protégé par mot de passe.\nSaisissez le mot de passe pour l'ouvrir :", "Dieses PDF ist kennwortgeschützt.\nGeben Sie das Kennwort zum Öffnen ein:", "Этот PDF защищён паролем.\nВведите пароль для открытия:", "この PDF はパスワードで保護されています。\n開くにはパスワードを入力してください：", "이 PDF는 보호 번호로 보호되어 있습니다.\n여는 보호 번호를 입력하세요:");
+    add("Wrong password. Please try again:", "密码错误，请重试：", "密碼錯誤，請重試：", "Contraseña incorrecta. Inténtelo de nuevo:", "Mot de passe incorrect. Veuillez réessayer :", "Falsches Kennwort. Bitte erneut versuchen:", "Неверный пароль. Попробуйте снова:", "パスワードが違います。もう一度入力してください：", "보호 번호가 틀렸습니다. 다시 시도하세요:");
+    add("This PDF is password-protected and could not be opened without the correct password.", "此 PDF 已用密码保护，没有正确密码无法打开。", "此 PDF 已用密碼保護，沒有正確密碼無法開啟。", "Este PDF está protegido con contraseña y no se pudo abrir sin la contraseña correcta.", "Ce PDF est protégé par mot de passe et n'a pas pu être ouvert sans le bon mot de passe.", "Dieses PDF ist kennwortgeschützt und konnte ohne das richtige Kennwort nicht geöffnet werden.", "Этот PDF защищён паролем и не может быть открыт без верного пароля.", "この PDF はパスワードで保護されており、正しいパスワードがなければ開けません。", "이 PDF는 보호 번호로 보호되어 있어 정확한 보호 번호 없이는 여릴 수 없습니다.");
+    add("encrypted: view / copy only, editing is disabled", "已加密：仅可查看 / 复制，编辑已禁用", "已加密：僅可檢視 / 複製，編輯已停用", "cifrado: solo ver / copiar, la edición está deshabilitada", "chiffré : lecture / copie seulement, l'édition est désactivée", "verschlüsselt: nur Ansehen / Kopieren, Bearbeiten ist deaktiviert", "зашифровано: только просмотр / копирование, редактирование отключено", "暗号化済み：閲覧 / コピーのみ可、編集は無効", "암호화됨: 보기 / 복사만 가능, 편집 부가능");
+    add("Already fully compressed: %1 KB → %2 KB (no further reduction possible).", "已完全压缩：%1 KB → %2 KB（无法再缩小）。", "已完全壓縮：%1 KB → %2 KB（無法再縮小）。", "Ya está completamente comprimido: %1 KB → %2 KB (no es posible reducirlo más).", "Déjà entièrement compressé : %1 KB → %2 KB (aucune réduction supplémentaire possible).", "Bereits vollständig komprimiert: %1 KB → %2 KB (keine weitere Verkleinerung möglich).", "Уже полностью сжато: %1 КБ → %2 КБ (дальнейшее уменьшение невозможно).", "すでに完全に圧縮されています：%1 KB → %2 KB（これ以上小さくできません）。", "이미 완전히 압술됨: %1 KB → %2 KB (더 이상 줄이려가 없습니다).");
+
+    // ---- Real text: select & copy the text that IS text ----
+    add("Copy Text", "复制文字", "複製文字", "Copiar texto", "Copier le texte", "Text kopieren", "Копировать текст", "テキストをコピー", "텍스트 복사");
+    add("Select All Text", "全选文字", "全選文字", "Seleccionar todo el texto", "Tout sélectionner", "Gesamten Text auswählen", "Выделить весь текст", "すべてのテキストを選択", "모든 텍스트 여기");
+    add("Copy Page Text", "复制本页文字", "複製本頁文字", "Copiar el texto de la página", "Copier le texte de la page", "Seitentext kopieren", "Копировать текст страницы", "パージ全文をコピー", "해당 페이지 텍스트 복사");
+    add("Copy All Text", "复制全文", "複製全文", "Copiar todo el texto", "Copier tout le texte", "Gesamten Text kopieren", "Копировать всё", "全文をコピー", "전짜 텍스트 복사");
+    add("Copied %1 characters of selected text.", "已复制所选文字的 %1 个字符。", "已複製所選文字的 %1 個字元。", "Se copiaron %1 caracteres del texto seleccionado.", "%1 caractères du texte sélectionné copiés.", "%1 Zeichen des markierten Textes kopiert.", "Скопировано символов выделенного текста: %1.", "選択したテキスト %1 文字をコピーしました。", "여기한 텍스트 %1자를 복사했습니다.");
+    add("Copied the whole page text (%1 characters).", "已复制本页全部文字（%1 个字符）。", "已複製本頁全部文字（%1 個字元）。", "Se copió todo el texto de la página (%1 caracteres).", "Tout le texte de la page a été copié (%1 caractères).", "Der gesamte Seitentext wurde kopiert (%1 Zeichen).", "Скопирован весь текст страницы (%1 симв.).", "パージ全文（%1 文字）をコピーしました。", "해당 페이지 전짜 텍스트(%1자)를 복사했습니다.");
+    add("Copied the text of %1 page(s) (%2 characters).", "已复制 %1 页的文字（%2 个字符）。", "已複製 %1 頁的文字（%2 個字元）。", "Se copió el texto de %1 página(s) (%2 caracteres).", "Texte de %1 page(s) copié (%2 caractères).", "Text von %1 Seite(n) kopiert (%2 Zeichen).", "Скопирован текст страниц: %1 (%2 симв.).", "%1 パージ分のテキスト（%2 文字）をコピーしました。", "%1개 페이지의 텍스트(%2자)를 복사했습니다.");
+    add("Selected all %1 characters on this page.", "已选中本页全部 %1 个字符。", "已選取本頁全部 %1 個字元。", "Se seleccionaron los %1 caracteres de esta página.", "Les %1 caractères de cette page sont sélectionnés.", "Alle %1 Zeichen dieser Seite ausgewählt.", "Выделены все символы страницы: %1.", "このパージの %1 文字をすべて選択しました。", "이 페이지의 %1자를 모두 여기했습니다.");
+    add("This page has no text layer — its text is part of an image, so there is nothing to copy. Use OCR or \"To Images\" instead.", "本页没有文字图层——其文字属于图片的一部分，因此没有可复制的文字。请使用 OCR 或“转为图片”。", "本頁沒有文字圖層——其文字屬於圖片的一部分，因此沒有可複製的文字。請使用 OCR 或「轉為圖片」。", "Esta página no tiene capa de texto: su texto forma parte de una imagen, así que no hay nada que copiar. Use OCR o \"A imágenes\".", "Cette page n'a pas de couche de texte : son texte fait partie d'une image, il n'y a donc rien à copier. Utilisez l'OCR ou « Vers images ».", "Diese Seite hat keine Textebene — ihr Text ist Teil eines Bildes, es gibt also nichts zu kopieren. Verwenden Sie OCR oder „Zu Bildern“.", "На этой странице нет текстового слоя — текст является частью изображения, копировать нечего. Используйте OCR или «В изображения».", "このパージにはテキストレイヤーがありません——文字は画像の一部なのでコピーできるテキストはありません。OCR または「画像に変換」をご利用ください。", "이 페이지에는 텍스트 레이어가 없습니다 — 문자가 이미지의 일부이뭀로 복사할 텍스트가 없습니다. OCR 또는 “이미지로 변환”을 사용하십시오.");
+    add("This page has no text layer — its text is part of an image, so there is nothing to select.", "本页没有文字图层——其文字属于图片的一部分，因此没有可选中的文字。", "本頁沒有文字圖層——其文字屬於圖片的一部分，因此沒有可選取的文字。", "Esta página no tiene capa de texto: su texto forma parte de una imagen, así que no hay nada que seleccionar.", "Cette page n'a pas de couche de texte : son texte fait partie d'une image, il n'y a donc rien à sélectionner.", "Diese Seite hat keine Textebene — ihr Text ist Teil eines Bildes, es gibt also nichts auszuwählen.", "На этой странице нет текстового слоя — текст является частью изображения, выделять нечего.", "このパージにはテキストレイヤーがありません——文字は画像の一部なので選択できるテキストはありません。", "이 페이지에는 텍스트 레이어가 없습니다 — 문자가 이미지의 일부이뭀로 여기할 텍스트가 없습니다.");
+    add("No extractable text was found in this document.", "在此文档中未找到可提取的文字。", "在此文件中找不到可擷取的文字。", "No se encontró texto extraíble en este documento.", "Aucun texte extractible n'a été trouvé dans ce document.", "In diesem Dokument wurde kein extrahierbarer Text gefunden.", "В этом документе не найдено извлекаемого текста.", "この文書から抽出できるテキストは見つかりませんでした。", "이 발서에서 추출 가능한 텍스트를 찾지 못했습니다.");
+    add("selectable text: %1 characters (drag to select, Ctrl+C to copy)", "可选文字：%1 个字符（拖动选中，Ctrl+C 复制）", "可選文字：%1 個字元（拖曳選取，Ctrl+C 複製）", "texto seleccionable: %1 caracteres (arrastre para seleccionar, Ctrl+C para copiar)", "texte sélectionnable : %1 caractères (glisser pour sélectionner, Ctrl+C pour copier)", "auswählbarer Text: %1 Zeichen (ziehen zum Auswählen, Ctrl+C zum Kopieren)", "текст доступен для выделения: %1 симв. (выделите мышью, Ctrl+C — копировать)", "選択可能なテキスト：%1 文字（ドラッグで選択、Ctrl+C でコピー）", "여기 가능한 텍스트: %1자 (드래게하여 여기, Ctrl+C로 복사)");
+    add("text can be copied whole-page only", "仅支持整页复制文字", "僅支援整頁複製文字", "el texto solo se puede copiar por página completa", "le texte ne peut être copié que page entière", "Text kann nur seitenweise kopiert werden", "текст можно скопировать только страницей целиком", "テキストはパージ全体しかコピーできません", "텍스트는 페이지 전짜로만 복사할 수 있습니다");
+    add("no text layer (image-only page)", "无文字图层（线图片页面）", "無文字圖層（純圖片頁面）", "sin capa de texto (página solo de imagen)", "aucune couche de texte (page image uniquement)", "keine Textebene (Seite besteht nur aus einem Bild)", "текстового слоя нет (страница — только изображение)", "テキストレイヤーなし（画像のみのパージ）", "텍스트 레이어 없음(이미지 전용 페이지)");
+    add("(this page has no text layer — its text is part of an image)", "（本页没有文字图层——其文字属于图片的一部分）", "（本頁沒有文字圖層——其文字屬於圖片的一部分）", "(esta página no tiene capa de texto: su texto forma parte de una imagen)", "(cette page n'a pas de couche de texte : son texte fait partie d'une image)", "(diese Seite hat keine Textebene — ihr Text ist Teil eines Bildes)", "(на этой странице нет текстового слоя — текст является частью изображения)", "（このパージにはテキストレイヤーがありません——文字は画像の一部です）", "(이 페이지에는 텍스트 레이어가 없습니다 — 문자가 이미지의 일부입니다)");
+
     // ---- PDF viewer / editor (toolbar, dialogs, status messages) ----
     add("PDF viewer / editor", "PDF 查看 / 编辑", "PDF 檢視 / 編輯", "Visor / editor de PDF", "Visionneuse / éditeur PDF", "PDF-Betrachter / -Editor", "Просмотр / редактирование PDF", "PDF ビューアー / エディタ", "PDF 뷰어 / 에디터");
 
@@ -998,6 +1027,71 @@ void I18n::loadTable()
         "이 페이지를 이미지로 렌더링할 수 없습니다. 텍스트 추출과 모든 페이지/주석 도구는 계속 사용할 수 있습니다.");
 
     // Annotation tools.
+    add("Annotate",          "批注",      "註解",      "Anotar",       "Annoter",       "Anmerken",      "Аннотации",       "注釈",          "주석");
+    add("Pages",             "页面",      "頁面",      "Páginas",      "Pages",         "Seiten",        "Страницы",        "ページ",        "페이지");
+    add("More",              "更多",      "更多",      "Más",          "Plus",          "Mehr",          "Ещё",             "その他",        "기타");
+    add("Select",            "选择",      "選擇",      "Seleccionar",  "Sélection",     "Auswählen",     "Выделить",        "選択",          "선택");
+    add("Choose stamp image","选择图章图片","選擇圖章圖片","Elegir imagen de sello","Choisir une image de tampon","Stempelbild auswählen","Выбрать изображение штампа","スタンプ画像を選択","스탬프 이미지 선택");
+    add("Could not load the image.","无法加载图片。","無法載入圖片。","No se pudo cargar la imagen.","Impossible de charger l'image.","Bild konnte nicht geladen werden.","Не удалось загрузить изображение.","画像を読み込めませんでした。","이미지를 불러올 수 없습니다.");
+    add("Stamp tool: drag a rectangle on the page to place the image.",
+        "图章工具：在页面上拖动一个矩形来放置图片。",
+        "圖章工具：在頁面上拖動一個矩形以放置圖片。",
+        "Herramienta de sello: arrastre un rectángulo en la página para colocar la imagen.",
+        "Outil tampon : glissez un rectangle sur la page pour placer l'image.",
+        "Stempel-Werkzeug: Ziehen Sie ein Rechteck auf der Seite, um das Bild zu platzieren.",
+        "Инструмент штампа: перетащите прямоугольник на странице, чтобы разместить изображение.",
+        "スタンプツール：ページ上に矩形をドラッグして画像を配置します。",
+        "스탬프 도구: 페이지에 사각형을 드래그하여 이미지를 배치합니다.");
+    add("Edit Text",         "编辑文字",  "編輯文字",  "Editar texto", "Modifier le texte","Text bearbeiten","Изменить текст",  "テキストを編集", "텍스트 편집");
+    add("Edit annotation text:","编辑批注文本：","編輯註解文字：","Editar el texto de la anotación:","Modifier le texte de l'annotation :","Anmerkungstext bearbeiten:","Изменить текст аннотации:","注釈テキストを編集：","주석 텍스트 편집:");
+    add("Signature added. Drag or resize it, then Save.",
+        "签名已添加。可拖动或缩放后再保存。",
+        "簽名已加入。可拖動或縮放後再儲存。",
+        "Firma añadida. Arrástrela o cámbiele el tamaño y luego guarde.",
+        "Signature ajoutée. Déplacez-la ou redimensionnez-la, puis enregistrez.",
+        "Signatur hinzugefügt. Verschieben oder skalieren, dann speichern.",
+        "Подпись добавлена. Переместите или измените размер, затем сохраните.",
+        "署名を追加しました。移動またはサイズ変更して保存してください。",
+        "서명이 추가되었습니다. 이동하거나 크기를 조절한 후 저장하세요.");
+    add("Image signature added. Drag or resize it, then Save.",
+        "图片签名已添加。可拖动或缩放后再保存。",
+        "圖片簽名已加入。可拖動或縮放後再儲存。",
+        "Firma de imagen añadida. Arrástrela o cámbiele el tamaño y luego guarde.",
+        "Signature image ajoutée. Déplacez-la ou redimensionnez-la, puis enregistrez.",
+        "Bildsignatur hinzugefügt. Verschieben oder skalieren, dann speichern.",
+        "Подпись-изображение добавлена. Переместите или измените размер, затем сохраните.",
+        "画像署名を追加しました。移動またはサイズ変更して保存してください。",
+        "이미지 서명이 추가되었습니다. 이동하거나 크기를 조절한 후 저장하세요.");
+    add("Draw your signature below, then click OK. You can drag / resize it on the page before saving.",
+        "在下方绘制签名，然后点击确定。保存前可在页面上拖动或缩放。",
+        "在下方繪製簽名，然後按一下確定。儲存前可在頁面上拖動或縮放。",
+        "Dibuje su firma a continuación y haga clic en Aceptar. Puede arrastrarla o cambiar su tamaño en la página antes de guardar.",
+        "Dessinez votre signature ci-dessous, puis cliquez sur OK. Vous pouvez la déplacer / redimensionner sur la page avant d'enregistrer.",
+        "Zeichnen Sie unten Ihre Signatur und klicken Sie dann auf OK. Sie können sie auf der Seite verschieben / skalieren, bevor Sie speichern.",
+        "Нарисуйте подпись ниже, затем нажмите ОК. Перед сохранением её можно перемещать и изменять размер на странице.",
+        "下に署名を描き、OK をクリックしてください。保存する前にページ上で移動・サイズ変更できます。",
+        "아래에 서명을 그린 다음 확인을 클릭하세요. 저장하기 전에 페이지에서 이동하거나 크기를 조절할 수 있습니다.");
+    add("Split into 2 files and opened them in new tabs.",
+        "已拆分为 2 个文件并在新标签页中打开。",
+        "已拆分為 2 個檔案並在新分頁中開啟。",
+        "Dividido en 2 archivos y abiertos en pestañas nuevas.",
+        "Scindé en 2 fichiers et ouverts dans de nouveaux onglets.",
+        "In 2 Dateien aufgeteilt und in neuen Tabs geöffnet.",
+        "Разделено на 2 файла и открыто в новых вкладках.",
+        "2 つのファイルに分割し、新しいタブで開きました。",
+        "2개 파일로 분할하여 새 탭에서 열었습니다.");
+    add("Extracted %1 page(s) to %2 and opened it in a new tab.",
+        "已提取 %1 页到 %2 并在新标签页中打开。",
+        "已擷取 %1 頁到 %2 並在新分頁中開啟。",
+        "Extraído %1 página(s) a %2 y abierto en una pestaña nueva.",
+        "Extrait %1 page(s) vers %2 et ouvert dans un nouvel onglet.",
+        "%1 Seite(n) nach %2 extrahiert und in einem neuen Tab geöffnet.",
+        "Извлечено %1 страниц в %2 и открыто в новой вкладке.",
+        "%1 ページを %2 に抽出し、新しいタブで開きました。",
+        "%1 페이지를 %2(으)로 추출하여 새 탭에서 열었습니다.");
+    add("Save first part","保存第一部分","儲存第一部分","Guardar primera parte","Enregistrer la première partie","Ersten Teil speichern","Сохранить первую часть","最初の部分を保存","첫 번째 부분 저장");
+    add("Save second part","保存第二部分","儲存第二部分","Guardar segunda parte","Enregistrer la deuxième partie","Zweiten Teil speichern","Сохранить вторую часть","2 番目の部分を保存","두 번째 부분 저장");
+
     add("Highlight",         "高亮",      "螢光標示",  "Resaltar",     "Surligner",     "Hervorheben",   "Выделение",       "ハイライト",    "형광펜");
     add("Underline",         "下划线",    "底線",      "Subrayar",     "Souligner",     "Unterstreichen","Подчёркивание",   "下線",          "밑줄");
     add("Strike",            "删除线",    "刪除線",    "Tachar",       "Barrer",        "Durchstreichen","Зачёркивание",    "取り消し線",    "취소선");
