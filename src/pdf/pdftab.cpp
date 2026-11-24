@@ -54,12 +54,12 @@ static inline QString TR(const char *s)
 // converts between widget pixels (origin top-left) and PDF points.
 //
 // Interaction model:
-//   * No tool selected (default) -> drag selects text.
+//   * Select tool (default) -> drag selects text; click an annotation to
+//     pick it up. The 8 selection handles resize it, dragging the body moves
+//     it, Delete removes it.
 //   * Highlight/Underline/Strike/Pen/TextBox/StickyNote/Stamp -> left-drag
 //     creates an annotation of that kind. After creation the tool resets to
-//     "Select" so the user can immediately drag / resize what they just made.
-//   * Select tool -> click an annotation to pick it up. The eight selection
-//     handles resize it; dragging the body moves it. Delete key removes it.
+//     Select so the user can immediately move / resize what they just made.
 // Every change (create, move, resize, delete) is pushed onto an undo stack so
 // Ctrl+Z / Ctrl+Y work.
 // ===========================================================================
@@ -73,14 +73,12 @@ public:
         Tool tool = Select;
         QColor color;
         QVector<QPointF> points;   // PDF points (for Pen)
-        QRectF rect;               // PDF points, normalised (for box tools)
+        QRectF rect;               // PDF points (for box tools)
         QString text;              // for TextBox / StickyNote
-        QImage image;              // for Stamp / signature (ARGB)
-        double rotation = 0.0;     // degrees (reserved)
+        QImage image;              // for Stamp / signature
+        double rotation = 0.0;
     };
 
-    // One per-page list — annotations stay on their original page even when
-    // the user flips through the document before saving.
     struct PageState {
         QVector<Annotation> items;
     };
@@ -109,23 +107,16 @@ public:
         update();
     }
 
-    // Real text layer (for selection/copy).
     void setTextChars(const QVector<PdfTextChar> &chars)
-    {
-        m_chars = chars;
-        clearSelection();
-        update();
-    }
+    { m_chars = chars; clearSelection(); update(); }
     bool hasTextLayer() const { return !m_chars.isEmpty(); }
     int textCharCount() const { return m_chars.size(); }
 
     bool hasSelection() const { return m_selEnd > m_selStart; }
-
     QString selectedText() const
     {
         if (!hasSelection()) return QString();
-        QString out;
-        out.reserve(m_selEnd - m_selStart + 8);
+        QString out; out.reserve(m_selEnd - m_selStart + 8);
         QRectF prev;
         for (int i = m_selStart; i < m_selEnd && i < m_chars.size(); ++i) {
             const PdfTextChar &c = m_chars.at(i);
@@ -133,9 +124,7 @@ public:
             if (!prev.isNull() && !c.box.isNull()
                 && !out.endsWith('\n') && !out.endsWith('\r')
                 && c.box.top() > prev.bottom() - prev.height() * 0.35
-                && c.box.top() > prev.top() + prev.height() * 0.55) {
-                out += '\n';
-            }
+                && c.box.top() > prev.top() + prev.height() * 0.55) out += '\n';
             out += ch;
             if (!c.box.isNull()) prev = c.box;
         }
@@ -143,16 +132,13 @@ public:
     }
     QString allText() const
     {
-        QString out;
-        out.reserve(m_chars.size() + 8);
+        QString out; out.reserve(m_chars.size() + 8);
         QRectF prev;
         for (const PdfTextChar &c : m_chars) {
             const QChar ch = c.ch ? QChar(c.ch) : QChar(' ');
             if (!prev.isNull() && !c.box.isNull()
                 && !out.endsWith('\n') && !out.endsWith('\r')
-                && c.box.top() > prev.top() + prev.height() * 0.55) {
-                out += '\n';
-            }
+                && c.box.top() > prev.top() + prev.height() * 0.55) out += '\n';
             out += ch;
             if (!c.box.isNull()) prev = c.box;
         }
@@ -181,11 +167,7 @@ public:
     }
 
     void setScale(double s)
-    {
-        m_scale = qBound(0.05, s, 10.0);
-        updateGeometryToPage();
-        update();
-    }
+    { m_scale = qBound(0.05, s, 10.0); updateGeometryToPage(); update(); }
     double scale() const { return m_scale; }
 
     double displayWidthPts() const
@@ -195,8 +177,7 @@ public:
 
     void setTool(Tool t)
     {
-        m_tool = t;
-        m_pickedIndex = -1;
+        m_tool = t; m_pickedIndex = -1;
         setCursor(t == Select ? Qt::IBeamCursor : Qt::CrossCursor);
         update();
     }
@@ -204,7 +185,6 @@ public:
     void setColor(const QColor &c) { m_color = c; }
     void setPlaceholderNote(const QString &s) { m_placeholder = s; update(); }
 
-    // --- Per-page annotation store --------------------------------------
     const QVector<Annotation> &annotationsOfPage(int page) const
     {
         static const QVector<Annotation> empty;
@@ -226,13 +206,9 @@ public:
     }
     void clearAllAnnotations()
     {
-        m_pages.clear();
-        m_undo.clear();
-        m_redo.clear();
-        m_pickedIndex = -1;
-        update();
+        m_pages.clear(); m_undo.clear(); m_redo.clear();
+        m_pickedIndex = -1; update();
     }
-    // Insert an annotation on the current page (used by the signature flow).
     void insertAnnotationOnCurrentPage(const Annotation &a)
     {
         if (m_pageIndex < 0) return;
@@ -244,7 +220,6 @@ public:
         emit annotationsChanged();
     }
 
-    // Undo / redo over the full per-page annotation state.
     void undo()
     {
         if (m_undo.isEmpty()) return;
@@ -268,8 +243,10 @@ public:
     double pageHeightPts() const { return m_pageH; }
     int currentPageIndex() const { return m_pageIndex; }
 
+    void setStampImage(const QImage &img) { m_stampImage = img; }
+
 signals:
-    void annotationsChanged();         // overlay was mutated (create/move/...)
+    void annotationsChanged();
     void selectionChanged();
 
 protected:
@@ -296,8 +273,7 @@ protected:
                 p.drawImage(dst, m_background);
             } else {
                 QRectF src = (m_rotation == 90 || m_rotation == 270)
-                                 ? QRectF(0, 0, dst.height(), dst.width())
-                                 : dst;
+                                 ? QRectF(0, 0, dst.height(), dst.width()) : dst;
                 p.save();
                 p.translate(dst.center());
                 p.rotate(m_rotation);
@@ -317,7 +293,6 @@ protected:
                        Qt::AlignCenter | Qt::TextWordWrap, note);
         }
 
-        // Text selection highlight.
         if (hasSelection()) {
             QColor sel(60, 120, 240, 90);
             p.setPen(Qt::NoPen);
@@ -327,9 +302,9 @@ protected:
                 const QRectF b = m_chars.at(i).box;
                 if (b.isNull() || b.isEmpty()) continue;
                 const QRectF px = boxToPx(b);
-                if (run.isNull()) { run = px; }
+                if (run.isNull()) run = px;
                 else if (qAbs(px.top() - run.top()) <= run.height() * 0.6
-                         && px.left() >= run.left() - 1) { run |= px; }
+                         && px.left() >= run.left() - 1) run |= px;
                 else { p.drawRect(run); run = px; }
             }
             if (!run.isNull()) p.drawRect(run);
@@ -340,28 +315,18 @@ protected:
         p.setBrush(Qt::NoBrush);
         p.drawRect(pageRect);
 
-        // Committed-to-overlay annotations on this page.
         const QVector<Annotation> &list = annotationsOfPage(m_pageIndex);
         for (int i = 0; i < list.size(); ++i)
             drawAnnotation(p, list[i], i == m_pickedIndex);
-
-        // In-progress annotation.
-        if (m_drawing)
-            drawAnnotation(p, m_current, false);
+        if (m_drawing) drawAnnotation(p, m_current, false);
     }
 
     void mousePressEvent(QMouseEvent *e) override
     {
         setFocus(Qt::MouseFocusReason);
-
-        if (e->button() != Qt::LeftButton) {
-            QWidget::mousePressEvent(e);
-            return;
-        }
+        if (e->button() != Qt::LeftButton) { QWidget::mousePressEvent(e); return; }
 
         if (m_tool == Select) {
-            // 1) If an annotation is already picked, see if the user grabbed a
-            //    resize handle.
             if (m_pickedIndex >= 0) {
                 const int handle = handleAt(m_pickedIndex, e->pos());
                 if (handle >= 0) {
@@ -372,7 +337,6 @@ protected:
                     return;
                 }
             }
-            // 2) Otherwise pick whichever annotation lies under the mouse.
             const int hit = annotationAt(e->pos());
             if (hit >= 0) {
                 m_pickedIndex = hit;
@@ -380,48 +344,35 @@ protected:
                 m_dragging = true;
                 m_dragStart = e->pos();
                 const Annotation &a = m_pages[m_pageIndex].items[hit];
-                m_origRect = a.rect;
-                m_origPoints = a.points;
-                update();
-                return;
+                m_origRect = a.rect; m_origPoints = a.points;
+                update(); return;
             }
             m_pickedIndex = -1;
-
-            // 3) No annotation under the mouse -> start a text selection.
             if (m_chars.isEmpty()) { clearSelection(); return; }
             const int idx = charIndexAt(e->pos());
-            m_selAnchor = idx;
-            m_selStart = idx;
-            m_selEnd = idx;
+            m_selAnchor = idx; m_selStart = idx; m_selEnd = idx;
             m_selecting = true;
-            update();
-            emit selectionChanged();
+            update(); emit selectionChanged();
             return;
         }
 
-        // A drawing tool: start creating a new annotation.
         m_drawing = true;
         m_current = Annotation();
         m_current.tool = m_tool;
         m_current.color = m_color;
-        m_current.image = m_stampImage;             // used by Stamp tool
+        m_current.image = m_stampImage;
         QPointF pt = toPdf(e->pos());
-        if (m_tool == Pen) {
-            m_current.points.append(pt);
-        } else {
-            m_current.rect = QRectF(pt, pt);
-        }
+        if (m_tool == Pen) m_current.points.append(pt);
+        else m_current.rect = QRectF(pt, pt);
     }
 
     void mouseMoveEvent(QMouseEvent *e) override
     {
         if (m_tool == Select && m_pickedIndex >= 0 && m_resizingHandle >= 0) {
-            resizePicked(e->pos());
-            return;
+            resizePicked(e->pos()); return;
         }
         if (m_tool == Select && m_dragging && m_pickedIndex >= 0) {
-            movePicked(e->pos());
-            return;
+            movePicked(e->pos()); return;
         }
         if (m_selecting) {
             const int idx = charIndexAt(e->pos());
@@ -435,8 +386,6 @@ protected:
             update(); emit selectionChanged();
             return;
         }
-
-        // Live cursor hint for the Select tool.
         if (m_tool == Select && !m_drawing) {
             if (m_pickedIndex >= 0) {
                 const int h = handleAt(m_pickedIndex, e->pos());
@@ -445,11 +394,8 @@ protected:
                 else setCursor(Qt::IBeamCursor);
             } else if (annotationAt(e->pos()) >= 0) {
                 setCursor(Qt::SizeAllCursor);
-            } else {
-                setCursor(Qt::IBeamCursor);
-            }
+            } else setCursor(Qt::IBeamCursor);
         }
-
         if (!m_drawing) return;
         QPointF pt = toPdf(e->pos());
         if (m_tool == Pen) m_current.points.append(pt);
@@ -460,21 +406,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent *e) override
     {
         if (m_tool == Select) {
-            if (m_resizingHandle >= 0) {
-                m_resizingHandle = -1;
-                emit annotationsChanged();
-                return;
-            }
-            if (m_dragging) {
-                m_dragging = false;
-                emit annotationsChanged();
-                return;
-            }
-            if (m_selecting) {
-                m_selecting = false;
-                emit selectionChanged();
-                return;
-            }
+            if (m_resizingHandle >= 0) { m_resizingHandle = -1; emit annotationsChanged(); return; }
+            if (m_dragging) { m_dragging = false; emit annotationsChanged(); return; }
+            if (m_selecting) { m_selecting = false; emit selectionChanged(); return; }
         }
         if (!m_drawing) return;
         m_drawing = false;
@@ -483,40 +417,26 @@ protected:
         if (m_tool == TextBox || m_tool == StickyNote) {
             bool ok = false;
             QString txt = QInputDialog::getText(this, TR("Text"),
-                                                TR("Enter annotation text:"),
-                                                QLineEdit::Normal, QString(), &ok);
+                TR("Enter annotation text:"), QLineEdit::Normal, QString(), &ok);
             if (!ok || txt.isEmpty()) { update(); return; }
             m_current.text = txt;
             if (m_current.rect.width() < 5) {
-                // click (not drag): give the box a sensible default size.
                 if (m_tool == StickyNote)
                     m_current.rect = QRectF(pt.x(), pt.y() + 20, 24, 24);
                 else
                     m_current.rect = QRectF(pt.x(), pt.y() + 20, 200, 60);
             }
         }
-        if (m_tool == Stamp && m_current.image.isNull()) {
-            // The toolbar should have prompted for an image before entering
-            // Stamp mode; if somehow we got here without one, cancel.
-            update(); return;
-        }
+        if (m_tool == Stamp && m_current.image.isNull()) { update(); return; }
         if (m_tool != Pen) {
             m_current.rect = m_current.rect.normalized();
-            // Drag-created boxes need some real size. Click-created text/sticky
-            // boxes have already been sized above, so accept them.
             if (m_current.rect.width() < 2 && m_current.rect.height() < 2
-                && m_tool != StickyNote && m_tool != TextBox) {
-                update(); return;
-            }
-        } else if (m_current.points.size() < 2) {
-            update(); return;
-        }
+                && m_tool != StickyNote && m_tool != TextBox) { update(); return; }
+        } else if (m_current.points.size() < 2) { update(); return; }
 
         pushUndoSnapshot();
         m_pages[m_pageIndex].items.append(m_current);
         m_pickedIndex = m_pages[m_pageIndex].items.size() - 1;
-        // After creating an annotation, switch back to Select so it can be
-        // moved/resized without having to click a toolbar button first.
         setTool(Select);
         emit annotationsChanged();
         update();
@@ -525,18 +445,15 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *e) override
     {
         if (m_tool != Select || m_chars.isEmpty()) {
-            QWidget::mouseDoubleClickEvent(e);
-            return;
+            QWidget::mouseDoubleClickEvent(e); return;
         }
-        // Edit the picked textbox/sticky note on double-click.
         const int hit = annotationAt(e->pos());
         if (hit >= 0) {
             Annotation &a = m_pages[m_pageIndex].items[hit];
             if (a.tool == TextBox || a.tool == StickyNote) {
                 bool ok = false;
                 QString txt = QInputDialog::getMultiLineText(
-                    this, TR("Edit Text"), TR("Edit annotation text:"),
-                    a.text, &ok);
+                    this, TR("Edit Text"), TR("Edit annotation text:"), a.text, &ok);
                 if (ok) {
                     pushUndoSnapshot();
                     a.text = txt;
@@ -561,8 +478,7 @@ protected:
             m_selStart = a; m_selEnd = b + 1;
         }
         m_selAnchor = m_selStart;
-        update();
-        emit selectionChanged();
+        update(); emit selectionChanged();
     }
 
     void keyPressEvent(QKeyEvent *e) override
@@ -579,20 +495,13 @@ protected:
             auto &list = m_pages[m_pageIndex].items;
             list.removeAt(m_pickedIndex);
             m_pickedIndex = -1;
-            update();
-            emit annotationsChanged();
-            e->accept();
-            return;
+            update(); emit annotationsChanged();
+            e->accept(); return;
         }
         QWidget::keyPressEvent(e);
     }
 
-public:
-    // Stamp configuration.
-    void setStampImage(const QImage &img) { m_stampImage = img; }
-
 private:
-    // --- Geometry helpers ------------------------------------------------
     QRectF computePageRect() const
     {
         QRectF r(0, 0, displayWidthPts() * m_scale, displayHeightPts() * m_scale);
@@ -607,7 +516,6 @@ private:
         setMinimumSize(qMax(200, w), qMax(200, h));
         resize(minimumSize());
     }
-    // Widget pixel -> PDF point (origin bottom-left).
     QPointF toPdf(const QPoint &px) const
     {
         double x = (px.x() - m_pageOrigin.x()) / m_scale;
@@ -615,7 +523,6 @@ private:
         double y = m_pageH - yTop;
         return QPointF(x, y);
     }
-    // PDF point -> widget pixel.
     QPointF toPx(const QPointF &pt) const
     {
         return QPointF(m_pageOrigin.x() + pt.x() * m_scale,
@@ -639,7 +546,6 @@ private:
         return QPointF((px.x() - m_pageOrigin.x()) / m_scale,
                        (px.y() - m_pageOrigin.y()) / m_scale);
     }
-
     int charIndexAt(const QPoint &px) const
     {
         if (m_chars.isEmpty()) return 0;
@@ -658,26 +564,18 @@ private:
         }
         return best < 0 ? 0 : best;
     }
-
-    // Annotation hit testing (topmost wins).
     int annotationAt(const QPoint &px) const
     {
         const QVector<Annotation> &list = annotationsOfPage(m_pageIndex);
         for (int i = list.size() - 1; i >= 0; --i) {
             const Annotation &a = list[i];
             QRectF bb = pxBoundingRect(a);
-            // For sticky notes make the hit area at least 24x24 so the little
-            // marker is grabbable.
             if (a.tool == StickyNote && bb.width() < 24) bb.setWidth(24);
             if (a.tool == StickyNote && bb.height() < 24) bb.setHeight(24);
-            if (bb.adjusted(-3, -3, 3, 3).contains(px))
-                return i;
+            if (bb.adjusted(-3, -3, 3, 3).contains(px)) return i;
         }
         return -1;
     }
-
-    // The axis-aligned pixel bounding rect of an annotation (where the user
-    // can grab it to move it).
     QRectF pxBoundingRect(const Annotation &a) const
     {
         if (a.tool == Pen) {
@@ -692,24 +590,20 @@ private:
         }
         return pdfRectToPx(a.rect);
     }
-
     int handleAt(int annotIndex, const QPoint &px) const
     {
         const QVector<Annotation> &list = annotationsOfPage(m_pageIndex);
         if (annotIndex < 0 || annotIndex >= list.size()) return -1;
         const QRectF bb = pxBoundingRect(list[annotIndex]);
-        // Eight handles; index: 0 TL, 1 T, 2 TR, 3 R, 4 BR, 5 B, 6 BL, 7 L.
         const QPointF handles[8] = {
-            bb.topLeft(), QPointF(bb.center().x(), bb.top()),   bb.topRight(),
+            bb.topLeft(), QPointF(bb.center().x(), bb.top()), bb.topRight(),
             QPointF(bb.right(), bb.center().y()),
             bb.bottomRight(), QPointF(bb.center().x(), bb.bottom()),
             bb.bottomLeft(), QPointF(bb.left(), bb.center().y()),
         };
         const double r = 5.5;
-        for (int i = 0; i < 8; ++i) {
-            if ((QPointF(px) - handles[i]).manhattanLength() <= r * 2)
-                return i;
-        }
+        for (int i = 0; i < 8; ++i)
+            if ((QPointF(px) - handles[i]).manhattanLength() <= r * 2) return i;
         return -1;
     }
     Qt::CursorShape cursorForHandle(int h) const
@@ -722,53 +616,43 @@ private:
         default: return Qt::ArrowCursor;
         }
     }
-
     void movePicked(const QPoint &pos)
     {
         auto &a = m_pages[m_pageIndex].items[m_pickedIndex];
         const QPointF dpx(pos - m_dragStart);
         const double dx = dpx.x() / m_scale;
-        const double dy = -dpx.y() / m_scale;    // y flips: screen down == PDF down
+        const double dy = -dpx.y() / m_scale;
         if (a.tool == Pen) {
             a.points.clear();
             for (const QPointF &p : m_origPoints)
                 a.points.append(QPointF(p.x() + dx, p.y() + dy));
-        } else {
-            a.rect = m_origRect.translated(dx, dy);
-        }
+        } else a.rect = m_origRect.translated(dx, dy);
         update();
     }
-
     void resizePicked(const QPoint &pos)
     {
         auto &a = m_pages[m_pageIndex].items[m_pickedIndex];
-        if (a.tool == Pen) return;              // pens keep their shape
+        if (a.tool == Pen) return;
         const QPointF dpx(pos - m_dragStart);
         const double dx = dpx.x() / m_scale;
         const double dy = -dpx.y() / m_scale;
         QRectF r = m_origRect;
-        // Rect is in PDF coords (y grows UP). m_origRect may or may not be
-        // normalised; use left/right/top/bottom as "logical" edges.
         double left = r.left(), right = r.right();
         double top = r.top(), bottom = r.bottom();
-        // PDF-coord: top > bottom when the rect was created with TopLeft on
-        // screen. We normalise at save time, so just treat the handle indices
-        // as screen directions.
         switch (m_resizingHandle) {
-        case 0: left += dx; top -= dy; break;        // TL (screen)
-        case 1: top -= dy; break;                    // T
-        case 2: right += dx; top -= dy; break;       // TR
-        case 3: right += dx; break;                  // R
-        case 4: right += dx; bottom -= dy; break;    // BR
-        case 5: bottom -= dy; break;                 // B
-        case 6: left += dx; bottom -= dy; break;     // BL
-        case 7: left += dx; break;                   // L
+        case 0: left += dx; top -= dy; break;
+        case 1: top -= dy; break;
+        case 2: right += dx; top -= dy; break;
+        case 3: right += dx; break;
+        case 4: right += dx; bottom -= dy; break;
+        case 5: bottom -= dy; break;
+        case 6: left += dx; bottom -= dy; break;
+        case 7: left += dx; break;
         default: break;
         }
         a.rect = QRectF(QPointF(left, top), QPointF(right, bottom));
         update();
     }
-
     void drawAnnotation(QPainter &p, const Annotation &a, bool picked) const
     {
         p.save();
@@ -803,20 +687,16 @@ private:
             p.drawRect(r);
             p.setBrush(Qt::NoBrush);
             p.setPen(QColor(0, 0, 0));
-            // Qt knows how to render Chinese — the bake step will rasterise
-            // this same text block to a QImage, so WYSIWYG holds.
             QFont f = p.font();
             f.setPointSizeF(qMax(8.0, 11.0 * m_scale));
             p.setFont(f);
-            p.drawText(r.adjusted(4, 2, -4, -2),
-                       Qt::AlignLeft | Qt::TextWordWrap, a.text);
+            p.drawText(r.adjusted(4, 2, -4, -2), Qt::AlignLeft | Qt::TextWordWrap, a.text);
             break;
         }
         case StickyNote: {
             QRectF r = pdfRectToPx(a.rect);
             if (r.width() < 18) r.setWidth(18);
             if (r.height() < 18) r.setHeight(18);
-            // Yellow icon + small body if the note has text.
             QRectF icon(r.topLeft(), QSizeF(20, 20));
             p.setBrush(QColor(255, 220, 90));
             p.setPen(QPen(QColor(180, 150, 0)));
@@ -840,8 +720,7 @@ private:
             break;
         }
         case Stamp: {
-            if (!a.image.isNull())
-                p.drawImage(pdfRectToPx(a.rect), a.image);
+            if (!a.image.isNull()) p.drawImage(pdfRectToPx(a.rect), a.image);
             break;
         }
         default: break;
@@ -849,7 +728,6 @@ private:
         p.restore();
 
         if (picked) {
-            // Selection rectangle + handles.
             QRectF bb = pxBoundingRect(a);
             QPen dash(QColor(30, 100, 220), 1, Qt::DashLine);
             p.save();
@@ -857,7 +735,7 @@ private:
             p.setBrush(Qt::NoBrush);
             p.drawRect(bb);
             const QPointF handles[8] = {
-                bb.topLeft(), QPointF(bb.center().x(), bb.top()),   bb.topRight(),
+                bb.topLeft(), QPointF(bb.center().x(), bb.top()), bb.topRight(),
                 QPointF(bb.right(), bb.center().y()),
                 bb.bottomRight(), QPointF(bb.center().x(), bb.bottom()),
                 bb.bottomLeft(), QPointF(bb.left(), bb.center().y()),
@@ -870,32 +748,22 @@ private:
         }
     }
 
-    // --- Undo / redo snapshots ------------------------------------------
     struct Snapshot {
         QHash<int, PageState> pages;
         int currentPage = -1;
         int picked = -1;
     };
     Snapshot takeSnapshot() const
-    {
-        Snapshot s; s.pages = m_pages; s.currentPage = m_pageIndex; s.picked = m_pickedIndex;
-        return s;
-    }
+    { Snapshot s; s.pages = m_pages; s.currentPage = m_pageIndex; s.picked = m_pickedIndex; return s; }
     void restoreSnapshot(const Snapshot &s)
-    {
-        m_pages = s.pages;
-        m_pickedIndex = s.picked;
-        // (page index is the view's responsibility; undo doesn't flip pages)
-    }
+    { m_pages = s.pages; m_pickedIndex = s.picked; }
     void pushUndoSnapshot()
     {
-        if (m_undo.size() >= 128)
-            m_undo.remove(0, 1);
+        if (m_undo.size() >= 128) m_undo.remove(0, 1);
         m_undo.push(takeSnapshot());
         m_redo.clear();
     }
 
-    // --- State ----------------------------------------------------------
     double m_pageW = 612, m_pageH = 792;
     int m_rotation = 0;
     double m_scale = 1.0;
@@ -912,12 +780,10 @@ private:
     bool m_drawing = false;
     Annotation m_current;
 
-    // Per-page uncommitted annotations + undo/redo history.
     QHash<int, PageState> m_pages;
     QStack<Snapshot> m_undo;
     QStack<Snapshot> m_redo;
 
-    // Selection / drag state.
     int m_pickedIndex = -1;
     bool m_dragging = false;
     int m_resizingHandle = -1;
@@ -925,7 +791,6 @@ private:
     QRectF m_origRect;
     QVector<QPointF> m_origPoints;
 
-    // Text layer selection.
     QVector<PdfTextChar> m_chars;
     int m_selStart = 0;
     int m_selEnd = 0;
@@ -934,33 +799,24 @@ private:
 };
 
 // ===========================================================================
-// Helpers: rasterise text into a transparent QImage so non-Latin characters
-// (Chinese/Japanese/Korean) can be stamped back into the PDF via an SMask.
+// Helpers: rasterise text to a transparent QImage for CJK-safe PDF baking.
 // ===========================================================================
 namespace {
 
-// Pick a font that actually renders CJK on this machine. Qt's default
-// Helvetica substitute has no glyphs for Chinese characters, which is why
-// baking a Chinese watermark used to produce the "乱码" squares.
 QFont pickCJKFont(double pointSize, bool bold = false)
 {
     static const QStringList candidates = {
-        QStringLiteral("Microsoft YaHei UI"),
-        QStringLiteral("Microsoft YaHei"),
-        QStringLiteral("SimHei"),
-        QStringLiteral("SimSun"),
-        QStringLiteral("Noto Sans CJK SC"),
-        QStringLiteral("Noto Sans SC"),
-        QStringLiteral("PingFang SC"),
-        QStringLiteral("Hiragino Sans GB"),
+        QStringLiteral("Microsoft YaHei UI"), QStringLiteral("Microsoft YaHei"),
+        QStringLiteral("SimHei"), QStringLiteral("SimSun"),
+        QStringLiteral("Noto Sans CJK SC"), QStringLiteral("Noto Sans SC"),
+        QStringLiteral("PingFang SC"), QStringLiteral("Hiragino Sans GB"),
         QStringLiteral("Arial Unicode MS"),
     };
     QFont f;
     const QStringList families = QFontDatabase::families();
     for (const QString &name : candidates) {
         if (families.contains(name, Qt::CaseInsensitive)) {
-            f.setFamily(name);
-            break;
+            f.setFamily(name); break;
         }
     }
     f.setPointSizeF(pointSize);
@@ -970,16 +826,13 @@ QFont pickCJKFont(double pointSize, bool bold = false)
     return f;
 }
 
-// Render `text` into a transparent ARGB32 image at ~200 dpi scale factor so
-// the resulting PDF looks crisp at 100%.
 QImage renderTextToImage(const QString &text, QFont font, const QColor &color,
                          double maxWidthPts, int flags)
 {
-    const double k = 2.5;                  // oversample factor
+    const double k = 2.5;
     QFontMetricsF fm(font);
     QRectF br = fm.boundingRect(
-        QRectF(0, 0, maxWidthPts > 0 ? maxWidthPts : 10000, 0),
-        flags, text);
+        QRectF(0, 0, maxWidthPts > 0 ? maxWidthPts : 10000, 0), flags, text);
     if (br.width() < 2) br.setWidth(fm.horizontalAdvance(text) + 2);
     if (br.height() < 2) br.setHeight(fm.height());
 
@@ -1000,8 +853,6 @@ QImage renderTextToImage(const QString &text, QFont font, const QColor &color,
     return img;
 }
 
-// Render an entire diagonal watermark (with rotation) into a transparent
-// image sized to the page. The returned image is centred on the page.
 QImage renderWatermarkToImage(const QString &text, double pageWpts, double pageHpts,
                               double fontSize, const QColor &color, double opacity)
 {
@@ -1018,7 +869,6 @@ QImage renderWatermarkToImage(const QString &text, double pageWpts, double pageH
     QFont f = pickCJKFont(fontSize * k, true);
     p.setFont(f);
     p.translate(W / 2.0, H / 2.0);
-    // 45° diagonal across the page.
     p.rotate(-30);
     QFontMetricsF fm(f);
     QRectF br = fm.boundingRect(text);
@@ -1058,12 +908,11 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
         return a;
     };
 
-    // --- Save (first button on the toolbar, as requested) ----------------
+    // --- Top toolbar: Save (first) / Undo / Redo / nav / zoom / text copy --
     m_actSave = addBtn("Save", &PdfTab::saveFromToolbar);
     m_actSave->setShortcut(QKeySequence::Save);
     m_actSave->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 
-    // --- Undo / Redo for the annotation overlay --------------------------
     m_actUndo = addBtn("Undo", &PdfTab::annotUndo);
     m_actUndo->setShortcut(QKeySequence::Undo);
     m_actUndo->setShortcutContext(Qt::WidgetWithChildrenShortcut);
@@ -1072,7 +921,6 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     m_actRedo->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     tb->addSeparator();
 
-    // --- Navigation ------------------------------------------------------
     m_actFirst = addGlyphBtn(QStringLiteral("⏮"), "First Page", &PdfTab::firstPage);
     m_actPrev  = addGlyphBtn(QStringLiteral("◀"), "Previous Page", &PdfTab::prevPage);
     m_actPrev->setShortcut(QKeySequence(Qt::Key_PageUp));
@@ -1111,81 +959,34 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     m_actSelectAllText->setShortcut(QKeySequence::SelectAll);
     m_actSelectAllText->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     m_actCopyPageText = addBtn("Copy Page Text", &PdfTab::copyPageText);
-<<<<<<< HEAD
-    tb->addSeparator();
-
-    // The top toolbar still carries every feature button (Annotation tools,
-    // Pages, Sign/Convert/etc.) to keep them one click away and avoid the
-    // widget-tree complexity of a separate side panel — earlier attempts to
-    // host the same buttons inside a right-hand QScrollArea / QGroupBox stack
-    // produced intermittent 0xC0000005 access violations on some PDFs during
-    // the initial paint while the thumbnails were still rendering.
-    addBtn("Select", &PdfTab::setToolSelect);
-    addBtn("Highlight", &PdfTab::setToolHighlight);
-    addBtn("Underline", &PdfTab::setToolUnderline);
-    addBtn("Strike", &PdfTab::setToolStrike);
-    addBtn("Text Box", &PdfTab::setToolTextBox);
-    addBtn("Sticky Note", &PdfTab::setToolStickyNote);
-    addBtn("Pen", &PdfTab::setToolPen);
-    addBtn("Stamp", &PdfTab::setToolStamp);
-    addBtn("Color...", &PdfTab::pickAnnotColor);
-    tb->addSeparator();
-
-    addBtn("Merge", &PdfTab::mergePdf);
-    addBtn("Split", &PdfTab::splitPdf);
-    addBtn("Delete Page", &PdfTab::deleteCurrentPage);
-    addBtn("Insert", &PdfTab::insertPages);
-    addBtn("Extract", &PdfTab::extractPages);
-    addGlyphBtn(QStringLiteral("↺"), "Rotate Left", &PdfTab::rotateCurrentLeft);
-    addGlyphBtn(QStringLiteral("↻"), "Rotate Right", &PdfTab::rotateCurrentRight);
-    addBtn("Move Up", &PdfTab::movePageUp);
-    addBtn("Move Down", &PdfTab::movePageDown);
-    tb->addSeparator();
-
-    addBtn("Sign (draw)", &PdfTab::drawSignature);
-    addBtn("Sign (image)", &PdfTab::imageSignature);
-    addBtn("To Images", &PdfTab::exportToImages);
-    addBtn("To Word", &PdfTab::exportToWord);
-    addBtn("Compress", &PdfTab::compressPdf);
-    addBtn("Text WM", &PdfTab::addTextWatermark);
-    addBtn("Image WM", &PdfTab::addImageWatermark);
-    addBtn("Password", &PdfTab::setOpenPassword);
-    addBtn("Fill Form", &PdfTab::fillForms);
-=======
 
     root->addWidget(tb);
 
-    // --- Side toolbar with the rest of the feature buttons -----------------
-    // The top toolbar keeps Save / Undo / Redo / navigation / zoom / text-copy.
-    // The side panel (right) groups Annotations, Pages, Sign, Convert, etc.,
-    // mirroring the image editor's side toolbar for a consistent look.
+    // --- Side toolbar on the right, mirroring the image editor's layout ---
+    // The side panel keeps the rest of the buttons grouped by category
+    // (Annotate / Pages / More) so the top toolbar stays short.
+    // Each side button stores its source string in m_sideBtnSources (a
+    // QPushButton-keyed container) so retranslate() can update its text when
+    // the UI language changes; we deliberately do NOT use a QAction-based
+    // tracking scheme that mixed real toolbar QActions with button-parented
+    // dummy QActions (that caused intermittent crashes on PDF open).
     auto *sideBar = new QWidget(this);
     sideBar->setFixedWidth(200);
     auto *sl = new QVBoxLayout(sideBar);
     sl->setContentsMargins(6, 6, 6, 6);
     sl->setSpacing(6);
 
-    // A helper that creates one labelled button inside a given group box.
     auto addSideBtn = [&](QVBoxLayout *gv, const char *src, auto slot) {
         auto *btn = new QPushButton(TR(src), sideBar);
         btn->setToolTip(TR(src));
-        // Stash the source so retranslate() can update the button's text when
-        // the UI language changes live.
-        QAction *act = new QAction(TR(src), btn);
-        m_actionSources.insert(act, QByteArray(src));
+        m_sideBtnSources.insert(btn, QByteArray(src));
         connect(btn, &QPushButton::clicked, this, slot);
-        // Keep button text in sync with the (dummy) action, so retranslate()
-        // updates both at once.
-        connect(act, &QAction::changed, btn, [btn, act]() { btn->setText(act->text()); });
         gv->addWidget(btn);
         return btn;
     };
->>>>>>> f56ebedd4ac859088bdbb3d5d37f7a7ad8bdd6ea
 
-    // Annotations group.
-    auto *annotBox = new QGroupBox(TR("Annotate"), sideBar);
-    m_annotGroup = annotBox;
-    auto *av = new QVBoxLayout(annotBox);
+    m_annotGroup = new QGroupBox(TR("Annotate"), sideBar);
+    auto *av = new QVBoxLayout(m_annotGroup);
     av->setSpacing(4);
     addSideBtn(av, "Select", &PdfTab::setToolSelect);
     addSideBtn(av, "Highlight", &PdfTab::setToolHighlight);
@@ -1196,12 +997,10 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     addSideBtn(av, "Pen", &PdfTab::setToolPen);
     addSideBtn(av, "Stamp", &PdfTab::setToolStamp);
     addSideBtn(av, "Color...", &PdfTab::pickAnnotColor);
-    sl->addWidget(annotBox);
+    sl->addWidget(m_annotGroup);
 
-    // Pages group.
-    auto *pagesBox = new QGroupBox(TR("Pages"), sideBar);
-    m_pagesGroup = pagesBox;
-    auto *pv = new QVBoxLayout(pagesBox);
+    m_pagesGroup = new QGroupBox(TR("Pages"), sideBar);
+    auto *pv = new QVBoxLayout(m_pagesGroup);
     pv->setSpacing(4);
     addSideBtn(pv, "Merge", &PdfTab::mergePdf);
     addSideBtn(pv, "Split", &PdfTab::splitPdf);
@@ -1212,12 +1011,10 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     addSideBtn(pv, "Rotate Right", &PdfTab::rotateCurrentRight);
     addSideBtn(pv, "Move Up", &PdfTab::movePageUp);
     addSideBtn(pv, "Move Down", &PdfTab::movePageDown);
-    sl->addWidget(pagesBox);
+    sl->addWidget(m_pagesGroup);
 
-    // Sign / convert / etc. group.
-    auto *moreBox = new QGroupBox(TR("More"), sideBar);
-    m_moreGroup = moreBox;
-    auto *mv = new QVBoxLayout(moreBox);
+    m_moreGroup = new QGroupBox(TR("More"), sideBar);
+    auto *mv = new QVBoxLayout(m_moreGroup);
     mv->setSpacing(4);
     addSideBtn(mv, "Sign (draw)", &PdfTab::drawSignature);
     addSideBtn(mv, "Sign (image)", &PdfTab::imageSignature);
@@ -1228,12 +1025,10 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     addSideBtn(mv, "Image WM", &PdfTab::addImageWatermark);
     addSideBtn(mv, "Password", &PdfTab::setOpenPassword);
     addSideBtn(mv, "Fill Form", &PdfTab::fillForms);
-    sl->addWidget(moreBox);
+    sl->addWidget(m_moreGroup);
 
     sl->addStretch(1);
 
-    // Wrap the side panel in its own scroll area so it works on short windows
-    // and small screens.
     m_sideScroll = new QScrollArea(this);
     m_sideScroll->setWidgetResizable(true);
     m_sideScroll->setWidget(sideBar);
@@ -1261,8 +1056,6 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     m_scroll->setWidget(m_view);
     mid->addWidget(m_scroll, 1);
 
-    // The side-toolbar lives on the right of the page viewport, like the
-    // image editor's side panel.
     mid->addWidget(m_sideScroll);
 
     auto *midWrap = new QWidget(this);
@@ -1287,9 +1080,6 @@ PdfTab::~PdfTab()
         QFile::remove(m_renderTempPath);
 }
 
-// ---------------------------------------------------------------------------
-// Text selection & copy
-// ---------------------------------------------------------------------------
 QString PdfTab::pageTextOf(int index) const
 {
     if (index < 0) return QString();
@@ -1428,6 +1218,16 @@ void PdfTab::retranslate()
         a->setToolTip(txt);
         if (!m_tooltipOnly.contains(a)) a->setText(txt);
     }
+    for (auto it = m_sideBtnSources.cbegin(); it != m_sideBtnSources.cend(); ++it) {
+        QPushButton *btn = it.key();
+        if (!btn) continue;
+        const QString txt = I18n::instance()->tr(QString::fromUtf8(it.value()));
+        btn->setText(txt);
+        btn->setToolTip(txt);
+    }
+    if (m_annotGroup) m_annotGroup->setTitle(TR("Annotate"));
+    if (m_pagesGroup) m_pagesGroup->setTitle(TR("Pages"));
+    if (m_moreGroup)  m_moreGroup->setTitle(TR("More"));
     if (m_pageSpin) m_pageSpin->setToolTip(TR("Go to page"));
     updateNavState();
     updatePageInfoLabel();
@@ -1663,9 +1463,6 @@ void PdfTab::markModified(bool on)
 void PdfTab::annotUndo() { if (m_view) m_view->undo(); onOverlayChanged(); }
 void PdfTab::annotRedo() { if (m_view) m_view->redo(); onOverlayChanged(); }
 
-// ---------------------------------------------------------------------------
-// Bake every page's uncommitted annotations into the real PDF.
-// ---------------------------------------------------------------------------
 void PdfTab::bakeAllPendingAnnotations()
 {
     if (!m_view || !m_view->hasAnyAnnotations()) return;
@@ -1675,7 +1472,6 @@ void PdfTab::bakeAllPendingAnnotations()
         if (pageIdx < 0 || pageIdx >= m_doc.pageCount()) continue;
         const QVector<PdfPageView::Annotation> items = m_view->annotationsOfPage(pageIdx);
 
-        // Vector marks go into the content stream.
         QByteArray frag;
         auto num = [](double v) { return QByteArray::number(v, 'f', 3); };
         for (const auto &a : items) {
@@ -1712,8 +1508,6 @@ void PdfTab::bakeAllPendingAnnotations()
         }
         if (!frag.isEmpty()) m_doc.appendPageContent(pageIdx, frag);
 
-        // TextBox / StickyNote / Stamp: render as transparent images so CJK
-        // renders correctly and viewers don't need an embedded font.
         for (const auto &a : items) {
             switch (a.tool) {
             case PdfPageView::TextBox: {
@@ -1844,22 +1638,7 @@ void PdfTab::reloadFromBytes(const QByteArray &data)
         if (m_currentPage >= m_doc.pageCount())
             m_currentPage = qMax(0, m_doc.pageCount() - 1);
         refreshAfterEdit();
-<<<<<<< HEAD
     }
-}
-
-void PdfTab::saveFromToolbar()
-{
-    if (m_filePath.isEmpty()) {
-        const QString path = QFileDialog::getSaveFileName(
-            this, TR("Save As"), QString(), TR("PDF Files (*.pdf)"));
-        if (path.isEmpty()) return;
-        saveAs(path);
-        return;
-=======
->>>>>>> f56ebedd4ac859088bdbb3d5d37f7a7ad8bdd6ea
-    }
-    save();
 }
 
 void PdfTab::saveFromToolbar()
@@ -1945,7 +1724,6 @@ QVector<QImage> PdfTab::printablePages()
     return out;
 }
 
-// --- Zoom -----------------------------------------------------------------
 void PdfTab::setZoom(double z)
 {
     const double old = m_zoom;
@@ -1993,7 +1771,6 @@ void PdfTab::fitPage()
     setZoom(qMin(availW / pw, availH / ph));
 }
 
-// --- Annotation tools -----------------------------------------------------
 void PdfTab::setToolSelect()    { if (m_view) m_view->setTool(PdfPageView::Select); }
 void PdfTab::setToolHighlight() { m_view->setTool(PdfPageView::Highlight);  m_view->setColor(m_annotColor); }
 void PdfTab::setToolUnderline() { m_view->setTool(PdfPageView::Underline);  m_view->setColor(m_annotColor); }
@@ -2005,8 +1782,6 @@ void PdfTab::setToolPen()       { m_view->setTool(PdfPageView::Pen);        m_vi
 void PdfTab::setToolStamp()
 {
     if (!m_view) return;
-    // The Stamp tool was previously a no-op because it needed an image but no
-    // file picker was ever shown. Ask for one now, then enter stamp mode.
     QString f = QFileDialog::getOpenFileName(
         this, TR("Choose stamp image"), QString(),
         TR("Images (*.png *.jpg *.jpeg *.bmp *.gif)"));
@@ -2032,7 +1807,6 @@ void PdfTab::pickAnnotColor()
     if (c.isValid()) { m_annotColor = c; m_view->setColor(c); }
 }
 
-// --- Page management ------------------------------------------------------
 void PdfTab::mergePdf()
 {
     QStringList files = QFileDialog::getOpenFileNames(
@@ -2055,7 +1829,6 @@ bool PdfTab::writeAndOpenDerived(const PdfDocument &part, const QString &suggest
         return false;
     }
     f.write(part.serialize()); f.close();
-    // Ask MainWindow to open it as a new tab.
     emit openPdfRequested(suggestedPath);
     return true;
 }
@@ -2072,9 +1845,6 @@ void PdfTab::splitPdf()
                                   m_doc.pageCount() - 1, 1, &ok);
     if (!ok) return;
 
-    // Auto-generate output filenames in the SAME folder as the source PDF,
-    // prompting only once to allow renaming; "originalname_pages_1-N.pdf" and
-    // "originalname_pages_(N+1)-M.pdf".
     QString base = QFileInfo(m_filePath.isEmpty() ? "document.pdf" : m_filePath)
                        .completeBaseName();
     QString dir  = m_filePath.isEmpty() ? QDir::homePath()
@@ -2162,9 +1932,6 @@ void PdfTab::extractPages()
     }
     if (idx.isEmpty()) return;
 
-    // Auto-generate the output filename: original base + "_extract_<spec>.pdf"
-    // in the same folder as the source. The user can still rename it in the
-    // Save-As dialog before confirming.
     QString base = QFileInfo(m_filePath.isEmpty() ? "document.pdf" : m_filePath)
                        .completeBaseName();
     QString dir  = m_filePath.isEmpty() ? QDir::homePath()
@@ -2203,11 +1970,6 @@ void PdfTab::movePageDown()
     markModified(true);
 }
 
-// --- Signatures ----------------------------------------------------------
-// After the drawing/image picker, the signature is added as an OVERLAY
-// annotation on the current page, not baked straight into the PDF. That is
-// what lets the user drag/resize it before saving, which was request "签名
-// 保存前可以修改和拖动位置和修改大小".
 namespace {
 class SignatureCanvas : public QWidget
 {
@@ -2269,17 +2031,14 @@ void PdfTab::drawSignature()
     QImage sig = canvas->image();
     if (sig.isNull()) return;
 
-    // Drop the signature on the page as an overlay Stamp. Default size is
-    // 150 x 60 pts, centred near the bottom-right — the user can drag and
-    // resize before saving.
     PdfPageView::Annotation a;
     a.tool = PdfPageView::Stamp;
     a.image = sig;
     PdfPageInfo pi = m_doc.pageInfo(m_currentPage);
     const double w = 150, h = 60;
     const double x = qMax(20.0, pi.width - w - 40);
-    const double y = 40;                           // 40pt margin from bottom
-    a.rect = QRectF(x, y + h, w, -h);              // y-up, drawn at the bottom
+    const double y = 40;
+    a.rect = QRectF(x, y + h, w, -h);
     m_view->insertAnnotationOnCurrentPage(a);
     emit statusMessage(TR("Signature added. Drag or resize it, then Save."));
 }
@@ -2314,7 +2073,6 @@ void PdfTab::imageSignature()
     emit statusMessage(TR("Image signature added. Drag or resize it, then Save."));
 }
 
-// --- Conversion ----------------------------------------------------------
 void PdfTab::exportToImages()
 {
     QString dir = QFileDialog::getExistingDirectory(this, TR("Output folder"));
@@ -2398,7 +2156,6 @@ void PdfTab::exportToWord()
     emit statusMessage(TR("Exported text to %1 (layout not preserved).").arg(out));
 }
 
-// --- Compression ---------------------------------------------------------
 void PdfTab::compressPdf()
 {
     bakeAllPendingAnnotations();
@@ -2443,7 +2200,6 @@ void PdfTab::compressPdf()
     }
 }
 
-// --- Watermark -----------------------------------------------------------
 void PdfTab::addTextWatermark()
 {
     bool ok = false;
@@ -2452,8 +2208,6 @@ void PdfTab::addTextWatermark()
                                           TR("CONFIDENTIAL"), &ok);
     if (!ok || text.isEmpty()) return;
 
-    // Render the watermark as a transparent image per page, so Chinese and
-    // every other non-Latin script just works. This fixes the "乱码" bug.
     const int total = m_doc.pageCount();
     for (int i = 0; i < total; ++i) {
         const PdfPageInfo pi = m_doc.pageInfo(i);
@@ -2483,7 +2237,6 @@ void PdfTab::addImageWatermark()
     emit statusMessage(TR("Image watermark applied to all pages."));
 }
 
-// --- Protection ----------------------------------------------------------
 void PdfTab::setOpenPassword()
 {
     bool ok = false;
@@ -2505,7 +2258,6 @@ void PdfTab::setOpenPassword()
     emit statusMessage(TR("Encrypted PDF written to %1").arg(out));
 }
 
-// --- Forms ---------------------------------------------------------------
 void PdfTab::fillForms()
 {
     QStringList fields = m_doc.formTextFields();

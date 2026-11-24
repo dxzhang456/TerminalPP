@@ -21,10 +21,7 @@ class QToolBar;
 class QComboBox;
 class QSpinBox;
 class QGroupBox;
-<<<<<<< HEAD
 class QPushButton;
-=======
->>>>>>> f56ebedd4ac859088bdbb3d5d37f7a7ad8bdd6ea
 class PdfPageView;   // internal annotation overlay surface (defined in the .cpp)
 
 // ---------------------------------------------------------------------------
