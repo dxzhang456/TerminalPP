@@ -43,6 +43,11 @@
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QMouseEvent>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
 #include <QApplication>
 #include <QFileInfo>
 #include <QTextCursor>
@@ -127,6 +132,17 @@ MainWindow::MainWindow(QWidget *parent)
     // Double-clicking empty space on the tab bar (to the right of the last
     // tab) opens a new file tab, like many editors (VS Code, Notepad++).
     m_tabs->tabBar()->installEventFilter(this);
+
+    // ---- Drag & drop: open any dropped file in the right kind of tab ----
+    // The window itself is a drop target (so Windows registers the drop site
+    // even when the central area is empty)...
+    setAcceptDrops(true);
+    m_tabs->setAcceptDrops(true);
+    // ...and an application-wide filter catches drops that land on a child
+    // widget which already accepts URL drops on its own (the code editor and
+    // the hex editor would otherwise paste the path as text, and the terminals
+    // would type it into the remote shell).
+    qApp->installEventFilter(this);
 
     m_sessions = new SessionManager();
     m_findDialog = new FindDialog(this);
@@ -2438,6 +2454,16 @@ void MainWindow::about()
             TR("Baidu Pan and WebDAV browsing, upload/download (files and "
                "folders), rename, delete, and streaming playback, with a "
                "Transfers panel showing live progress and history.") + "</li>"
+        "<li><b>" + TR("Drag & Drop") + "</b> &mdash; " +
+            TR("drop a text file, a source file, an image, a PDF or any binary "
+               "anywhere on the window and it opens in the matching tab: the "
+               "format is detected from the file's own content (libmagic "
+               "sniffing, not the extension), so text and source code go to "
+               "the editor, images to the image editor, PDFs to the PDF "
+               "viewer, and everything else to the hex editor. Several files "
+               "can be dropped at once (each one is routed individually and a "
+               "per-type summary is reported), and dropping exactly two "
+               "folders starts a folder comparison.") + "</li>"
         "</ul>"
         "<p>" + TR("Multi-language UI (9 languages), VS Code-like themes applied "
                    "across all tabs.") + "</p>"
@@ -2622,7 +2648,197 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             return true;
         }
     }
+
+    // ---- Application-wide drag & drop of files -------------------------
+    // Several child widgets accept URL drops on their own account (the code
+    // editor and hex editor would insert the path as text, the terminals
+    // would type it into the remote shell). Intercepting the events here,
+    // before they reach those widgets, guarantees that dropping a file
+    // anywhere inside the window opens it in the matching tab type.
+    switch (event->type()) {
+    case QEvent::DragEnter:
+    case QEvent::DragMove: {
+        auto *w = qobject_cast<QWidget *>(watched);
+        if (!w || w->window() != this)
+            break;
+        auto *de = static_cast<QDragMoveEvent *>(event);
+        if (!hasDroppableFiles(de->mimeData()))
+            break;   // e.g. an internal tab-reorder drag: leave it alone
+        de->setDropAction(Qt::CopyAction);
+        de->accept();
+        return true;
+    }
+    case QEvent::Drop: {
+        auto *w = qobject_cast<QWidget *>(watched);
+        if (!w || w->window() != this)
+            break;
+        auto *de = static_cast<QDropEvent *>(event);
+        if (!hasDroppableFiles(de->mimeData()))
+            break;
+        const QStringList paths = droppedPaths(de->mimeData());
+        de->setDropAction(Qt::CopyAction);
+        de->accept();
+        openDroppedPaths(paths);
+        return true;
+    }
+    default:
+        break;
+    }
+
     return QMainWindow::eventFilter(watched, event);
+}
+
+// ------------------------------------------------------------------
+// Drag & drop: open dropped files in the tab type matching their *content*
+// ------------------------------------------------------------------
+bool MainWindow::hasDroppableFiles(const QMimeData *md)
+{
+    if (!md || !md->hasUrls())
+        return false;
+    const QList<QUrl> urls = md->urls();
+    for (const QUrl &u : urls) {
+        const QString p = u.toLocalFile();
+        if (!p.isEmpty() && QFileInfo::exists(p))
+            return true;
+    }
+    return false;
+}
+
+QStringList MainWindow::droppedPaths(const QMimeData *md)
+{
+    QStringList out;
+    if (!md || !md->hasUrls())
+        return out;
+    const QList<QUrl> urls = md->urls();
+    for (const QUrl &u : urls) {
+        const QString p = u.toLocalFile();
+        if (!p.isEmpty() && QFileInfo::exists(p) && !out.contains(p))
+            out << p;
+    }
+    return out;
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (hasDroppableFiles(event->mimeData())) {
+        event->setDropAction(Qt::CopyAction);
+        event->accept();
+        return;
+    }
+    QMainWindow::dragEnterEvent(event);
+}
+
+void MainWindow::dragMoveEvent(QDragMoveEvent *event)
+{
+    if (hasDroppableFiles(event->mimeData())) {
+        event->setDropAction(Qt::CopyAction);
+        event->accept();
+        return;
+    }
+    QMainWindow::dragMoveEvent(event);
+}
+
+void MainWindow::dropEvent(QDropEvent *event)
+{
+    if (!hasDroppableFiles(event->mimeData())) {
+        QMainWindow::dropEvent(event);
+        return;
+    }
+    const QStringList paths = droppedPaths(event->mimeData());
+    event->setDropAction(Qt::CopyAction);
+    event->accept();
+    openDroppedPaths(paths);
+}
+
+// Open every dropped path. The format of each file is detected from its
+// *content* (libmagic, via MagicDetector) rather than its extension, so a
+// .log that is really a PNG still opens in the image editor and an extension-
+// less firmware blob still opens in the hex editor:
+//     text / source -> EditorTab        image -> ImageEditorTab
+//     PDF           -> PdfTab           other -> HexEditorTab
+// Dropping exactly two folders starts a folder comparison instead.
+void MainWindow::openDroppedPaths(const QStringList &paths)
+{
+    if (paths.isEmpty())
+        return;
+
+    // Split into files and folders.
+    QStringList files, dirs;
+    for (const QString &p : paths) {
+        if (QFileInfo(p).isDir())
+            dirs << p;
+        else
+            files << p;
+    }
+
+    // Two folders and nothing else: that is unambiguously a folder compare.
+    if (files.isEmpty() && dirs.size() == 2) {
+        openFolderCompare(dirs.at(0), dirs.at(1));
+        closeInitialEmptyTab();
+        statusBar()->showMessage(
+            TR("Comparing the two dropped folders."), 4000);
+        return;
+    }
+
+    // Opening a very large selection by accident would create dozens of tabs,
+    // so confirm first.
+    const int kAskAbove = 12;
+    if (files.size() > kAskAbove) {
+        const auto ret = QMessageBox::question(this, TR("Open Dropped Files"),
+            TR("Open all %1 dropped files in separate tabs?").arg(files.size()),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        if (ret != QMessageBox::Yes)
+            return;
+    }
+
+    int nText = 0, nImage = 0, nPdf = 0, nBinary = 0, nFailed = 0;
+    for (const QString &f : files) {
+        // Detect first so the summary can report what each file was taken to
+        // be; openFile() performs exactly the same detection internally.
+        const MagicDetector::FileType type = MagicDetector::detectType(f);
+        if (!openFile(f)) {
+            ++nFailed;
+            continue;
+        }
+        switch (type) {
+        case MagicDetector::Pdf:    ++nPdf;    break;
+        case MagicDetector::Image:  ++nImage;  break;
+        case MagicDetector::Binary: ++nBinary; break;
+        default:                    ++nText;   break;
+        }
+    }
+
+    // A single dropped folder (or folders mixed with files) cannot be opened
+    // as a document; say so rather than silently ignoring it.
+    if (!dirs.isEmpty()) {
+        statusBar()->showMessage(
+            TR("Skipped %1 folder(s) — drop exactly two folders to compare them.")
+                .arg(dirs.size()), 5000);
+    }
+
+    closeInitialEmptyTab();
+
+    if (nText + nImage + nPdf + nBinary > 0) {
+        QStringList parts;
+        if (nText)   parts << TR("%1 text").arg(nText);
+        if (nImage)  parts << TR("%1 image").arg(nImage);
+        if (nPdf)    parts << TR("%1 PDF").arg(nPdf);
+        if (nBinary) parts << TR("%1 binary").arg(nBinary);
+        statusBar()->showMessage(
+            TR("Opened %1 dropped file(s) by detected format: %2")
+                .arg(nText + nImage + nPdf + nBinary)
+                .arg(parts.join(QStringLiteral(", "))), 6000);
+    }
+    if (nFailed > 0) {
+        statusBar()->showMessage(
+            TR("%1 dropped file(s) could not be opened.").arg(nFailed), 6000);
+    }
+
+    // Bring the window forward — a drop usually comes from Explorer.
+    if (isMinimized())
+        setWindowState(windowState() & ~Qt::WindowMinimized);
+    raise();
+    activateWindow();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

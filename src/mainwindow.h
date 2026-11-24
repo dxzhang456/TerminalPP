@@ -23,6 +23,10 @@ class CloudBrowserTab;
 class TransferPanel;
 class QShortcut;
 class CloudProvider;
+class QMimeData;
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDropEvent;
 
 // The application main window. Hosts a central tab widget that can contain:
 //   * Editor tabs (ndd / Notepad-- replica)
@@ -60,8 +64,21 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
-    // Catches double-clicks on empty tab-bar space to open a new file tab.
+    // Catches double-clicks on empty tab-bar space to open a new file tab, and
+    // (installed on qApp) intercepts drag & drop of files anywhere in the
+    // window so child widgets that accept URL drops themselves - the code
+    // editor, the hex editor, the terminals - cannot swallow the drop.
     bool eventFilter(QObject *watched, QEvent *event) override;
+
+    // --- Drag & drop ---
+    // Dropping any file onto the window opens it in the tab type that matches
+    // its *detected* format (libmagic content sniffing, not the extension):
+    // text/source -> editor, image -> image editor, PDF -> PDF viewer,
+    // anything else -> hex editor. Dropping exactly two folders starts a
+    // folder comparison.
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dragMoveEvent(QDragMoveEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
 
 private slots:
     // --- File / editor ---
@@ -165,6 +182,15 @@ private:
     // convert / compress / watermark / protect / forms).
     void openPdf(const QString &path);
 
+    // --- Drag & drop helpers ---
+    // True when the payload carries at least one existing local file/folder.
+    static bool hasDroppableFiles(const QMimeData *md);
+    // Extract the existing local paths from a drop payload (order preserved).
+    static QStringList droppedPaths(const QMimeData *md);
+    // Open every dropped path, auto-detecting each one's format, and report a
+    // per-type summary on the status bar.
+    void openDroppedPaths(const QStringList &paths);
+
     // Recent-files list (most-recent first, capped at 20). Persisted in
     // QSettings and rebuilt into the File > Open Recent submenu.
     void addRecentFile(const QString &path);
@@ -193,6 +219,14 @@ private:
     // stored config). Returns true if a tab was actually closed.
     bool closeSshTabFor(const SshSessionConfig &cfg);
     bool closeSerialTabFor(const SerialSessionConfig &cfg);
+    // Index of the saved SSH / serial session an open terminal tab belongs to
+    // (-1 when the tab's configuration is no longer in the saved list). Used to
+    // offer Edit / Reconnect / Delete directly from a terminal tab.
+    int savedSshIndexForTab(SshTab *tab) const;
+    int savedSerialIndexForTab(SerialTab *tab) const;
+    // Append Reconnect / Disconnect / Edit... / Delete entries for an SSH or
+    // serial terminal tab to a context menu.
+    void addTerminalTabActions(QMenu *menu, int tabIndex);
 
     // Rebuild the Cloud menu: "Connect Cloud Drive..." followed by one entry
     // per saved drive (labelled "BaiduPan-<name>") with Open / Reconnect /
