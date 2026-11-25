@@ -10,6 +10,7 @@
 #include <QPointer>
 #include <QRandomGenerator>
 #include <QStringList>
+#include <QDebug>
 
 StreamProxy *StreamProxy::instance()
 {
@@ -133,23 +134,66 @@ void StreamProxy::handleRequest(QTcpSocket *sock, const QByteArray &requestData)
     QPointer<QTcpSocket> client(sock);
     auto *headerSent = new bool(false);
 
+    qDebug() << "[StreamProxy]" << method << "/" << token
+             << "->" << entry.url
+             << "range=" << (clientRange.isEmpty() ? "(none)" : clientRange);
+
     // Relay the upstream status line + the headers a player needs, then stream.
     auto sendHeaders = [reply, client, headerSent]() {
         if (*headerSent || !client)
             return;
         *headerSent = true;
         int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if (status <= 0)
-            status = 200;
-        QByteArray out = "HTTP/1.1 " + QByteArray::number(status) + " OK\r\n";
+        if (status <= 0) status = 200;
+        // Use the correct reason phrase so strict HTTP clients (Chrome's video
+        // pipeline in particular) accept the response — "HTTP/1.1 206 OK" is
+        // invalid and triggers ERR_INVALID_RESPONSE.
+        const QByteArray reason =
+            reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute)
+                .toByteArray();
+        QByteArray reasonPhrase = reason;
+        if (reasonPhrase.isEmpty()) {
+            switch (status) {
+            case 200: reasonPhrase = "OK"; break;
+            case 206: reasonPhrase = "Partial Content"; break;
+            case 301: reasonPhrase = "Moved Permanently"; break;
+            case 302: reasonPhrase = "Found"; break;
+            case 304: reasonPhrase = "Not Modified"; break;
+            case 404: reasonPhrase = "Not Found"; break;
+            case 416: reasonPhrase = "Range Not Satisfiable"; break;
+            case 500: reasonPhrase = "Internal Server Error"; break;
+            default:  reasonPhrase = "OK"; break;
+            }
+        }
+        QByteArray out = "HTTP/1.1 " + QByteArray::number(status) + ' '
+                       + reasonPhrase + "\r\n";
         // Pass through the headers that matter for media playback/seeking.
         static const char *pass[] = { "Content-Type", "Content-Length",
                                       "Content-Range", "Accept-Ranges",
-                                      "Last-Modified", nullptr };
+                                      "Last-Modified", "ETag", nullptr };
+        bool haveType = false;
         for (int i = 0; pass[i]; ++i) {
             const QByteArray key(pass[i]);
-            if (reply->hasRawHeader(key))
+            if (reply->hasRawHeader(key)) {
                 out += key + ": " + reply->rawHeader(key) + "\r\n";
+                if (key == "Content-Type") haveType = true;
+            }
+        }
+        // Chrome refuses to play video without a Content-Type; synthesize one
+        // from the URL when upstream omits it.
+        if (!haveType) {
+            const QString u = reply->url().toString();
+            QByteArray ct = "application/octet-stream";
+            if (u.endsWith(".mp4", Qt::CaseInsensitive)) ct = "video/mp4";
+            else if (u.endsWith(".webm", Qt::CaseInsensitive)) ct = "video/webm";
+            else if (u.endsWith(".mkv", Qt::CaseInsensitive)) ct = "video/x-matroska";
+            else if (u.endsWith(".mov", Qt::CaseInsensitive)) ct = "video/quicktime";
+            else if (u.endsWith(".mp3", Qt::CaseInsensitive)) ct = "audio/mpeg";
+            else if (u.endsWith(".flac", Qt::CaseInsensitive)) ct = "audio/flac";
+            else if (u.endsWith(".ogg", Qt::CaseInsensitive)) ct = "audio/ogg";
+            else if (u.endsWith(".wav", Qt::CaseInsensitive)) ct = "audio/wav";
+            else if (u.endsWith(".m4a", Qt::CaseInsensitive)) ct = "audio/mp4";
+            out += "Content-Type: " + ct + "\r\n";
         }
         if (!reply->hasRawHeader("Accept-Ranges"))
             out += "Accept-Ranges: bytes\r\n";
@@ -168,11 +212,39 @@ void StreamProxy::handleRequest(QTcpSocket *sock, const QByteArray &requestData)
         // Let the socket drain so we don't buffer the whole file in memory.
         client->flush();
     });
+    connect(reply, &QNetworkReply::errorOccurred, this,
+            [reply, client, headerSent](QNetworkReply::NetworkError err) {
+        qWarning() << "[StreamProxy] upstream error:" << err
+                   << reply->errorString() << "status="
+                   << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        // If headers never went out, send a 502 so the client sees SOMETHING
+        // instead of an empty response (which Chrome reports as
+        // ERR_INVALID_RESPONSE / ERR_EMPTY_RESPONSE).
+        if (client && !*headerSent) {
+            *headerSent = true;
+            const QByteArray body = reply->errorString().toUtf8();
+            QByteArray out;
+            out += "HTTP/1.1 502 Bad Gateway\r\n";
+            out += "Content-Type: text/plain; charset=utf-8\r\n";
+            out += "Content-Length: " + QByteArray::number(body.size()) + "\r\n";
+            out += "Connection: close\r\n\r\n";
+            out += body;
+            client->write(out);
+            client->flush();
+        }
+    });
     connect(reply, &QNetworkReply::finished, this,
             [reply, client, sendHeaders, headerSent]() {
+        qDebug() << "[StreamProxy] upstream finished status="
+                 << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+                 << "bytesAvailable=" << reply->bytesAvailable();
         if (client) {
-            sendHeaders();
-            client->write(reply->readAll());
+            // Only synthesize a 200 header if nothing was sent yet AND the
+            // upstream didn't error out (errorOccurred already wrote a 502).
+            if (!*headerSent && reply->error() == QNetworkReply::NoError)
+                sendHeaders();
+            if (reply->bytesAvailable() > 0)
+                client->write(reply->readAll());
             client->flush();
             client->disconnectFromHost();
         }

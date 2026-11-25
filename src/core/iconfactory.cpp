@@ -228,19 +228,30 @@ QIcon makeToolIcon(const QString &rawName, const QColor &fg)
         QPolygonF b; b << QPointF(12,12) << QPointF(7,16) << QPointF(17,16);
         fillArrow(a); fillArrow(b);
     } else if (name == "Text WM") {
+        // A rotated "WM" block of text to suggest a diagonal watermark.
         p.save();
         p.translate(12, 12);
         p.rotate(-30);
-        drawText(QStringLiteral("T"), 11);
+        QFont f = p.font();
+        f.setPointSize(9);
+        f.setBold(true);
+        p.setFont(f);
+        p.drawText(QRectF(-12, -8, 24, 16), Qt::AlignCenter,
+                   QStringLiteral("WM"));
+        p.drawLine(-10, 7, 10, 7);
         p.restore();
     } else if (name == "Image WM") {
+        // A tilted picture frame with a mountain + sun inside to suggest an
+        // image watermark.
         p.save();
         p.translate(12, 12);
         p.rotate(-30);
-        p.drawRect(QRectF(-8, -5, 16, 10));
-        p.drawLine(-8, 5, -2, -1);
-        p.drawLine(-2, -1, 3, 4);
-        p.drawEllipse(QPointF(4, -2), 1.5, 1.5);
+        p.drawRect(QRectF(-9, -6, 18, 12));
+        p.drawLine(-9, 6, -3, 0);
+        p.drawLine(-3, 0, 3, 5);
+        p.setBrush(fg);
+        p.drawEllipse(QPointF(5, -3), 1.6, 1.6);
+        p.setBrush(Qt::NoBrush);
         p.restore();
     } else if (name == "Password") {
         p.drawEllipse(QPointF(12, 10), 3, 3);
@@ -525,6 +536,16 @@ QIcon makeToolIcon(const QString &rawName, const QColor &fg)
         p.drawEllipse(QPointF(12, 12), 8, 8);
         p.drawLine(8, 12, 11, 15);
         p.drawLine(11, 15, 16, 9);
+    } else if (name == "Box Width...") {
+        // A frame with three horizontal rules of increasing thickness, to
+        // suggest "pick a border thickness".
+        p.drawRect(QRectF(4, 4, 16, 16));
+        p.setPen(QPen(fg, 1));
+        p.drawLine(7, 9, 17, 9);
+        p.setPen(QPen(fg, 2));
+        p.drawLine(7, 13, 17, 13);
+        p.setPen(QPen(fg, 3));
+        p.drawLine(7, 17, 17, 17);
     }
     else {
         // Unknown name -> return a blank icon so Qt falls back to the label.

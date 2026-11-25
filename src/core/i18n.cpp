@@ -1131,6 +1131,10 @@ void I18n::loadTable()
     add("Stamp",             "图章",      "圖章",      "Sello",        "Tampon",        "Stempel",       "Штамп",           "スタンプ",      "스탬프");
     add("Color...",          "颜色...",   "顏色...",   "Color...",     "Couleur...",    "Farbe...",      "Цвет...",         "色...",         "색상...");
     add("Annotation Color",  "批注颜色",  "註解顏色",  "Color de anotación","Couleur d'annotation","Anmerkungsfarbe","Цвет аннотации","注釈の色",      "주석 색상");
+    add("Box Width...",      "文本框线宽...","文字方塊線寬...","Grosor del borde...","Épaisseur de bordure...","Rahmenbreite...","Толщина рамки...","枠線の太さ...","테두리 두께...");
+    add("Text Box Line Width","文本框线宽","文字方塊線寬","Grosor del cuadro de texto","Épaisseur de la zone de texte","Textfeld-Rahmenbreite","Толщина рамки текстового поля","テキストボックス枠の太さ","텍스트 상자 테두리 두께");
+    add("Border thickness (points, 0 = none):","边框粗细（点，0 = 无边框）：","邊框粗細（點，0 = 無邊框）：","Grosor del borde (puntos, 0 = ninguno):","Épaisseur de la bordure (points, 0 = aucune) :","Rahmendicke (Punkte, 0 = keine):","Толщина рамки (пт, 0 = нет):","枠線の太さ（ポイント、0 = なし）：","테두리 두께(포인트, 0 = 없음):");
+    add("Text box border set to %1 pt.","文本框边框已设为 %1 pt。","文字方塊邊框已設為 %1 pt。","Borde del cuadro de texto establecido en %1 pt.","Bordure de la zone de texte réglée sur %1 pt.","Textfeld-Rahmen auf %1 pt gesetzt.","Толщина рамки текстового поля: %1 пт.","テキストボックス枠を %1 pt に設定しました。","텍스트 상자 테두리를 %1 pt 로 설정했습니다.");
     add("Enter annotation text:","输入批注文本：","輸入註解文字：","Introduzca el texto de la anotación:","Saisissez le texte de l'annotation :","Anmerkungstext eingeben:","Введите текст аннотации:","注釈テキストを入力：","주석 텍스트 입력:");
 
     // Page management.

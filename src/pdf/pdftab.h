@@ -109,6 +109,7 @@ private slots:
     void setToolStamp();
     void setToolSelect();              // the default: pick/drag/resize
     void pickAnnotColor();
+    void pickTextBoxLineWidth();       // ask for the TextBox border width
 
     // Page management.
     void mergePdf();
@@ -225,6 +226,7 @@ private:
     QHash<QPushButton *, QByteArray> m_sideBtnSources;
 
     QColor m_annotColor = QColor(255, 220, 0);
+    double m_textBoxLineWidth = 0.75;   // configurable PDF-pt line width
 
     QString m_fallbackPageText;
 

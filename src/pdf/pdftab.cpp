@@ -1024,6 +1024,10 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     addSideBtn(av, "Pen", &PdfTab::setToolPen);
     addSideBtn(av, "Stamp", &PdfTab::setToolStamp);
     addSideBtn(av, "Color...", &PdfTab::pickAnnotColor);
+    // "Box Width..." side button temporarily disabled while we investigate a
+    // crash on PDF open — the picker slot is still wired (menu/shortcut can
+    // still access it), we're only skipping the side-panel entry.
+    //addSideBtn(av, "Box Width...", &PdfTab::pickTextBoxLineWidth);
     sl->addWidget(m_annotGroup);
 
     m_pagesGroup = new QGroupBox(TR("Pages"), sideBar);
@@ -1538,30 +1542,68 @@ void PdfTab::bakeAllPendingAnnotations()
         for (const auto &a : items) {
             switch (a.tool) {
             case PdfPageView::TextBox: {
+                // In PDF coordinates y-axis points up, so for the normalized
+                // rect in a.rect (which is in PDF points):
+                //   rc.top()    = min y = visual BOTTOM edge of the box
+                //   rc.bottom() = max y = visual TOP edge of the box
+                // PDF's `re` operator takes bottom-left corner (x, y) plus
+                // (w, h) and fills up+right from there, so the bottom-left of
+                // a visual box is (rc.left(), rc.top()).
                 QRectF rc = a.rect.normalized();
                 if (rc.width() < 2 || rc.height() < 2) break;
+                const double lineW = qMax(0.1, m_textBoxLineWidth);
                 QByteArray boxFrag;
-                boxFrag += "q\n0.75 w\n"
+                boxFrag += "q\n" + num(lineW) + " w\n"
                         + num(a.color.redF()) + " " + num(a.color.greenF()) + " "
                         + num(a.color.blueF()) + " RG\n"
-                        + num(rc.left()) + " " + num(rc.bottom()) + " "
+                        + num(rc.left()) + " " + num(rc.top()) + " "
                         + num(rc.width()) + " " + num(rc.height()) + " re S\nQ\n";
                 m_doc.appendPageContent(pageIdx, boxFrag);
                 QFont f = pickCJKFont(11.0);
+                const double pad = 3.0;
+                // Render the text at the box's inner width so it wraps
+                // properly. The renderer uses a 2.5× oversampling factor so
+                // 1 PDF point corresponds to k image pixels.
+                const double k = 2.5;
                 QImage txt = renderTextToImage(a.text, f, QColor(0, 0, 0),
-                                               rc.width() - 6,
+                                               rc.width() - 2 * pad,
                                                Qt::AlignLeft | Qt::TextWordWrap);
                 if (!txt.isNull()) {
-                    double tw = rc.width() - 6;
-                    double th = qMin(rc.height() - 4,
-                                     tw * txt.height() / qMax(1, txt.width()));
-                    double tx = rc.left() + 3;
-                    double ty = rc.top() - th - 2;
+                    // IMPORTANT: use the image's natural pixel aspect ratio
+                    // (converted back to PDF points), NOT the box's own ratio.
+                    // Otherwise the stampQImage cm-matrix scales the glyphs
+                    // horizontally to fill the whole box width and vertically
+                    // to the derived height, stretching the characters.
+                    double tw = txt.width()  / k;
+                    double th = txt.height() / k;
+                    // Clamp to the box minus padding without changing the
+                    // aspect ratio (shrink uniformly if the text is too wide
+                    // or too tall).
+                    const double maxW = rc.width()  - 2 * pad;
+                    const double maxH = rc.height() - 2 * pad;
+                    if (tw > maxW && tw > 0) {
+                        const double s = maxW / tw;
+                        tw *= s; th *= s;
+                    }
+                    if (th > maxH && th > 0) {
+                        const double s = maxH / th;
+                        tw *= s; th *= s;
+                    }
+                    // Place the rendered text image aligned to the TOP of the
+                    // box (same as the overlay preview). The image's PDF-y
+                    // anchor is its bottom edge:
+                    //   top-of-box in PDF y = rc.bottom()
+                    //   bottom edge of image = top-of-box - padding - imageH
+                    double tx = rc.left() + pad;
+                    double ty = rc.bottom() - pad - th;
                     m_doc.stampQImage(pageIdx, txt, tx, ty, tw, th, 1.0, 0.0);
                 }
                 break;
             }
             case PdfPageView::StickyNote: {
+                // Sticky notes are anchored to the TOP-LEFT of the drag rect
+                // in the overlay; match that here. See the TextBox comment for
+                // the explanation of rc.top() = visual bottom in PDF y-up.
                 QRectF rc = a.rect.normalized();
                 const double iconW = 24;
                 const double gapW = 4;
@@ -1604,16 +1646,23 @@ void PdfTab::bakeAllPendingAnnotations()
                 }
                 p.end();
 
+                // Place with the sticky note's visual TOP aligned to the
+                // overlay's visual top (= rc.bottom() in PDF y-up).
                 double x = rc.left();
-                double yAnchor = rc.top() - totalH;
+                double yAnchor = rc.bottom() - totalH;
                 m_doc.stampQImage(pageIdx, img, x, yAnchor, totalW, totalH, 1.0, 0.0);
                 break;
             }
             case PdfPageView::Stamp: {
+                // The overlay draws the image into `pdfRectToPx(a.rect)` which
+                // spans visual left→right and visual bottom (rc.top() in PDF
+                // y-up) to visual top (rc.bottom()). PDF's cm matrix treats
+                // (x, y) as the BOTTOM-LEFT of the drawn image, so we must
+                // pass rc.top() (not rc.bottom()) as the y anchor.
                 if (a.image.isNull()) break;
                 QRectF rc = a.rect.normalized();
                 if (rc.width() < 2 || rc.height() < 2) break;
-                m_doc.stampQImage(pageIdx, a.image, rc.left(), rc.bottom(),
+                m_doc.stampQImage(pageIdx, a.image, rc.left(), rc.top(),
                                   rc.width(), rc.height(), 1.0, 0.0);
                 break;
             }
@@ -1802,7 +1851,7 @@ void PdfTab::setToolSelect()    { if (m_view) m_view->setTool(PdfPageView::Selec
 void PdfTab::setToolHighlight() { m_view->setTool(PdfPageView::Highlight);  m_view->setColor(m_annotColor); }
 void PdfTab::setToolUnderline() { m_view->setTool(PdfPageView::Underline);  m_view->setColor(m_annotColor); }
 void PdfTab::setToolStrike()    { m_view->setTool(PdfPageView::Strike);     m_view->setColor(m_annotColor); }
-void PdfTab::setToolTextBox()   { m_view->setTool(PdfPageView::TextBox);    m_view->setColor(Qt::black); }
+void PdfTab::setToolTextBox()   { m_view->setTool(PdfPageView::TextBox);    m_view->setColor(m_annotColor); }
 void PdfTab::setToolStickyNote(){ m_view->setTool(PdfPageView::StickyNote); m_view->setColor(m_annotColor); }
 void PdfTab::setToolPen()       { m_view->setTool(PdfPageView::Pen);        m_view->setColor(m_annotColor); }
 
@@ -1832,6 +1881,21 @@ void PdfTab::pickAnnotColor()
 {
     QColor c = QColorDialog::getColor(m_annotColor, this, TR("Annotation Color"));
     if (c.isValid()) { m_annotColor = c; m_view->setColor(c); }
+}
+
+void PdfTab::pickTextBoxLineWidth()
+{
+    // Ask the user for the Text Box border thickness in PDF points. The value
+    // is persisted on the tab and applied to every Text Box baked on Save.
+    bool ok = false;
+    const double w = QInputDialog::getDouble(
+        this, TR("Text Box Line Width"),
+        TR("Border thickness (points, 0 = none):"),
+        m_textBoxLineWidth, 0.0, 20.0, 2, &ok);
+    if (!ok) return;
+    m_textBoxLineWidth = qMax(0.0, w);
+    emit statusMessage(TR("Text box border set to %1 pt.")
+                           .arg(QString::number(m_textBoxLineWidth, 'f', 2)));
 }
 
 void PdfTab::mergePdf()
