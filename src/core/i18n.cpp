@@ -1092,6 +1092,36 @@ void I18n::loadTable()
     add("Save first part","保存第一部分","儲存第一部分","Guardar primera parte","Enregistrer la première partie","Ersten Teil speichern","Сохранить первую часть","最初の部分を保存","첫 번째 부분 저장");
     add("Save second part","保存第二部分","儲存第二部分","Guardar segunda parte","Enregistrer la deuxième partie","Zweiten Teil speichern","Сохранить вторую часть","2 番目の部分を保存","두 번째 부분 저장");
 
+    // --- TextCompareTab row context menu + row-operation messages --------
+    add("Selected line(s): %1","已选中 %1 行","已選取 %1 行","Línea(s) seleccionada(s): %1","Ligne(s) sélectionnée(s) : %1","Ausgewählte Zeile(n): %1","Выбрано строк: %1","選択した行: %1","선택한 줄: %1");
+    add("Copy Left → Right","复制 左 → 右","複製 左 → 右","Copiar izq. → der.","Copier gauche → droite","Links → Rechts kopieren","Копировать слева → направо","左 → 右 にコピー","왼쪽 → 오른쪽 복사");
+    add("Copy Right → Left","复制 右 → 左","複製 右 → 左","Copiar der. → izq.","Copier droite → gauche","Rechts → Links kopieren","Копировать справа → налево","右 → 左 にコピー","오른쪽 → 왼쪽 복사");
+    add("Move Left → Right","移动 左 → 右","移動 左 → 右","Mover izq. → der.","Déplacer gauche → droite","Links → Rechts verschieben","Переместить слева → направо","左 → 右 に移動","왼쪽 → 오른쪽 이동");
+    add("Move Right → Left","移动 右 → 左","移動 右 → 左","Mover der. → izq.","Déplacer droite → gauche","Rechts → Links verschieben","Переместить справа → налево","右 → 左 に移動","오른쪽 → 왼쪽 이동");
+    add("Edit Line...","编辑行...","編輯行...","Editar línea...","Modifier la ligne...","Zeile bearbeiten...","Изменить строку...","行を編集...","줄 편집...");
+    add("Edit Left Line %1","编辑左侧第 %1 行","編輯左側第 %1 行","Editar línea izq. %1","Modifier la ligne gauche %1","Linke Zeile %1 bearbeiten","Изменить левую строку %1","左の行 %1 を編集","왼쪽 %1번째 줄 편집");
+    add("Edit Right Line %1","编辑右侧第 %1 行","編輯右側第 %1 行","Editar línea der. %1","Modifier la ligne droite %1","Rechte Zeile %1 bearbeiten","Изменить правую строку %1","右の行 %1 を編集","오른쪽 %1번째 줄 편집");
+    add("Line content:","行内容：","行內容：","Contenido de la línea:","Contenu de la ligne :","Zeileninhalt:","Содержимое строки:","行の内容：","줄 내용:");
+    add("Click a line first, then right-click it.","先点击一行，然后对其右键单击。","先點擊一行，然後對其右鍵點擊。","Haga clic en una línea y luego clic derecho sobre ella.","Cliquez d'abord sur une ligne, puis faites un clic droit dessus.","Zuerst eine Zeile anklicken, dann Rechtsklick.","Сначала выберите строку, затем щёлкните по ней правой кнопкой.","まず行をクリックし、その上で右クリックしてください。","먼저 줄을 클릭한 뒤 마우스 오른쪽 버튼을 클릭하세요.");
+    add("Select one or more lines first.","请先选择一行或多行。","請先選擇一行或多行。","Seleccione primero una o más líneas.","Sélectionnez d'abord une ou plusieurs lignes.","Zuerst eine oder mehrere Zeilen auswählen.","Сначала выберите одну или несколько строк.","まず 1 行以上を選択してください。","먼저 한 줄 이상 선택하세요.");
+    add("Nothing to delete on that side.","该侧没有可删除的内容。","該側沒有可刪除的內容。","Nada que eliminar en ese lado.","Rien à supprimer de ce côté.","Nichts auf dieser Seite zu löschen.","На этой стороне нечего удалять.","その側には削除するものがありません。","그쪽에 삭제할 내용이 없습니다.");
+    add("That row is a gap on this side — nothing to edit.","此行在该侧为空，无法编辑。","此行在該側為空，無法編輯。","Esa fila está vacía en este lado — nada que editar.","Cette ligne est vide de ce côté — rien à modifier.","Diese Zeile ist auf dieser Seite leer — nichts zu bearbeiten.","Эта строка на этой стороне пустая — редактировать нечего.","この行はこちら側が空です — 編集するものがありません。","이 행은 이쪽에 비어 있어 편집할 내용이 없습니다.");
+    add("Moved","已移动","已移動","Movido","Déplacé","Verschoben","Перемещено","移動しました","이동됨");
+    add("Copied","已复制","已複製","Copiado","Copié","Kopiert","Скопировано","コピーしました","복사됨");
+    add("Deleted","已删除","已刪除","Eliminado","Supprimé","Gelöscht","Удалено","削除しました","삭제됨");
+    add("%1 %2 line(s).","%1 %2 行。","%1 %2 行。","%1 %2 línea(s).","%1 %2 ligne(s).","%1 %2 Zeile(n).","%1 %2 строк.","%1 行を %2 。","%1 %2 줄.");
+    add("Edited %1 line %2. Use \"Save L\" / \"Save R\" to write the file.",
+        "已编辑 %1 第 %2 行。使用 \"Save L\" / \"Save R\" 写入文件。",
+        "已編輯 %1 第 %2 行。使用 \"Save L\" / \"Save R\" 寫入檔案。",
+        "Se editó la línea %2 de %1. Use \"Save L\" / \"Save R\" para escribir el archivo.",
+        "Ligne %2 de %1 modifiée. Utilisez \"Save L\" / \"Save R\" pour écrire le fichier.",
+        "Zeile %2 (%1) bearbeitet. Verwenden Sie \"Save L\" / \"Save R\", um die Datei zu schreiben.",
+        "Изменена строка %2 (%1). Используйте \"Save L\" / \"Save R\", чтобы записать файл.",
+        "%1 の %2 行目を編集しました。「Save L」/「Save R」でファイルに書き込んでください。",
+        "%1 의 %2번째 줄을 편집했습니다. \"Save L\" / \"Save R\" 로 파일에 기록하세요.");
+    add("left","左侧","左側","izquierdo","gauche","links","левой","左","왼쪽");
+    add("right","右侧","右側","derecho","droite","rechts","правой","右","오른쪽");
+
     add("Highlight",         "高亮",      "螢光標示",  "Resaltar",     "Surligner",     "Hervorheben",   "Выделение",       "ハイライト",    "형광펜");
     add("Underline",         "下划线",    "底線",      "Subrayar",     "Souligner",     "Unterstreichen","Подчёркивание",   "下線",          "밑줄");
     add("Strike",            "删除线",    "刪除線",    "Tachar",       "Barrer",        "Durchstreichen","Зачёркивание",    "取り消し線",    "취소선");

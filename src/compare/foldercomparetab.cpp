@@ -8,6 +8,7 @@ static inline QString TRc(const char *s){ return I18n::instance()->tr(QString::f
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QToolBar>
+#include "core/iconfactory.h"
 #include <QAction>
 #include <QLineEdit>
 #include <QDir>
@@ -65,11 +66,22 @@ FolderCompareTab::FolderCompareTab(QWidget *parent)
     outer->setSpacing(0);
 
     auto *tb = new QToolBar(this);
-    tb->addAction(TRc("Refresh"), this, &FolderCompareTab::refresh);
-    tb->addAction(TRc("Copy →"), this, &FolderCompareTab::copyLeftToRight);
-    tb->addAction(TRc("← Copy"), this, &FolderCompareTab::copyRightToLeft);
+    tb->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    tb->setIconSize(QSize(20, 20));
+    auto addIconAction = [&](const char *src, auto slot) -> QAction * {
+        QIcon icon = IconFactory::makeToolIcon(QString::fromUtf8(src));
+        QAction *a = icon.isNull() ? tb->addAction(TRc(src), this, slot)
+                                   : tb->addAction(icon, TRc(src), this, slot);
+        a->setToolTip(TRc(src));
+        return a;
+    };
+    addIconAction("Refresh", &FolderCompareTab::refresh);
+    addIconAction("Copy →", &FolderCompareTab::copyLeftToRight);
+    addIconAction("← Copy", &FolderCompareTab::copyRightToLeft);
     tb->addSeparator();
-    QAction *diffOnly = tb->addAction(TRc("Differences Only"));
+    QAction *diffOnly = tb->addAction(IconFactory::makeToolIcon(QStringLiteral("Differences Only")),
+                                      TRc("Differences Only"));
+    diffOnly->setToolTip(TRc("Differences Only"));
     diffOnly->setCheckable(true);
     connect(diffOnly, &QAction::toggled, this, &FolderCompareTab::setShowOnlyDifferences);
     tb->addSeparator();

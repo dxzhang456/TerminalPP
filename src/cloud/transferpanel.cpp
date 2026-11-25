@@ -8,6 +8,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QToolBar>
+#include "core/iconfactory.h"
 #include <QAction>
 #include <QLabel>
 #include <QSpinBox>
@@ -47,20 +48,34 @@ TransferPanel::TransferPanel(QWidget *parent) : QWidget(parent)
     outer->setSpacing(0);
 
     auto *tb = new QToolBar(this);
-    tb->addAction(TRc("Cancel"), this, [this]() {
+    // Toolbar uses auto-generated monochrome vector icons; the original label
+    // is kept as the tooltip and follows UI language changes live.
+    tb->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    tb->setIconSize(QSize(20, 20));
+    auto iconFor = [](const char *src) {
+        return IconFactory::makeToolIcon(QString::fromUtf8(src));
+    };
+    auto addIconLambda = [&](const char *src, auto fn) -> QAction * {
+        QIcon ic = iconFor(src);
+        QAction *a = ic.isNull() ? tb->addAction(TRc(src), this, fn)
+                                 : tb->addAction(ic, TRc(src), this, fn);
+        a->setToolTip(TRc(src));
+        return a;
+    };
+    addIconLambda("Cancel", [this]() {
         if (auto *it = m_tree->currentItem())
             TransferManager::instance()->cancel(idForItem(it));
     });
-    tb->addAction(TRc("Retry"), this, [this]() {
+    addIconLambda("Retry", [this]() {
         if (auto *it = m_tree->currentItem())
             TransferManager::instance()->retry(idForItem(it));
     });
-    tb->addAction(TRc("Remove"), this, [this]() {
+    addIconLambda("Remove", [this]() {
         if (auto *it = m_tree->currentItem())
             TransferManager::instance()->remove(idForItem(it));
     });
     tb->addSeparator();
-    tb->addAction(TRc("Open"), this, [this]() {
+    addIconLambda("Open", [this]() {
         if (auto *it = m_tree->currentItem()) {
             if (TransferItem *t = TransferManager::instance()->find(idForItem(it)))
                 if (t->direction == TransferItem::Download
@@ -68,7 +83,7 @@ TransferPanel::TransferPanel(QWidget *parent) : QWidget(parent)
                     emit openLocalFile(t->localPath);
         }
     });
-    tb->addAction(TRc("Open Folder"), this, [this]() {
+    addIconLambda("Open Folder", [this]() {
         if (auto *it = m_tree->currentItem()) {
             if (TransferItem *t = TransferManager::instance()->find(idForItem(it))) {
                 if (!t->localPath.isEmpty()) {
@@ -79,7 +94,7 @@ TransferPanel::TransferPanel(QWidget *parent) : QWidget(parent)
         }
     });
     tb->addSeparator();
-    tb->addAction(TRc("Clear Finished"), this,
+    addIconLambda("Clear Finished",
                   []() { TransferManager::instance()->clearFinished(); });
     tb->addSeparator();
 

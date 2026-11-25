@@ -11,6 +11,7 @@
 #include <QButtonGroup>
 #include <QToolButton>
 #include <QToolBar>
+#include "core/iconfactory.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -482,13 +483,25 @@ ImageEditorTab::ImageEditorTab(QWidget *parent) : QWidget(parent)
         {"Text", ToolText}, {"Crop", ToolCrop}, {"Mosaic", ToolMosaic},
         {"Magic Wand", ToolMagicWand},
     };
+    // Side-panel tool buttons use the same icon-above-text style as every
+    // other side panel in the app (PDF side panel, etc.): vector icon drawn by
+    // IconFactory, English label kept for live translation.
     int r = 0, c = 0;
     for (const auto &t : tools) {
         auto *b = new QToolButton(toolBox);
         b->setText(TRi(t.label));
+        b->setToolTip(TRi(t.label));
+        const QIcon ic = IconFactory::makeToolIcon(QString::fromUtf8(t.label));
+        if (!ic.isNull()) {
+            b->setIcon(ic);
+            b->setIconSize(QSize(18, 18));
+            b->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+        } else {
+            b->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        }
         b->setCheckable(true);
-        b->setToolButtonStyle(Qt::ToolButtonTextOnly);
         b->setMinimumWidth(72);
+        b->setStyleSheet("QToolButton{padding:3px;}");
         group->addButton(b, t.id);
         tg->addWidget(b, r, c);
         if (++c == 3) { c = 0; ++r; }
@@ -499,13 +512,21 @@ ImageEditorTab::ImageEditorTab(QWidget *parent) : QWidget(parent)
     // Brush / text style.
     auto *styleBox = new QGroupBox(TRi("Style"), side);
     auto *stf = new QFormLayout(styleBox);
-    auto *brushColorBtn = new QPushButton(TRi("Brush Color..."), styleBox);
+    // The two colour buttons also gain vector icons (color wheel) so the side
+    // panel is uniformly iconised.
+    auto *brushColorBtn = new QPushButton(IconFactory::makeToolIcon(QStringLiteral("Color...")),
+                                          TRi("Brush Color..."), styleBox);
+    brushColorBtn->setIconSize(QSize(18, 18));
+    brushColorBtn->setStyleSheet("text-align:left; padding:3px 6px;");
     connect(brushColorBtn, &QPushButton::clicked, this, &ImageEditorTab::pickBrushColor);
     auto *brushW = new QSpinBox(styleBox); brushW->setRange(1, 200); brushW->setValue(m_brushWidth);
     connect(brushW, qOverload<int>(&QSpinBox::valueChanged), this, [this](int v){
         m_brushWidth = v; if (m_canvas) m_canvas->setBrushWidth(v);
     });
-    auto *textColorBtn = new QPushButton(TRi("Text Color..."), styleBox);
+    auto *textColorBtn = new QPushButton(IconFactory::makeToolIcon(QStringLiteral("Color...")),
+                                         TRi("Text Color..."), styleBox);
+    textColorBtn->setIconSize(QSize(18, 18));
+    textColorBtn->setStyleSheet("text-align:left; padding:3px 6px;");
     connect(textColorBtn, &QPushButton::clicked, this, &ImageEditorTab::pickTextColor);
     auto *textSz = new QSpinBox(styleBox); textSz->setRange(6, 512); textSz->setValue(m_textSize);
     connect(textSz, qOverload<int>(&QSpinBox::valueChanged), this, [this](int v){
@@ -593,33 +614,44 @@ ImageEditorTab::ImageEditorTab(QWidget *parent) : QWidget(parent)
     cv->setSpacing(0);
 
     auto *tb = new QToolBar(container);
-    tb->addAction(TRi("Undo"), this, &ImageEditorTab::undo);
-    tb->addAction(TRi("Redo"), this, &ImageEditorTab::redo);
+    // Toolbar uses auto-generated monochrome vector icons; the original label
+    // is kept as the tooltip (and still follows UI language changes live).
+    tb->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    tb->setIconSize(QSize(20, 20));
+    auto addIconAction = [&](const char *src, auto slot) -> QAction * {
+        QIcon icon = IconFactory::makeToolIcon(QString::fromUtf8(src));
+        QAction *a = icon.isNull() ? tb->addAction(TRi(src), this, slot)
+                                   : tb->addAction(icon, TRi(src), this, slot);
+        a->setToolTip(TRi(src));
+        return a;
+    };
+    addIconAction("Undo", &ImageEditorTab::undo);
+    addIconAction("Redo", &ImageEditorTab::redo);
     tb->addSeparator();
-    tb->addAction(TRi("Rotate Left"),  this, &ImageEditorTab::rotateLeft);
-    tb->addAction(TRi("Rotate Right"), this, &ImageEditorTab::rotateRight);
-    tb->addAction(TRi("Free Rotate..."), this, &ImageEditorTab::rotateFree);
-    tb->addAction(TRi("Straighten..."), this, &ImageEditorTab::straighten);
-    tb->addAction(TRi("Flip H"), this, &ImageEditorTab::flipHorizontal);
-    tb->addAction(TRi("Flip V"), this, &ImageEditorTab::flipVertical);
-    tb->addAction(TRi("Crop"),   this, &ImageEditorTab::cropToSelection);
+    addIconAction("Rotate Left",  &ImageEditorTab::rotateLeft);
+    addIconAction("Rotate Right", &ImageEditorTab::rotateRight);
+    addIconAction("Free Rotate...", &ImageEditorTab::rotateFree);
+    addIconAction("Straighten...", &ImageEditorTab::straighten);
+    addIconAction("Flip H", &ImageEditorTab::flipHorizontal);
+    addIconAction("Flip V", &ImageEditorTab::flipVertical);
+    addIconAction("Crop", &ImageEditorTab::cropToSelection);
     tb->addSeparator();
-    tb->addAction(TRi("Resize..."),  this, &ImageEditorTab::resizeCanvas);
-    tb->addAction(TRi("Scale..."),   this, &ImageEditorTab::scaleImage);
-    tb->addAction(TRi("DPI..."),     this, &ImageEditorTab::setDpi);
-    tb->addAction(TRi("Expand Canvas..."), this, &ImageEditorTab::expandCanvas);
+    addIconAction("Resize...", &ImageEditorTab::resizeCanvas);
+    addIconAction("Scale...", &ImageEditorTab::scaleImage);
+    addIconAction("DPI...", &ImageEditorTab::setDpi);
+    addIconAction("Expand Canvas...", &ImageEditorTab::expandCanvas);
     tb->addSeparator();
-    tb->addAction(TRi("Auto Cutout"), this, &ImageEditorTab::autoCutout);
-    tb->addAction(TRi("Text Watermark..."),  this, &ImageEditorTab::addTextWatermark);
-    tb->addAction(TRi("Image Watermark..."), this, &ImageEditorTab::addImageWatermark);
+    addIconAction("Auto Cutout", &ImageEditorTab::autoCutout);
+    addIconAction("Text Watermark...", &ImageEditorTab::addTextWatermark);
+    addIconAction("Image Watermark...", &ImageEditorTab::addImageWatermark);
     tb->addSeparator();
-    tb->addAction(TRi("Export As..."), this, &ImageEditorTab::exportAs);
-    tb->addAction(TRi("Compress & Export..."), this, &ImageEditorTab::compressExport);
+    addIconAction("Export As...", &ImageEditorTab::exportAs);
+    addIconAction("Compress & Export...", &ImageEditorTab::compressExport);
     tb->addSeparator();
-    tb->addAction("  +  ", this, &ImageEditorTab::zoomIn);
-    tb->addAction("  -  ", this, &ImageEditorTab::zoomOut);
-    tb->addAction(TRi("Fit"),  this, &ImageEditorTab::zoomFit);
-    tb->addAction("100%", this, &ImageEditorTab::zoomReset);
+    addIconAction("Zoom In", &ImageEditorTab::zoomIn);
+    addIconAction("Zoom Out", &ImageEditorTab::zoomOut);
+    addIconAction("Fit", &ImageEditorTab::zoomFit);
+    addIconAction("Actual Size", &ImageEditorTab::zoomReset);
     cv->addWidget(tb);
 
     m_info = new QLabel(container);

@@ -8,6 +8,7 @@ static inline QString TRc(const char *s) { return I18n::instance()->tr(QString::
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QToolBar>
+#include "core/iconfactory.h"
 #include <QFile>
 #include <QFileInfo>
 #include <QScrollBar>
@@ -113,16 +114,37 @@ HexCompareTab::HexCompareTab(QWidget *parent)
     outer->setSpacing(0);
 
     auto *tb = new QToolBar(this);
-    tb->addAction(TRc("Reload"), this, &HexCompareTab::reload);
-    // Switch the current two files to another comparison type.
-    tb->addAction(TRc("As Text"), this, [this]() {
-        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
-            emit requestCompareAs(0, m_leftPath, m_rightPath);
-    });
-    tb->addAction(TRc("As Picture"), this, [this]() {
-        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
-            emit requestCompareAs(3, m_leftPath, m_rightPath);
-    });
+    tb->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    tb->setIconSize(QSize(20, 20));
+    auto addIconAction = [&](const char *src, auto slot) -> QAction * {
+        QIcon icon = IconFactory::makeToolIcon(QString::fromUtf8(src));
+        QAction *a = icon.isNull() ? tb->addAction(TRc(src), this, slot)
+                                   : tb->addAction(icon, TRc(src), this, slot);
+        a->setToolTip(TRc(src));
+        return a;
+    };
+    addIconAction("Reload", &HexCompareTab::reload);
+    tb->addSeparator();
+    {
+        QIcon icon = IconFactory::makeToolIcon(QStringLiteral("As Text"));
+        QAction *a = icon.isNull() ? tb->addAction(TRc("As Text"))
+                                   : tb->addAction(icon, TRc("As Text"));
+        a->setToolTip(TRc("As Text"));
+        connect(a, &QAction::triggered, this, [this]() {
+            if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+                emit requestCompareAs(0, m_leftPath, m_rightPath);
+        });
+    }
+    {
+        QIcon icon = IconFactory::makeToolIcon(QStringLiteral("As Picture"));
+        QAction *a = icon.isNull() ? tb->addAction(TRc("As Picture"))
+                                   : tb->addAction(icon, TRc("As Picture"));
+        a->setToolTip(TRc("As Picture"));
+        connect(a, &QAction::triggered, this, [this]() {
+            if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+                emit requestCompareAs(3, m_leftPath, m_rightPath);
+        });
+    }
     outer->addWidget(tb);
 
     auto *hdr = new QHBoxLayout();

@@ -47,6 +47,7 @@ SOURCES += \
     src/core/fileassoc.cpp \
     src/core/magicdetector.cpp \
     src/core/errorlogger.cpp \
+    src/core/iconfactory.cpp \
     src/compare/diffengine.cpp \
     src/compare/textcomparetab.cpp \
     src/compare/foldercomparetab.cpp \
@@ -93,6 +94,7 @@ HEADERS += \
     src/core/fileassoc.h \
     src/core/magicdetector.h \
     src/core/errorlogger.h \
+    src/core/iconfactory.h \
     src/compare/diffengine.h \
     src/compare/textcomparetab.h \
     src/compare/foldercomparetab.h \

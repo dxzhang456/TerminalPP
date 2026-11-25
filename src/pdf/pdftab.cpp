@@ -1,5 +1,6 @@
 #include "pdf/pdftab.h"
 #include "core/i18n.h"
+#include "core/iconfactory.h"
 
 #include <QBuffer>
 #include <QColorDialog>
@@ -890,17 +891,33 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
 
     m_tb = new QToolBar(this);
     QToolBar *tb = m_tb;
-    tb->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    // The top toolbar uses icon-only buttons; each button's full name still
+    // appears as its tooltip and follows the UI language live.
+    tb->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    tb->setIconSize(QSize(20, 20));
 
     auto addBtn = [&](const char *src, auto slot) {
-        QAction *a = tb->addAction(TR(src));
+        QIcon icon = IconFactory::makeToolIcon(QString::fromUtf8(src),
+                                               palette().windowText().color());
+        QAction *a = icon.isNull() ? tb->addAction(TR(src))
+                                   : tb->addAction(icon, TR(src));
         a->setToolTip(TR(src));
         m_actionSources.insert(a, QByteArray(src));
+        // Toolbar is ToolButtonIconOnly so the label is suppressed on buttons
+        // that *do* have an icon. Buttons whose icon factory returned a blank
+        // QIcon (unknown name) keep the text label as a safety net.
+        if (!icon.isNull()) m_tooltipOnly.append(a);
         connect(a, &QAction::triggered, this, slot);
         return a;
     };
-    auto addGlyphBtn = [&](const QString &glyph, const char *src, auto slot) {
-        QAction *a = tb->addAction(glyph);
+    // The original "glyph" buttons (⏮◀▶⏭ etc.) now get real icons too; the
+    // glyph string is dropped in favour of the factory output, and the full
+    // name goes to the tooltip.
+    auto addGlyphBtn = [&](const QString & /*glyph*/, const char *src, auto slot) {
+        QIcon icon = IconFactory::makeToolIcon(QString::fromUtf8(src),
+                                               palette().windowText().color());
+        QAction *a = icon.isNull() ? tb->addAction(TR(src))
+                                   : tb->addAction(icon, TR(src));
         a->setToolTip(TR(src));
         m_actionSources.insert(a, QByteArray(src));
         m_tooltipOnly.append(a);
@@ -976,9 +993,19 @@ PdfTab::PdfTab(QWidget *parent) : QWidget(parent)
     sl->setContentsMargins(6, 6, 6, 6);
     sl->setSpacing(6);
 
+    // Side-panel buttons use icon + text so they stay readable even on a
+    // narrow column; tooltip still shows the full name (handy when the
+    // current UI language produces a slightly truncated label).
     auto addSideBtn = [&](QVBoxLayout *gv, const char *src, auto slot) {
+        QIcon icon = IconFactory::makeToolIcon(QString::fromUtf8(src),
+                                               palette().windowText().color());
         auto *btn = new QPushButton(TR(src), sideBar);
+        if (!icon.isNull()) {
+            btn->setIcon(icon);
+            btn->setIconSize(QSize(18, 18));
+        }
         btn->setToolTip(TR(src));
+        btn->setStyleSheet("text-align: left; padding: 3px 6px;");
         m_sideBtnSources.insert(btn, QByteArray(src));
         connect(btn, &QPushButton::clicked, this, slot);
         gv->addWidget(btn);

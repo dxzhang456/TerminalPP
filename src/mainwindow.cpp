@@ -2533,7 +2533,7 @@ void MainWindow::loadPreferences()
 void MainWindow::about()
 {
     const QString body =
-        "<h3>Terminal++ 1.7</h3>"
+        "<h3>Terminal++ 1.8</h3>"
         "<p>" + TR("Editor, hex, image, PDF, SSH and serial terminal, file "
                    "compare and cloud drives in one tabbed window.") + "</p>"
         "<p>" + TR("Qt 6 / MinGW. 9 UI languages.") + "</p>";

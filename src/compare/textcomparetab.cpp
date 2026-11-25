@@ -14,6 +14,7 @@ static inline QString TRc(const char *s) { return I18n::instance()->tr(QString::
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QToolBar>
+#include "core/iconfactory.h"
 #include <QAction>
 #include <QFile>
 #include <QTextStream>
@@ -427,33 +428,61 @@ TextCompareTab::TextCompareTab(QWidget *parent)
 
     // Toolbar with side-by-side actions.
     auto *tb = new QToolBar(this);
-    tb->addAction(TRc("◀ Prev Diff"), this, &TextCompareTab::prevDiff);
-    tb->addAction(TRc("Next Diff ▶"), this, &TextCompareTab::nextDiff);
+    // Toolbar icons are drawn on the fly by IconFactory (no PNG assets
+    // needed). The original label is kept as the tooltip and follows the UI
+    // language live.
+    tb->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    tb->setIconSize(QSize(20, 20));
+    auto addIconAction = [&](const char *src, auto slot) -> QAction * {
+        QIcon icon = IconFactory::makeToolIcon(QString::fromUtf8(src));
+        QAction *a = icon.isNull() ? tb->addAction(TRc(src), this, slot)
+                                   : tb->addAction(icon, TRc(src), this, slot);
+        a->setToolTip(TRc(src));
+        return a;
+    };
+    addIconAction("◀ Prev Diff", &TextCompareTab::prevDiff);
+    addIconAction("Next Diff ▶", &TextCompareTab::nextDiff);
     tb->addSeparator();
-    tb->addAction(TRc("Copy →"), this, &TextCompareTab::copyLeftToRight);
-    tb->addAction(TRc("← Copy"), this, &TextCompareTab::copyRightToLeft);
+    addIconAction("Copy →", &TextCompareTab::copyLeftToRight);
+    addIconAction("← Copy", &TextCompareTab::copyRightToLeft);
     tb->addSeparator();
-    tb->addAction(TRc("Swap"), this, &TextCompareTab::swapSides);
-    tb->addAction(TRc("Reload"), this, &TextCompareTab::reload);
+    addIconAction("Swap", &TextCompareTab::swapSides);
+    addIconAction("Reload", &TextCompareTab::reload);
     // Switch the current two files to another comparison type.
-    tb->addAction(TRc("As Hex"), this, [this]() {
-        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
-            emit requestCompareAs(2, m_leftPath, m_rightPath);
-    });
-    tb->addAction(TRc("As Picture"), this, [this]() {
-        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
-            emit requestCompareAs(3, m_leftPath, m_rightPath);
-    });
-    tb->addAction(TRc("Save L"), this, &TextCompareTab::saveLeft);
-    tb->addAction(TRc("Save R"), this, &TextCompareTab::saveRight);
+    {
+        QIcon icon = IconFactory::makeToolIcon(QStringLiteral("As Hex"));
+        QAction *a = icon.isNull() ? tb->addAction(TRc("As Hex"))
+                                   : tb->addAction(icon, TRc("As Hex"));
+        a->setToolTip(TRc("As Hex"));
+        connect(a, &QAction::triggered, this, [this]() {
+            if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+                emit requestCompareAs(2, m_leftPath, m_rightPath);
+        });
+    }
+    {
+        QIcon icon = IconFactory::makeToolIcon(QStringLiteral("As Picture"));
+        QAction *a = icon.isNull() ? tb->addAction(TRc("As Picture"))
+                                   : tb->addAction(icon, TRc("As Picture"));
+        a->setToolTip(TRc("As Picture"));
+        connect(a, &QAction::triggered, this, [this]() {
+            if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+                emit requestCompareAs(3, m_leftPath, m_rightPath);
+        });
+    }
+    addIconAction("Save L", &TextCompareTab::saveLeft);
+    addIconAction("Save R", &TextCompareTab::saveRight);
     tb->addSeparator();
 
-    QAction *icAct = tb->addAction(TRc("Ignore Case"));
+    QAction *icAct = tb->addAction(IconFactory::makeToolIcon(QStringLiteral("Ignore Case")),
+                                   TRc("Ignore Case"));
+    icAct->setToolTip(TRc("Ignore Case"));
     icAct->setCheckable(true);
     connect(icAct, &QAction::toggled, this, [this](bool on) {
         m_opts.ignoreCase = on; recompute();
     });
-    QAction *iwAct = tb->addAction(TRc("Ignore Whitespace"));
+    QAction *iwAct = tb->addAction(IconFactory::makeToolIcon(QStringLiteral("Ignore Whitespace")),
+                                   TRc("Ignore Whitespace"));
+    iwAct->setToolTip(TRc("Ignore Whitespace"));
     iwAct->setCheckable(true);
     connect(iwAct, &QAction::toggled, this, [this](bool on) {
         m_opts.ignoreWhitespace = on; recompute();

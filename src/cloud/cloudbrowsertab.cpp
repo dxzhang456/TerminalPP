@@ -8,6 +8,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QToolBar>
+#include "core/iconfactory.h"
 #include <QAction>
 #include <QLabel>
 #include <QLineEdit>
@@ -52,13 +53,24 @@ CloudBrowserTab::CloudBrowserTab(CloudProvider *provider, const QString &title,
     outer->setSpacing(0);
 
     auto *tb = new QToolBar(this);
-    tb->addAction(TRc("Back"), this, &CloudBrowserTab::goBack);
-    tb->addAction(TRc("Up"), this, &CloudBrowserTab::goUp);
-    tb->addAction(TRc("Refresh"), this, &CloudBrowserTab::refresh);
+    // Toolbar uses auto-generated monochrome vector icons; the original label
+    // is kept as the tooltip and follows UI language changes live.
+    tb->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    tb->setIconSize(QSize(20, 20));
+    auto addIconAction = [&](const char *src, auto slot) -> QAction * {
+        QIcon icon = IconFactory::makeToolIcon(QString::fromUtf8(src));
+        QAction *a = icon.isNull() ? tb->addAction(TRc(src), this, slot)
+                                   : tb->addAction(icon, TRc(src), this, slot);
+        a->setToolTip(TRc(src));
+        return a;
+    };
+    addIconAction("Back", &CloudBrowserTab::goBack);
+    addIconAction("Up", &CloudBrowserTab::goUp);
+    addIconAction("Refresh", &CloudBrowserTab::refresh);
     tb->addSeparator();
-    tb->addAction(TRc("Upload Files..."), this, &CloudBrowserTab::uploadFiles);
-    tb->addAction(TRc("Upload Folder..."), this, &CloudBrowserTab::uploadFolder);
-    tb->addAction(TRc("New Folder..."), this, &CloudBrowserTab::makeFolder);
+    addIconAction("Upload Files...", &CloudBrowserTab::uploadFiles);
+    addIconAction("Upload Folder...", &CloudBrowserTab::uploadFolder);
+    addIconAction("New Folder...", &CloudBrowserTab::makeFolder);
     tb->addSeparator();
     tb->addWidget(new QLabel(TRc(" Path: "), this));
     m_pathEdit = new QLineEdit(this);

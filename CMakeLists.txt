@@ -62,6 +62,8 @@ set(PROJECT_SOURCES
     src/core/magicdetector.h
     src/core/errorlogger.cpp
     src/core/errorlogger.h
+    src/core/iconfactory.cpp
+    src/core/iconfactory.h
 
     # --- Compare (Beyond Compare-style) ---
     src/compare/diffengine.cpp

@@ -9,6 +9,7 @@ static inline QString TRc(const char *s) { return I18n::instance()->tr(QString::
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QToolBar>
+#include "core/iconfactory.h"
 #include <QAction>
 #include <QFileInfo>
 #include <QPainter>
@@ -97,25 +98,49 @@ ImageCompareTab::ImageCompareTab(QWidget *parent)
     outer->setSpacing(0);
 
     auto *tb = new QToolBar(this);
-    tb->addAction(TRc("Zoom In"), this, &ImageCompareTab::zoomIn);
-    tb->addAction(TRc("Zoom Out"), this, &ImageCompareTab::zoomOut);
-    tb->addAction(TRc("Fit"), this, &ImageCompareTab::zoomFit);
-    tb->addAction(TRc("1:1"), this, &ImageCompareTab::zoomReset);
+    tb->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    tb->setIconSize(QSize(20, 20));
+    auto addIconAction = [&](const char *src, auto slot) -> QAction * {
+        QIcon icon = IconFactory::makeToolIcon(QString::fromUtf8(src));
+        QAction *a = icon.isNull() ? tb->addAction(TRc(src), this, slot)
+                                   : tb->addAction(icon, TRc(src), this, slot);
+        a->setToolTip(TRc(src));
+        return a;
+    };
+    addIconAction("Zoom In", &ImageCompareTab::zoomIn);
+    addIconAction("Zoom Out", &ImageCompareTab::zoomOut);
+    addIconAction("Fit", &ImageCompareTab::zoomFit);
+    addIconAction("1:1", &ImageCompareTab::zoomReset);
     tb->addSeparator();
-    QAction *diffAct = tb->addAction(TRc("Difference Overlay"));
+    QAction *diffAct = tb->addAction(
+        IconFactory::makeToolIcon(QStringLiteral("Difference Overlay")),
+        TRc("Difference Overlay"));
+    diffAct->setToolTip(TRc("Difference Overlay"));
     diffAct->setCheckable(true);
     connect(diffAct, &QAction::toggled, this, &ImageCompareTab::toggleDiffOverlay);
     tb->addSeparator();
-    tb->addAction(TRc("Reload"), this, &ImageCompareTab::reload);
-    // Switch the current two files to another comparison type.
-    tb->addAction(TRc("As Text"), this, [this]() {
-        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
-            emit requestCompareAs(0, m_leftPath, m_rightPath);
-    });
-    tb->addAction(TRc("As Hex"), this, [this]() {
-        if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
-            emit requestCompareAs(2, m_leftPath, m_rightPath);
-    });
+    addIconAction("Reload", &ImageCompareTab::reload);
+    tb->addSeparator();
+    {
+        QIcon icon = IconFactory::makeToolIcon(QStringLiteral("As Text"));
+        QAction *a = icon.isNull() ? tb->addAction(TRc("As Text"))
+                                   : tb->addAction(icon, TRc("As Text"));
+        a->setToolTip(TRc("As Text"));
+        connect(a, &QAction::triggered, this, [this]() {
+            if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+                emit requestCompareAs(0, m_leftPath, m_rightPath);
+        });
+    }
+    {
+        QIcon icon = IconFactory::makeToolIcon(QStringLiteral("As Hex"));
+        QAction *a = icon.isNull() ? tb->addAction(TRc("As Hex"))
+                                   : tb->addAction(icon, TRc("As Hex"));
+        a->setToolTip(TRc("As Hex"));
+        connect(a, &QAction::triggered, this, [this]() {
+            if (!m_leftPath.isEmpty() && !m_rightPath.isEmpty())
+                emit requestCompareAs(2, m_leftPath, m_rightPath);
+        });
+    }
     outer->addWidget(tb);
 
     auto *hdr = new QHBoxLayout();
