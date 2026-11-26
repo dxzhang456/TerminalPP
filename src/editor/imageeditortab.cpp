@@ -625,6 +625,13 @@ ImageEditorTab::ImageEditorTab(QWidget *parent) : QWidget(parent)
         a->setToolTip(TRi(src));
         return a;
     };
+    // Save sits at the very left of the image-editor toolbar, mirroring the
+    // PDF tab layout. Falls back to the main-window Ctrl+S if the file has no
+    // path yet (same behaviour as the File menu's Save action).
+    auto *saveAct = addIconAction("Save", &ImageEditorTab::save);
+    saveAct->setShortcut(QKeySequence::Save);
+    saveAct->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+    tb->addSeparator();
     addIconAction("Undo", &ImageEditorTab::undo);
     addIconAction("Redo", &ImageEditorTab::redo);
     tb->addSeparator();

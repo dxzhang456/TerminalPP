@@ -334,7 +334,15 @@ protected:
                     pushUndoSnapshot();
                     m_resizingHandle = handle;
                     m_dragStart = e->pos();
-                    m_origRect = m_pages[m_pageIndex].items[m_pickedIndex].rect;
+                    // Always store the NORMALIZED rect as the origin: some
+                    // annotations (signatures) were created with a
+                    // negative-height QRectF for convenience, which inverted
+                    // the top/bottom edges in resizePicked and made the
+                    // top-middle / bottom-middle handles grow instead of
+                    // shrink the box.
+                    m_origRect = m_pages[m_pageIndex].items[m_pickedIndex].rect
+                                     .normalized();
+                    m_pages[m_pageIndex].items[m_pickedIndex].rect = m_origRect;
                     return;
                 }
             }
@@ -344,7 +352,10 @@ protected:
                 pushUndoSnapshot();
                 m_dragging = true;
                 m_dragStart = e->pos();
-                const Annotation &a = m_pages[m_pageIndex].items[hit];
+                Annotation &a = m_pages[m_pageIndex].items[hit];
+                // Same normalisation as above so dragging after picking a
+                // negative-height annotation uses sane edges.
+                a.rect = a.rect.normalized();
                 m_origRect = a.rect; m_origPoints = a.points;
                 update(); return;
             }
@@ -632,23 +643,36 @@ private:
     }
     void resizePicked(const QPoint &pos)
     {
+        // The stored QRectF uses PDF coordinates (y points UP), so:
+        //   rect.top()    = min y = visual BOTTOM edge on screen
+        //   rect.bottom() = max y = visual TOP edge on screen
+        // The widget drag deltas are in screen space (y DOWN), so:
+        //   wdx > 0  → cursor moved right    → visual-right edge moves right
+        //   wdy > 0  → cursor moved down     → visual-top edge moves down (shrinks)
+        // Earlier the code used y-up deltas here, which inverted every
+        // vertical handle so the top/bottom handles grew the box when
+        // dragged inward. The axis is now mapped straight from the widget
+        // delta so that dragging a handle INTO the box always shrinks it
+        // and dragging AWAY always grows it.
         auto &a = m_pages[m_pageIndex].items[m_pickedIndex];
         if (a.tool == Pen) return;
         const QPointF dpx(pos - m_dragStart);
-        const double dx = dpx.x() / m_scale;
-        const double dy = -dpx.y() / m_scale;
+        const double wdx = dpx.x() / m_scale;
+        const double wdy = dpx.y() / m_scale;
         QRectF r = m_origRect;
-        double left = r.left(), right = r.right();
-        double top = r.top(), bottom = r.bottom();
+        double left   = r.left();      // PDF min-x = visual left
+        double right  = r.right();     // PDF max-x = visual right
+        double top    = r.top();       // PDF min-y = visual BOTTOM edge
+        double bottom = r.bottom();    // PDF max-y = visual TOP edge
         switch (m_resizingHandle) {
-        case 0: left += dx; top -= dy; break;
-        case 1: top -= dy; break;
-        case 2: right += dx; top -= dy; break;
-        case 3: right += dx; break;
-        case 4: right += dx; bottom -= dy; break;
-        case 5: bottom -= dy; break;
-        case 6: left += dx; bottom -= dy; break;
-        case 7: left += dx; break;
+        case 0: left  += wdx; bottom -= wdy; break;   // top-left   (visual TL)
+        case 1:               bottom -= wdy; break;   // top-middle
+        case 2: right += wdx; bottom -= wdy; break;   // top-right
+        case 3: right += wdx;                 break;  // right-middle
+        case 4: right += wdx; top    -= wdy; break;   // bottom-right (visual BR)
+        case 5:               top    -= wdy; break;   // bottom-middle
+        case 6: left  += wdx; top    -= wdy; break;   // bottom-left
+        case 7: left  += wdx;                 break;  // left-middle
         default: break;
         }
         a.rect = QRectF(QPointF(left, top), QPointF(right, bottom));
@@ -1503,8 +1527,61 @@ void PdfTab::bakeAllPendingAnnotations()
         if (pageIdx < 0 || pageIdx >= m_doc.pageCount()) continue;
         const QVector<PdfPageView::Annotation> items = m_view->annotationsOfPage(pageIdx);
 
-        QByteArray frag;
+        // --- Per-page rotation handling (WYSIWYG) -----------------------
+        // Every page has its own /Rotate (0 / 90 / 180 / 270), independent
+        // of whether the MediaBox is portrait or landscape. PDFium hands
+        // us pageSizePts() in DISPLAY orientation (i.e. after /Rotate has
+        // been applied), and the overlay stores annotations in that same
+        // display frame. The PDF content stream is drawn in the page's
+        // NATIVE MediaBox coord system (y-up), and the viewer applies
+        // /Rotate at render time.
+        //
+        // To make baked annotations land at EXACTLY the display spot the
+        // user chose (same position, same size, no extra rotation), we
+        // prepend a `cm` matrix to each content fragment that maps
+        // display-space coords into native-content-space coords. Because
+        // `appendPageContent` wraps every fragment in q ... Q, the matrix
+        // is scoped to just our fragment.
+        //
+        // Derivation of the matrix (page viewer rotates CW by r°):
+        //   r=0:   identity
+        //   r=90:  a=0  b=1  c=-1 d=0  e=mbW f=0
+        //   r=180: a=-1 b=0  c=0  d=-1 e=mbW f=mbH
+        //   r=270: a=0  b=-1 c=1  d=0  e=0   f=mbH
+        // (See the derivation in the git log for this change.)
+        const PdfPageInfo pi = m_doc.pageInfo(pageIdx);
+        const int rot = ((pi.rotation % 360) + 360) % 360;
+        const double mbW = pi.width;
+        const double mbH = pi.height;
+
         auto num = [](double v) { return QByteArray::number(v, 'f', 3); };
+        auto displayToContentCm = [&]() -> QByteArray {
+            switch (rot) {
+            case 90:  return "0 1 -1 0 " + num(mbW) + " 0 cm\n";
+            case 180: return "-1 0 0 -1 " + num(mbW) + " " + num(mbH) + " cm\n";
+            case 270: return "0 -1 1 0 0 " + num(mbH) + " cm\n";
+            default:  return QByteArray();  // identity — no cm needed
+            }
+        };
+        // For stampQImage we can't inject a cm inside its own q...Q block,
+        // so we instead give it the content-space CENTRE of the display
+        // rect plus a CCW rotation of `rot` degrees. stampQImage already
+        // builds a matrix around the stamp's centre, so passing the
+        // ORIGINAL (unswapped) image width/height plus rotationDeg=rot
+        // makes the image land axis-aligned in display space after the
+        // viewer's /Rotate pass.
+        auto toContent = [=](double xd, double yd) -> QPointF {
+            switch (rot) {
+            case 90:  return QPointF(mbW - yd, xd);
+            case 180: return QPointF(mbW - xd, mbH - yd);
+            case 270: return QPointF(yd, mbH - xd);
+            default:  return QPointF(xd, yd);
+            }
+        };
+        const double stampRotCcw = double(rot);
+
+        QByteArray frag;
+        if (rot != 0) frag += displayToContentCm();
         for (const auto &a : items) {
             double r = a.color.redF(), g = a.color.greenF(), b = a.color.blueF();
             switch (a.tool) {
@@ -1542,17 +1619,17 @@ void PdfTab::bakeAllPendingAnnotations()
         for (const auto &a : items) {
             switch (a.tool) {
             case PdfPageView::TextBox: {
-                // In PDF coordinates y-axis points up, so for the normalized
-                // rect in a.rect (which is in PDF points):
+                // In PDF display-space coordinates y-axis points up, so
+                // for the normalized rect in a.rect:
                 //   rc.top()    = min y = visual BOTTOM edge of the box
                 //   rc.bottom() = max y = visual TOP edge of the box
-                // PDF's `re` operator takes bottom-left corner (x, y) plus
-                // (w, h) and fills up+right from there, so the bottom-left of
-                // a visual box is (rc.left(), rc.top()).
+                // We prepend the display→content `cm` so this rect still
+                // uses display coords, same as the border strokes above.
                 QRectF rc = a.rect.normalized();
                 if (rc.width() < 2 || rc.height() < 2) break;
                 const double lineW = qMax(0.1, m_textBoxLineWidth);
                 QByteArray boxFrag;
+                if (rot != 0) boxFrag += displayToContentCm();
                 boxFrag += "q\n" + num(lineW) + " w\n"
                         + num(a.color.redF()) + " " + num(a.color.greenF()) + " "
                         + num(a.color.blueF()) + " RG\n"
@@ -1561,24 +1638,15 @@ void PdfTab::bakeAllPendingAnnotations()
                 m_doc.appendPageContent(pageIdx, boxFrag);
                 QFont f = pickCJKFont(11.0);
                 const double pad = 3.0;
-                // Render the text at the box's inner width so it wraps
-                // properly. The renderer uses a 2.5× oversampling factor so
-                // 1 PDF point corresponds to k image pixels.
                 const double k = 2.5;
                 QImage txt = renderTextToImage(a.text, f, QColor(0, 0, 0),
                                                rc.width() - 2 * pad,
                                                Qt::AlignLeft | Qt::TextWordWrap);
                 if (!txt.isNull()) {
-                    // IMPORTANT: use the image's natural pixel aspect ratio
-                    // (converted back to PDF points), NOT the box's own ratio.
-                    // Otherwise the stampQImage cm-matrix scales the glyphs
-                    // horizontally to fill the whole box width and vertically
-                    // to the derived height, stretching the characters.
+                    // Use the image's natural pixel aspect ratio so the
+                    // glyphs aren't stretched to fill the whole box.
                     double tw = txt.width()  / k;
                     double th = txt.height() / k;
-                    // Clamp to the box minus padding without changing the
-                    // aspect ratio (shrink uniformly if the text is too wide
-                    // or too tall).
                     const double maxW = rc.width()  - 2 * pad;
                     const double maxH = rc.height() - 2 * pad;
                     if (tw > maxW && tw > 0) {
@@ -1589,21 +1657,23 @@ void PdfTab::bakeAllPendingAnnotations()
                         const double s = maxH / th;
                         tw *= s; th *= s;
                     }
-                    // Place the rendered text image aligned to the TOP of the
-                    // box (same as the overlay preview). The image's PDF-y
-                    // anchor is its bottom edge:
-                    //   top-of-box in PDF y = rc.bottom()
-                    //   bottom edge of image = top-of-box - padding - imageH
-                    double tx = rc.left() + pad;
-                    double ty = rc.bottom() - pad - th;
-                    m_doc.stampQImage(pageIdx, txt, tx, ty, tw, th, 1.0, 0.0);
+                    // Display-space bottom-left of the text image inside
+                    // the box, then mapped to content-space CENTRE via
+                    // toContent() so stampQImage can rotate around it.
+                    const double tx_d = rc.left() + pad;
+                    const double ty_d = rc.bottom() - pad - th;
+                    const QPointF cc = toContent(tx_d + tw / 2.0,
+                                                 ty_d + th / 2.0);
+                    const double cx = cc.x() - tw / 2.0;
+                    const double cy = cc.y() - th / 2.0;
+                    m_doc.stampQImage(pageIdx, txt, cx, cy, tw, th,
+                                      1.0, stampRotCcw);
                 }
                 break;
             }
             case PdfPageView::StickyNote: {
-                // Sticky notes are anchored to the TOP-LEFT of the drag rect
-                // in the overlay; match that here. See the TextBox comment for
-                // the explanation of rc.top() = visual bottom in PDF y-up.
+                // Sticky notes anchor to the TOP-LEFT of the drag rect
+                // (= rc.bottom() in PDF y-up).
                 QRectF rc = a.rect.normalized();
                 const double iconW = 24;
                 const double gapW = 4;
@@ -1646,24 +1716,34 @@ void PdfTab::bakeAllPendingAnnotations()
                 }
                 p.end();
 
-                // Place with the sticky note's visual TOP aligned to the
-                // overlay's visual top (= rc.bottom() in PDF y-up).
-                double x = rc.left();
-                double yAnchor = rc.bottom() - totalH;
-                m_doc.stampQImage(pageIdx, img, x, yAnchor, totalW, totalH, 1.0, 0.0);
+                // Display-space bottom-left of the sticky-note image,
+                // then map to content-space CENTRE for stampQImage.
+                const double xd = rc.left();
+                const double yd = rc.bottom() - totalH;
+                const QPointF cc = toContent(xd + totalW / 2.0,
+                                             yd + totalH / 2.0);
+                m_doc.stampQImage(pageIdx, img,
+                                  cc.x() - totalW / 2.0,
+                                  cc.y() - totalH / 2.0,
+                                  totalW, totalH, 1.0, stampRotCcw);
                 break;
             }
             case PdfPageView::Stamp: {
-                // The overlay draws the image into `pdfRectToPx(a.rect)` which
-                // spans visual left→right and visual bottom (rc.top() in PDF
-                // y-up) to visual top (rc.bottom()). PDF's cm matrix treats
-                // (x, y) as the BOTTOM-LEFT of the drawn image, so we must
-                // pass rc.top() (not rc.bottom()) as the y anchor.
+                // The overlay's rect uses rc.top() as visual BOTTOM in
+                // PDF y-up. Map the display centre into content space so
+                // stampQImage can rotate the image by the page's /Rotate
+                // around that centre — keeping the stamp axis-aligned in
+                // display after the viewer's /Rotate pass.
                 if (a.image.isNull()) break;
                 QRectF rc = a.rect.normalized();
                 if (rc.width() < 2 || rc.height() < 2) break;
-                m_doc.stampQImage(pageIdx, a.image, rc.left(), rc.top(),
-                                  rc.width(), rc.height(), 1.0, 0.0);
+                const QPointF cc = toContent(rc.center().x(), rc.center().y());
+                const double w = rc.width();
+                const double h = rc.height();
+                m_doc.stampQImage(pageIdx, a.image,
+                                  cc.x() - w / 2.0,
+                                  cc.y() - h / 2.0,
+                                  w, h, 1.0, stampRotCcw);
                 break;
             }
             default: break;
@@ -2125,11 +2205,18 @@ void PdfTab::drawSignature()
     PdfPageView::Annotation a;
     a.tool = PdfPageView::Stamp;
     a.image = sig;
-    PdfPageInfo pi = m_doc.pageInfo(m_currentPage);
+    // Place the signature at the bottom-right of the DISPLAYED page (so
+    // rotated landscape pages get the signature in their displayed bottom-
+    // right, not in the MediaBox's bottom-right).
+    const double pageW = m_view->displayWidthPts();
+    const double pageH = m_view->displayHeightPts();
     const double w = 150, h = 60;
-    const double x = qMax(20.0, pi.width - w - 40);
-    const double y = 40;
-    a.rect = QRectF(x, y + h, w, -h);
+    const double margin = 40;
+    const double x = qMax(margin, pageW - w - margin);
+    const double y = margin;  // PDF y-up: margin above visual bottom
+    // Normalised rect (positive height) so the resize handles behave
+    // consistently from the first pick-up.
+    a.rect = QRectF(x, y, w, h);
     m_view->insertAnnotationOnCurrentPage(a);
     emit statusMessage(TR("Signature added. Drag or resize it, then Save."));
 }
@@ -2153,13 +2240,18 @@ void PdfTab::imageSignature()
     PdfPageView::Annotation a;
     a.tool = PdfPageView::Stamp;
     a.image = img;
-    PdfPageInfo pi = m_doc.pageInfo(m_currentPage);
+    // Place at the bottom-right of the DISPLAYED page (rotated or not).
+    const double pageW = m_view->displayWidthPts();
+    const double pageH = m_view->displayHeightPts();
     double w = 160;
     double h = w * (img.height() / double(qMax(1, img.width())));
     if (h < 20) h = 20;
-    const double x = qMax(20.0, pi.width - w - 40);
-    const double y = 40;
-    a.rect = QRectF(x, y + h, w, -h);
+    const double margin = 40;
+    const double x = qMax(margin, pageW - w - margin);
+    const double y = margin;  // PDF y-up: margin above visual bottom
+    // Normalised rect (positive height) so resize handles work correctly
+    // from the first pick-up.
+    a.rect = QRectF(x, y, w, h);
     m_view->insertAnnotationOnCurrentPage(a);
     emit statusMessage(TR("Image signature added. Drag or resize it, then Save."));
 }
