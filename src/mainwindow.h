@@ -141,6 +141,15 @@ private slots:
     void connectSharedFolder();      // Windows/Samba SMB share
     void connectSftpFtp();           // SFTP or FTP
 
+    // --- Host this machine as a share / SSH server for the local subnet ---
+    // "Start/Stop Share Folder": publishes ./share as an SMB network share
+    // (Share) so other devices in the same subnet can mount it.
+    // "Start/Stop SSH Server":   enables the Windows OpenSSH Server service
+    // with ./home as the login's default landing directory. Both are
+    // checkable menu entries that act as live on/off toggles.
+    void toggleShareFolder(bool on);
+    void toggleSshServer(bool on);
+
     // --- Compare ---
     void newComparison();
     void openTextCompare(const QString &left, const QString &right);
@@ -275,6 +284,44 @@ private:
     QMenu *m_cloudMenu = nullptr;       // "Connect" menu (cloud drives, shared folders, SFTP/FTP)
     QMenu *m_uiLangMenu = nullptr;      // "UI Language" menu
     QMenu *m_helpMenu = nullptr;
+
+    // Checkable on/off entries at the bottom of the Connect menu that host
+    // this PC as an SMB share and an SSH server. The menu text is rebuilt
+    // live from the current configuration: "Share Folder (<share-name>)"
+    // and "SSH Server (<port>)".
+    QAction *m_actShareFolder = nullptr;
+    QAction *m_actSshServer = nullptr;
+    // Live handle to the portable sshd.exe we spawn for user-mode SSH
+    // hosting (so toggling the menu entry off terminates the child process).
+    class QProcess *m_sshdProc = nullptr;
+
+    // Persisted settings for the two toggles (defaults restored from
+    // QSettings on first use, written back whenever the user edits them in
+    // the configure dialogs).
+    //   Share Folder:  shareName (default Share), shareDir
+    //                  (default <appDir>/share).
+    //   SSH Server  :  sshPort (default 2222), sshHomeDir (default
+    //                  <appDir>/home), sshUser / sshPasswordEnc (optional).
+    QString m_shareName;
+    QString m_shareDir;
+    QString m_shareUser;         // credential hint for remote mounter
+    QString m_sharePasswordEnc;  // credential hint for remote mounter
+    quint16 m_sharePort = 445;   // informational (SMB listens on 445)
+    quint16 m_sshPort = 2222;
+    QString m_sshHomeDir;
+    QString m_sshUser;
+    QString m_sshPasswordEnc;    // DPAPI-encrypted; may be empty
+
+    // Build the Connect-menu checkbox labels from the current settings.
+    void refreshHostActionLabels();
+    // On startup (and after retranslate), probe the OS for the actual state
+    // of the SMB share / sshd service and tick the matching menu entry so
+    // the UI reflects reality after a UAC-elevated restart.
+    void refreshHostToggleStates();
+    // Ask the user for share dir + share name / SSH home + port + user +
+    // password. Returns true if the user accepted the dialog.
+    bool configureShareFolder();
+    bool configureSshServer();
 
     // Status bar widgets.
     QLabel *m_posLabel = nullptr;

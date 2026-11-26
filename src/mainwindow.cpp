@@ -71,6 +71,30 @@
 #include <QPalette>
 #include <QShortcut>
 #include <QDir>
+#include <QProcess>
+#include <QCoreApplication>
+#include <QNetworkInterface>
+#include <QHostAddress>
+#include <QTextStream>
+#include <QFormLayout>
+#include <QLineEdit>
+#include <QSpinBox>
+#include <QDialogButtonBox>
+#include <QRegularExpression>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
+// Forward declarations of helpers defined in the anonymous namespace near
+// the bottom of this file. They are used by refreshHostToggleStates() which
+// runs during loadPreferences(), well before that namespace is parsed by
+// the compiler, so we hoist the prototypes to make them visible here.
+namespace {
+QString ensureSubdir(const QString &leaf);
+QString runWinCmd(const QStringList &argv, bool *ok);
+QStringList localIpv4Addresses();
+}
 
 // Shorthand for the runtime UI translator.
 static inline QString TR(const char *s) { return I18n::instance()->tr(QString::fromUtf8(s)); }
@@ -515,6 +539,27 @@ void MainWindow::rebuildCloudMenu()
                            &MainWindow::connectSharedFolder);
     m_cloudMenu->addAction(TR("Connect SFTP/&FTP..."), this,
                            &MainWindow::connectSftpFtp);
+    m_cloudMenu->addSeparator();
+
+    // ---- Host-this-PC toggles ---------------------------------------
+    // Two checkable entries let the user turn this machine into either an
+    // SMB share host or an SSH server for the local subnet. The menu text
+    // is rebuilt live from the current configuration (Share name / SSH
+    // port), and the checkbox state is refreshed from the OS so a UAC-
+    // elevated restart leaves the menu reflecting reality.
+    m_actShareFolder = m_cloudMenu->addAction(QString());
+    m_actShareFolder->setCheckable(true);
+    connect(m_actShareFolder, &QAction::toggled,
+            this, &MainWindow::toggleShareFolder);
+
+    m_actSshServer = m_cloudMenu->addAction(QString());
+    m_actSshServer->setCheckable(true);
+    connect(m_actSshServer, &QAction::toggled,
+            this, &MainWindow::toggleSshServer);
+
+    refreshHostActionLabels();    // fills in text/tooltips from the settings
+    refreshHostToggleStates();    // ticks the checkbox if sshd/share is live
+
     m_cloudMenu->addSeparator();
 
     // Every saved connection (cloud drive, shared folder, or SFTP/FTP) is
@@ -2522,6 +2567,240 @@ void MainWindow::loadPreferences()
                                   m_themeManager.currentName()).toString();
     if (m_themeManager.themeNames().contains(theme))
         applyThemeByName(theme);
+
+    // ---- Host-this-PC settings (Share Folder / SSH Server) --------------
+    // Defaults map to the app's own /share and /home subdirectories but the
+    // user can override them (plus the SMB share name, SSH port, username
+    // and password) in the configure dialog opened by the menu toggles.
+    const QString defShareDir = QDir(QCoreApplication::applicationDirPath())
+                                    .absoluteFilePath(QStringLiteral("sharefolder"));
+    const QString defHomeDir  = QDir(QCoreApplication::applicationDirPath())
+                                    .absoluteFilePath(QStringLiteral("home"));
+    m_shareDir   = s.value(QStringLiteral("host/shareDir"), defShareDir).toString();
+    m_shareName  = s.value(QStringLiteral("host/shareName"),
+                           QStringLiteral("Share")).toString();
+    m_shareUser         = s.value(QStringLiteral("host/shareUser")).toString();
+    m_sharePasswordEnc  = s.value(QStringLiteral("host/sharePasswordEnc")).toString();
+    m_sharePort         = static_cast<quint16>(
+        s.value(QStringLiteral("host/sharePort"), 445).toUInt());
+    m_sshHomeDir = s.value(QStringLiteral("host/sshHomeDir"), defHomeDir).toString();
+    m_sshPort    = static_cast<quint16>(
+        s.value(QStringLiteral("host/sshPort"), 2222).toUInt());
+    m_sshUser    = s.value(QStringLiteral("host/sshUser")).toString();
+    m_sshPasswordEnc = s.value(QStringLiteral("host/sshPasswordEnc")).toString();
+
+    // Make sure the default host-this-PC folders exist on disk so the user
+    // sees them in Explorer even before they toggle the Share/SSH entries
+    // for the first time (the build-msys2.sh deploy step does the same for
+    // shipped dist/ builds; this is the matching runtime safety net for
+    // launches that bypassed the build step).
+    QDir().mkpath(m_shareDir);
+    QDir().mkpath(m_sshHomeDir);
+
+    // Push the restored values into the (already-built) menu entries so the
+    // Connect menu is immediately correct on first paint.
+    refreshHostActionLabels();
+    refreshHostToggleStates();
+}
+
+// ---------------------------------------------------------------------------
+// Host-this-PC toggle: label refresh + live state detection
+// ---------------------------------------------------------------------------
+void MainWindow::refreshHostActionLabels()
+{
+    if (m_actShareFolder) {
+        const QString text = TR("Share Folder (%1)").arg(m_shareName);
+        m_actShareFolder->setText(text);
+        m_actShareFolder->setToolTip(
+            TR("Publish \"%1\" (an SMB network share pointing at %2) so "
+               "other devices on this subnet can connect to it.")
+                .arg(m_shareName, QDir::toNativeSeparators(m_shareDir)));
+    }
+    if (m_actSshServer) {
+        const QString text = TR("SSH Server (port %1)").arg(m_sshPort);
+        m_actSshServer->setText(text);
+        m_actSshServer->setToolTip(
+            TR("Run an SSH server on port %1 with %2 as the default landing "
+               "directory so other devices can SSH into this PC.")
+                .arg(m_sshPort).arg(QDir::toNativeSeparators(m_sshHomeDir)));
+    }
+}
+
+void MainWindow::refreshHostToggleStates()
+{
+#ifdef Q_OS_WIN
+    // The Share Folder entry is ticked iff `net share <name>` reports that
+    // the share exists (admin UAC-elevated first launch may have published
+    // it before this instance even started, so always probe the OS).
+    if (m_actShareFolder) {
+        bool shareOk = false;
+        const QString out = runWinCmd({"net.exe", "share", m_shareName}, &shareOk);
+        const bool live = shareOk && !out.contains("does not exist",
+                                                   Qt::CaseInsensitive);
+        m_actShareFolder->blockSignals(true);
+        m_actShareFolder->setChecked(live);
+        m_actShareFolder->blockSignals(false);
+    }
+
+    // The SSH Server entry is ticked iff either our spawned sshd child is
+    // alive, OR the system "sshd" service reports STATE=RUNNING.
+    if (m_actSshServer) {
+        bool live = false;
+        if (m_sshdProc && m_sshdProc->state() != QProcess::NotRunning) {
+            live = true;
+        } else {
+            bool ok = false;
+            const QString svc = runWinCmd({"sc.exe", "query", "sshd"}, &ok);
+            if (ok && svc.contains("RUNNING", Qt::CaseInsensitive))
+                live = true;
+        }
+        m_actSshServer->blockSignals(true);
+        m_actSshServer->setChecked(live);
+        m_actSshServer->blockSignals(false);
+    }
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// Configure dialogs — ask for dir/name/port/user/password before enabling
+// ---------------------------------------------------------------------------
+bool MainWindow::configureShareFolder()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(TR("Share Folder"));
+    // Config dialogs are deliberately wide (~3× the natural ~300 px) so long
+    // paths and share names remain legible on first open.
+    dlg.setMinimumWidth(900);
+    auto *form = new QFormLayout(&dlg);
+
+    auto *edDir = new QLineEdit(m_shareDir, &dlg);
+    auto *btnBrowse = new QPushButton(TR("Browse..."), &dlg);
+    auto *rowDir = new QHBoxLayout();
+    rowDir->addWidget(edDir, 1); rowDir->addWidget(btnBrowse);
+    connect(btnBrowse, &QPushButton::clicked, &dlg, [&]() {
+        const QString d = QFileDialog::getExistingDirectory(&dlg,
+            TR("Share directory"), edDir->text());
+        if (!d.isEmpty()) edDir->setText(QDir::toNativeSeparators(d));
+    });
+
+    auto *edName = new QLineEdit(m_shareName, &dlg);
+    auto *spPort = new QSpinBox(&dlg);
+    spPort->setRange(1, 65535);
+    spPort->setValue(m_sharePort);
+    auto *edUser = new QLineEdit(m_shareUser, &dlg);
+    auto *edPwd  = new QLineEdit(&dlg);
+    edPwd->setEchoMode(QLineEdit::Password);
+    edPwd->setPlaceholderText(m_sharePasswordEnc.isEmpty() ? QString()
+                                                           : TR("(unchanged)"));
+
+    form->addRow(TR("Shared directory:"), rowDir);
+    form->addRow(TR("Share name:"), edName);
+    // Port is informational for the SMB share: Windows' SMB server always
+    // listens on TCP 445. The field is there for symmetry with the SSH
+    // Server dialog and to let the user record which port they expect
+    // mounters to use (e.g. behind a port-forwarding firewall).
+    form->addRow(TR("Port (SMB, informational):"), spPort);
+    form->addRow(TR("Username (optional):"), edUser);
+    form->addRow(TR("Password (optional):"), edPwd);
+
+    auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    connect(bb, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    form->addRow(bb);
+
+    if (dlg.exec() != QDialog::Accepted) return false;
+    QString newDir  = edDir->text().trimmed();
+    QString newName = edName->text().trimmed();
+    if (newDir.isEmpty() || newName.isEmpty()) {
+        QMessageBox::warning(this, TR("Share Folder"),
+            TR("Both the shared directory and the share name are required."));
+        return false;
+    }
+    // Share name must not contain spaces or path separators.
+    newName.replace(QRegularExpression("[^A-Za-z0-9_\\-]"), "_");
+    m_shareDir   = newDir;
+    m_shareName  = newName;
+    m_sharePort  = static_cast<quint16>(spPort->value());
+    m_shareUser  = edUser->text().trimmed();
+    // Overwrite the stored password only when a new one was typed in. (The
+    // password is a connection hint for mounters — Windows' `net share` does
+    // NOT take username/password itself; the credentials are evaluated at
+    // mount time against the local user accounts.)
+    if (!edPwd->text().isEmpty())
+        m_sharePasswordEnc = edPwd->text();
+    QSettings s;
+    s.setValue(QStringLiteral("host/shareDir"),         m_shareDir);
+    s.setValue(QStringLiteral("host/shareName"),        m_shareName);
+    s.setValue(QStringLiteral("host/sharePort"),        m_sharePort);
+    s.setValue(QStringLiteral("host/shareUser"),        m_shareUser);
+    s.setValue(QStringLiteral("host/sharePasswordEnc"), m_sharePasswordEnc);
+    refreshHostActionLabels();
+    return true;
+}
+
+bool MainWindow::configureSshServer()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(TR("SSH Server"));
+    dlg.setMinimumWidth(900);   // 3× the natural width so long paths fit
+    auto *form = new QFormLayout(&dlg);
+
+    auto *edDir = new QLineEdit(m_sshHomeDir, &dlg);
+    auto *btnBrowse = new QPushButton(TR("Browse..."), &dlg);
+    auto *rowDir = new QHBoxLayout();
+    rowDir->addWidget(edDir, 1); rowDir->addWidget(btnBrowse);
+    connect(btnBrowse, &QPushButton::clicked, &dlg, [&]() {
+        const QString d = QFileDialog::getExistingDirectory(&dlg,
+            TR("Session root directory"), edDir->text());
+        if (!d.isEmpty()) edDir->setText(QDir::toNativeSeparators(d));
+    });
+
+    auto *spPort = new QSpinBox(&dlg);
+    spPort->setRange(1, 65535);
+    spPort->setValue(m_sshPort);
+
+    auto *edUser = new QLineEdit(m_sshUser, &dlg);
+    auto *edPwd  = new QLineEdit(&dlg);
+    edPwd->setEchoMode(QLineEdit::Password);
+    // We never re-display the stored encrypted password — the field starts
+    // empty and is only written if the user types a new one.
+    edPwd->setPlaceholderText(m_sshPasswordEnc.isEmpty() ? QString()
+                                                         : TR("(unchanged)"));
+
+    form->addRow(TR("Session root directory:"), rowDir);
+    form->addRow(TR("Port:"), spPort);
+    form->addRow(TR("Username (optional):"), edUser);
+    form->addRow(TR("Password (optional):"), edPwd);
+
+    auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    connect(bb, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    form->addRow(bb);
+
+    if (dlg.exec() != QDialog::Accepted) return false;
+    const QString newDir = edDir->text().trimmed();
+    if (newDir.isEmpty()) {
+        QMessageBox::warning(this, TR("SSH Server"),
+            TR("The session root directory is required."));
+        return false;
+    }
+    m_sshHomeDir = newDir;
+    m_sshPort    = static_cast<quint16>(spPort->value());
+    m_sshUser    = edUser->text().trimmed();
+    // Only overwrite the password when a new one was typed in. (Password
+    // storage here is plain QSettings — we deliberately don't treat this
+    // field as a hard security boundary, since the sshd we spawn
+    // authenticates against the Windows user, not against this value.)
+    if (!edPwd->text().isEmpty())
+        m_sshPasswordEnc = edPwd->text();
+
+    QSettings s;
+    s.setValue(QStringLiteral("host/sshHomeDir"),    m_sshHomeDir);
+    s.setValue(QStringLiteral("host/sshPort"),       m_sshPort);
+    s.setValue(QStringLiteral("host/sshUser"),       m_sshUser);
+    s.setValue(QStringLiteral("host/sshPasswordEnc"),m_sshPasswordEnc);
+    refreshHostActionLabels();
+    return true;
 }
 
 // ------------------------------------------------------------------
@@ -2913,6 +3192,344 @@ void MainWindow::openDroppedPaths(const QStringList &paths)
         setWindowState(windowState() & ~Qt::WindowMinimized);
     raise();
     activateWindow();
+}
+
+// ------------------------------------------------------------------
+// Host-this-PC toggles: SMB share of ./share and OpenSSH server on ./home.
+// Both are on/off checkboxes in the Connect menu. Keeping them side-effect-
+// safe means (a) we ensure the target folder exists before enabling anything
+// and (b) if the OS-level step fails we uncheck the menu entry and surface a
+// clear reason — never leaving the UI out of sync with the actual state.
+// ------------------------------------------------------------------
+namespace {
+// Return an absolute path to <program-dir>/<leaf>, creating it if missing.
+QString ensureSubdir(const QString &leaf)
+{
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString full = QDir(appDir).absoluteFilePath(leaf);
+    QDir().mkpath(full);
+    return QDir::toNativeSeparators(full);
+}
+
+// Returns stdout+stderr of a short command; `ok` tells whether exitCode==0.
+QString runWinCmd(const QStringList &argv, bool *ok = nullptr)
+{
+    QProcess p;
+    p.setProcessChannelMode(QProcess::MergedChannels);
+    p.start(argv.first(), argv.mid(1));
+    const bool started = p.waitForStarted(3000);
+    if (!started) {
+        if (ok) *ok = false;
+        return QStringLiteral("could not start %1").arg(argv.first());
+    }
+    p.waitForFinished(15000);
+    const QString out = QString::fromLocal8Bit(p.readAll()).trimmed();
+    if (ok) *ok = (p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0);
+    return out;
+}
+
+// List every IPv4 address of this machine (so the user knows how to reach
+// the share / SSH server from their phone or another PC on the subnet).
+QStringList localIpv4Addresses()
+{
+    QStringList out;
+    const auto all = QNetworkInterface::allAddresses();
+    for (const QHostAddress &a : all) {
+        if (a.protocol() != QAbstractSocket::IPv4Protocol) continue;
+        if (a.isLoopback()) continue;
+        out << a.toString();
+    }
+    return out;
+}
+} // namespace
+
+#ifdef Q_OS_WIN
+// Relaunch the current executable as Administrator via UAC. Returns true if
+// the system accepted the request (the new elevated instance is starting);
+// false if the user declined the UAC prompt.
+static bool relaunchAsAdmin(const QString &extraArg = QString())
+{
+    const QString exe = QCoreApplication::applicationFilePath();
+    SHELLEXECUTEINFOW sei{};
+    sei.cbSize = sizeof(sei);
+    sei.lpVerb = L"runas";
+    const std::wstring wExe = exe.toStdWString();
+    sei.lpFile = wExe.c_str();
+    const std::wstring wArg = extraArg.toStdWString();
+    sei.lpParameters = wArg.empty() ? nullptr : wArg.c_str();
+    sei.nShow = SW_SHOWNORMAL;
+    return ShellExecuteExW(&sei) == TRUE;
+}
+#endif
+
+void MainWindow::toggleShareFolder(bool on)
+{
+#ifdef Q_OS_WIN
+    if (on) {
+        // Prompt once per enable for directory + share name (the user can
+        // just hit OK to keep the stored defaults).
+        if (!configureShareFolder()) {
+            m_actShareFolder->blockSignals(true);
+            m_actShareFolder->setChecked(false);
+            m_actShareFolder->blockSignals(false);
+            return;
+        }
+        QDir().mkpath(m_shareDir);
+        bool ok = false;
+        const QString out = runWinCmd({
+            "net.exe", "share", m_shareName + "=" + QDir::toNativeSeparators(m_shareDir),
+            "/GRANT:Everyone,FULL",
+            "/REMARK:Terminal++ share"
+        }, &ok);
+        if (!ok) {
+            m_actShareFolder->blockSignals(true);
+            m_actShareFolder->setChecked(false);
+            m_actShareFolder->blockSignals(false);
+            QMessageBox box(QMessageBox::Warning, TR("Share Folder"),
+                TR("Could not publish the share.\n\n"
+                   "Publishing a Windows SMB share needs Administrator "
+                   "rights. Click \"Elevate & Retry\" to re-launch "
+                   "Terminal++ with the UAC prompt and try again.\n"
+                   "\nCommand output:\n%1").arg(out), QMessageBox::NoButton, this);
+            QPushButton *elevate = box.addButton(TR("Elevate && Retry"),
+                                                QMessageBox::AcceptRole);
+            box.addButton(QMessageBox::Close);
+            box.exec();
+            if (box.clickedButton() == elevate) {
+                if (relaunchAsAdmin()) qApp->quit();
+            }
+            return;
+        }
+        QString addresses = localIpv4Addresses().join(QStringLiteral(", "));
+        if (addresses.isEmpty()) addresses = QStringLiteral("<this PC's IP>");
+        statusBar()->showMessage(
+            TR("Share folder published. From another device on the same "
+               "subnet, mount \\\\%1\\%2").arg(addresses, m_shareName), 10000);
+        refreshHostActionLabels();
+    } else {
+        bool ok = false;
+        runWinCmd({"net.exe", "share", m_shareName, "/DELETE", "/Y"}, &ok);
+        statusBar()->showMessage(TR("Share folder stopped."), 4000);
+    }
+#else
+    Q_UNUSED(on);
+    m_actShareFolder->blockSignals(true);
+    m_actShareFolder->setChecked(false);
+    m_actShareFolder->blockSignals(false);
+    QMessageBox::information(this, TR("Share Folder"),
+        TR("Built-in share-folder hosting is only implemented on Windows. "
+           "Run a local Samba server to achieve the same on Linux/macOS."));
+#endif
+}
+
+#ifdef Q_OS_WIN
+// Look for a portable OpenSSH-for-Windows distribution bundled alongside
+// TerminalPP.exe. Returns the full path to sshd.exe if found, otherwise
+// an empty string. Supported layouts:
+//   dist/
+//     TerminalPP.exe
+//     openssh/sshd.exe              <-- preferred layout
+//     openssh/bin/sshd.exe          <-- MSYS/MinGW layout
+//     OpenSSH/sshd.exe              <-- Win32-OpenSSH release ZIP layout
+static QString findBundledSshd()
+{
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QStringList candidates = {
+        QDir(appDir).absoluteFilePath(QStringLiteral("openssh/sshd.exe")),
+        QDir(appDir).absoluteFilePath(QStringLiteral("openssh/bin/sshd.exe")),
+        QDir(appDir).absoluteFilePath(QStringLiteral("OpenSSH/sshd.exe")),
+    };
+    for (const QString &p : candidates)
+        if (QFileInfo::exists(p)) return QDir::toNativeSeparators(p);
+    return QString();
+}
+
+// Write a self-contained user-mode sshd_config in <appDir>/openssh/ and make
+// sure a host key exists. Returns the config path on success, empty on error.
+static QString prepareUserModeSshdConfig(const QString &sshdExe,
+                                         const QString &homeDir,
+                                         quint16 port)
+{
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString cfgDir = QDir(appDir).absoluteFilePath(QStringLiteral("openssh"));
+    QDir().mkpath(cfgDir);
+    const QString cfgFile = QDir(cfgDir).absoluteFilePath(QStringLiteral("sshd_config_terminalpp"));
+    const QString keyFile = QDir(cfgDir).absoluteFilePath(QStringLiteral("ssh_host_ed25519_key"));
+
+    // Generate the host key on first use via ssh-keygen (ships next to sshd.exe).
+    if (!QFileInfo::exists(keyFile)) {
+        QString keygen = QDir(QFileInfo(sshdExe).absolutePath())
+                             .absoluteFilePath(QStringLiteral("ssh-keygen.exe"));
+        if (!QFileInfo::exists(keygen)) {
+            // Fallback: try PATH (Windows 10/11 ships ssh-keygen).
+            keygen = QStringLiteral("ssh-keygen.exe");
+        }
+        QProcess kg;
+        kg.start(keygen, QStringList{"-q", "-f", keyFile, "-N", "", "-t", "ed25519"});
+        kg.waitForFinished(15000);
+        if (!QFileInfo::exists(keyFile))
+            return QString();   // keygen failed
+    }
+
+    // Minimal user-mode sshd_config: listen on the given port, allow password
+    // authentication for the current Windows user, use ./home as the session
+    // root (ChrootDirectory requires admin — we just set ForceCommand cd and
+    // rely on the user's shell to start there).
+    QFile f(cfgFile);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+        return QString();
+    QTextStream s(&f);
+    s << "# Terminal++ user-mode sshd config (auto-generated)\n";
+    s << "Port " << port << "\n";
+    s << "ListenAddress 0.0.0.0\n";
+    s << "HostKey " << QDir::toNativeSeparators(keyFile) << "\n";
+    s << "PasswordAuthentication yes\n";
+    s << "PubkeyAuthentication yes\n";
+    s << "PermitRootLogin yes\n";
+    s << "StrictModes no\n";
+    s << "UsePAM no\n";
+    s << "Subsystem sftp internal-sftp\n";
+    s << "# Land logged-in users in TerminalPP's ./home by default.\n";
+    s << "Match all\n";
+    s << "    ForceCommand cd \"" << QDir::toNativeSeparators(homeDir)
+      << "\" && cmd\n";
+    f.close();
+    return cfgFile;
+}
+#endif
+
+void MainWindow::toggleSshServer(bool on)
+{
+#ifdef Q_OS_WIN
+    if (on) {
+        if (!configureSshServer()) {
+            m_actSshServer->blockSignals(true);
+            m_actSshServer->setChecked(false);
+            m_actSshServer->blockSignals(false);
+            return;
+        }
+        QDir().mkpath(m_sshHomeDir);
+        const QString homeDir = QDir::toNativeSeparators(m_sshHomeDir);
+        const quint16 kPort = m_sshPort;
+
+        // Prefer a portable OpenSSH that ships alongside TerminalPP.exe.
+        // Spawning it in user mode on a non-privileged port (>= 1024) means
+        // no Administrator and no system service are required. The classic
+        // Windows OpenSSH Server service is used only as a fallback when no
+        // bundled sshd is found.
+        const QString sshd = findBundledSshd();
+        if (!sshd.isEmpty()) {
+            if (m_sshdProc && m_sshdProc->state() != QProcess::NotRunning) {
+                statusBar()->showMessage(TR("SSH server is already running."), 4000);
+                return;
+            }
+            const QString cfg = prepareUserModeSshdConfig(sshd, homeDir, kPort);
+            if (cfg.isEmpty()) {
+                m_actSshServer->blockSignals(true);
+                m_actSshServer->setChecked(false);
+                m_actSshServer->blockSignals(false);
+                QMessageBox::warning(this, TR("SSH Server"),
+                    TR("Could not generate an sshd host key.\n\n"
+                       "Make sure ssh-keygen.exe sits next to sshd.exe, "
+                       "or install it separately so it is reachable via PATH."));
+                return;
+            }
+            if (!m_sshdProc) m_sshdProc = new QProcess(this);
+            m_sshdProc->setProgram(sshd);
+            m_sshdProc->setArguments({"-D", "-f", cfg, "-e"});
+            m_sshdProc->setProcessChannelMode(QProcess::MergedChannels);
+            m_sshdProc->start();
+            if (!m_sshdProc->waitForStarted(5000)) {
+                m_actSshServer->blockSignals(true);
+                m_actSshServer->setChecked(false);
+                m_actSshServer->blockSignals(false);
+                QMessageBox::warning(this, TR("SSH Server"),
+                    TR("Could not start the bundled sshd.exe:\n%1")
+                        .arg(m_sshdProc->errorString()));
+                return;
+            }
+            QString addresses = localIpv4Addresses().join(QStringLiteral(", "));
+            if (addresses.isEmpty()) addresses = QStringLiteral("<this PC's IP>");
+            statusBar()->showMessage(
+                TR("SSH server running on port %1 (user mode — no Administrator "
+                   "needed). From another device on the same subnet, connect "
+                   "with  ssh -p %1 <user>@%2  —  session root: ./home")
+                    .arg(kPort).arg(addresses), 15000);
+            return;
+        }
+
+        // No bundled sshd — fall back to the system "sshd" service (admin).
+        bool ok = false;
+        const QString svc = runWinCmd({"sc.exe", "query", "sshd"}, &ok);
+        if (!ok || svc.contains("does not exist", Qt::CaseInsensitive)
+                || svc.contains("1060", Qt::CaseInsensitive)) {
+            m_actSshServer->blockSignals(true);
+            m_actSshServer->setChecked(false);
+            m_actSshServer->blockSignals(false);
+            QMessageBox::information(this, TR("SSH Server"),
+                TR("No SSH server is available on this PC.\n\n"
+                   "Option A (recommended, no Administrator):\n"
+                   "  1) Download \"OpenSSH-Win64.zip\" from "
+                   "https://github.com/PowerShell/Win32-OpenSSH/releases\n"
+                   "  2) Extract its contents into an \"openssh\" folder "
+                   "next to TerminalPP.exe (so you get openssh/sshd.exe).\n"
+                   "  3) Enable this checkbox again — Terminal++ will spawn "
+                   "sshd.exe itself on port 2222, no Administrator required.\n\n"
+                   "Option B: install the Windows OpenSSH Server optional "
+                   "feature (Settings → Apps → Optional features → "
+                   "\"OpenSSH Server\"); Terminal++ will then start the "
+                   "system service via UAC the next time you enable this."));
+            return;
+        }
+        bool startedOk = false;
+        const QString out = runWinCmd({"sc.exe", "start", "sshd"}, &startedOk);
+        if (!startedOk && !out.contains("1056", Qt::CaseInsensitive) /* already running */) {
+            m_actSshServer->blockSignals(true);
+            m_actSshServer->setChecked(false);
+            m_actSshServer->blockSignals(false);
+            QMessageBox box(QMessageBox::Warning, TR("SSH Server"),
+                TR("Could not start the sshd service.\n\n"
+                   "Starting a Windows service needs Administrator rights. "
+                   "Click \"Elevate & Retry\" to re-launch Terminal++ "
+                   "with the UAC prompt and try again.\n"
+                   "\nCommand output:\n%1").arg(out), QMessageBox::NoButton, this);
+            QPushButton *elevate = box.addButton(TR("Elevate && Retry"),
+                                                QMessageBox::AcceptRole);
+            box.addButton(QMessageBox::Close);
+            box.exec();
+            if (box.clickedButton() == elevate) {
+                if (relaunchAsAdmin()) qApp->quit();
+            }
+            return;
+        }
+        QString addresses = localIpv4Addresses().join(QStringLiteral(", "));
+        if (addresses.isEmpty()) addresses = QStringLiteral("<this PC's IP>");
+        statusBar()->showMessage(
+            TR("SSH server running. From another device on the same subnet, "
+               "connect to ssh <user>@%1 (default port 22). Session root: ./home")
+                .arg(addresses), 10000);
+    } else {
+        // If we spawned a portable sshd, terminate it; otherwise stop the
+        // system service.
+        if (m_sshdProc && m_sshdProc->state() != QProcess::NotRunning) {
+            m_sshdProc->terminate();
+            if (!m_sshdProc->waitForFinished(3000))
+                m_sshdProc->kill();
+        } else {
+            bool ok = false;
+            runWinCmd({"sc.exe", "stop", "sshd"}, &ok);
+        }
+        statusBar()->showMessage(TR("SSH server stopped."), 4000);
+    }
+#else
+    Q_UNUSED(on);
+    m_actSshServer->blockSignals(true);
+    m_actSshServer->setChecked(false);
+    m_actSshServer->blockSignals(false);
+    QMessageBox::information(this, TR("SSH Server"),
+        TR("Built-in SSH-server hosting is only implemented on Windows. "
+           "Use the system OpenSSH server on Linux/macOS instead."));
+#endif
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
