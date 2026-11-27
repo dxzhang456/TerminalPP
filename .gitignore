@@ -1,0 +1,13 @@
+build-ucrt64/
+dist-ucrt64/
+error.log
+src/cloud/ftpprovider.moc
+src/cloud/sftpprovider.moc
+src/compare/imagecomparetab.moc
+src/compare/textcomparetab.moc
+src/editor/hexeditortab.moc
+src/editor/imageeditortab.moc
+src/pdf/pdftab.moc
+src/terminal/localshelltab.cpp
+src/terminal/localshelltab.h
+thirdparty/
